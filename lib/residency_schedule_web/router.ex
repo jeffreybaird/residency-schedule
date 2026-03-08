@@ -14,10 +14,21 @@ defmodule ResidencyScheduleWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :authenticated do
+    plug ResidencyScheduleWeb.Plugs.RequireAuth
+  end
+
   scope "/", ResidencyScheduleWeb do
     pipe_through :browser
+    get "/login", AuthController, :show
+    post "/login", AuthController, :create
+    post "/logout", AuthController, :delete
+  end
 
-    get "/", PageController, :home
+  scope "/", ResidencyScheduleWeb do
+    pipe_through [:browser, :authenticated]
+    live "/", ScheduleLive.Index, :index
+    live "/upload", UploadLive.Index, :index
   end
 
   # Other scopes may use custom stacks.
