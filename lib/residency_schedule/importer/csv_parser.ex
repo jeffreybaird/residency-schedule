@@ -186,7 +186,10 @@ defmodule ResidencySchedule.Importer.CsvParser do
     [_, year_str, num_str] = Regex.run(@resident_row_pattern, position_code)
     residency_year = String.to_integer(year_str)
     schedule_number = String.to_integer(num_str)
-    name = String.trim(name_raw)
+    name = case String.trim(name_raw) do
+      "" -> position_code
+      trimmed -> trimmed
+    end
 
     {rotations, warnings} = build_rotations(position_code, cells, slots)
 

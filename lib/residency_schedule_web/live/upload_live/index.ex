@@ -37,11 +37,11 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
 
     # consume_uploaded_entries unwraps {:ok, value} → returns [value]
     case result do
-      [{:ok, summary, warnings}] ->
+      [{:ok, %{schedule_id: schedule_id} = summary, warnings}] ->
         socket =
           socket
           |> assign(upload_result: summary, warnings: warnings, error: nil)
-          |> push_navigate(to: "/")
+          |> push_navigate(to: "/?schedule_id=#{schedule_id}")
 
         {:noreply, socket}
 
