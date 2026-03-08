@@ -29,6 +29,10 @@ defmodule ResidencyScheduleWeb.Router do
     pipe_through [:browser, :authenticated]
     live "/", ScheduleLive.Index, :index
     live "/upload", UploadLive.Index, :index
+    live "/residents/:id", ResidentLive.Show, :show
+    live "/calendar", CalendarLive.Index, :index
+    live "/compare", CompareLive.Index, :index
+    get "/residents/:id/calendar.ics", IcalController, :show
   end
 
   # Other scopes may use custom stacks.

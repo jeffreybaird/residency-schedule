@@ -31,6 +31,32 @@
     </script>
   </head>
   <body>
+    <nav class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-50">
+      <a href="/" class="text-base font-semibold text-gray-800 hover:text-blue-600 transition-colors">
+        Residency Schedule
+      </a>
+      <div class="flex items-center gap-1">
+        <a href="/" class="px-3 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+          Schedule
+        </a>
+        <a href="/calendar" class="px-3 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+          Calendar
+        </a>
+        <a href="/compare" class="px-3 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+          Compare
+        </a>
+        <a href="/upload" class="px-3 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+          Upload
+        </a>
+        <span class="w-px h-4 bg-gray-200 mx-1"></span>
+        <form action="/logout" method="post">
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+          <button type="submit" class="px-3 py-1.5 rounded-md text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+            Sign out
+          </button>
+        </form>
+      </div>
+    </nav>
     {@inner_content}
   </body>
 </html>

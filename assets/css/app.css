@@ -5,6 +5,10 @@
 @source "../css";
 @source "../js";
 @source "../../lib/residency_schedule_web";
+@source "../../lib/residency_schedule";
+
+/* Rotation badge colors — assembled dynamically in rotations.ex, must be safelisted */
+@source inline("bg-blue-500 bg-blue-400 bg-blue-300 bg-blue-800 bg-cyan-500 bg-cyan-300 bg-cyan-800 bg-fuchsia-500 bg-rose-700 bg-indigo-700 bg-indigo-400 bg-indigo-100 bg-teal-500 bg-yellow-500 bg-orange-400 bg-violet-400 bg-violet-200 bg-lime-500 bg-emerald-400 bg-gray-400 bg-gray-300 bg-gray-200 text-white text-gray-800 text-gray-900 text-gray-700 text-gray-600 text-indigo-900 text-violet-900 text-blue-600 opacity-20");
 
 /* A Tailwind plugin that makes "hero-#{ICON}" classes available.
    The heroicons installation itself is managed by your mix.exs */

@@ -5,6 +5,10 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
 
+  # Fixed pixel widths for sticky label columns — must match left-[Xpx] values below.
+  @id_col_px 72
+  @name_col_px 128
+
   @impl true
   def mount(_params, _session, socket) do
     schedules = Schedules.list_schedules()
@@ -20,7 +24,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           residents_by_year: %{},
           slots: [],
           filter_year: nil,
-          filter_type: nil
         )
       end
 
@@ -48,46 +51,32 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   @impl true
-  def handle_event("filter_type", %{"type" => type}, socket) do
-    filter_type = if type == "", do: nil, else: type
-    {:noreply, assign(socket, filter_type: filter_type)}
-  end
-
-  @impl true
   def render(assigns) do
+    assigns = assign(assigns, :id_col_px, @id_col_px)
+    assigns = assign(assigns, :name_col_px, @name_col_px)
+
     ~H"""
     <div class="min-h-screen bg-gray-50">
-      <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <h1 class="text-xl font-semibold text-gray-800">Residency Schedule</h1>
-        <div class="flex items-center gap-4">
-          <%= if length(@schedules) > 1 do %>
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-gray-500">Year:</span>
-              <%= for s <- @schedules do %>
-                <button
-                  phx-click="select_schedule"
-                  phx-value-id={s.id}
-                  class={[
-                    "px-3 py-1 rounded-full text-sm font-medium transition-colors",
-                    if(@schedule && @schedule.id == s.id,
-                      do: "bg-blue-600 text-white",
-                      else: "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    )
-                  ]}
-                >
-                  <%= s.label %>
-                </button>
-              <% end %>
-            </div>
+      <%= if length(@schedules) > 1 do %>
+        <div class="bg-white border-b border-gray-200 px-6 py-2 flex items-center gap-2">
+          <span class="text-sm text-gray-500">Year:</span>
+          <%= for s <- @schedules do %>
+            <button
+              phx-click="select_schedule"
+              phx-value-id={s.id}
+              class={[
+                "px-3 py-1 rounded-full text-sm font-medium transition-colors",
+                if(@schedule && @schedule.id == s.id,
+                  do: "bg-blue-600 text-white",
+                  else: "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                )
+              ]}
+            >
+              <%= s.label %>
+            </button>
           <% end %>
-          <.link
-            navigate="/upload"
-            class="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Upload Schedule
-          </.link>
         </div>
-      </header>
+      <% end %>
 
       <%= if @schedule do %>
         <div class="px-6 py-4 flex items-center gap-6 border-b border-gray-200 bg-white">
@@ -111,36 +100,37 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
             <% end %>
           </div>
 
-          <div class="flex items-center gap-2">
-            <span class="text-sm text-gray-500 font-medium">Type:</span>
-            <select
-              phx-change="filter_type"
-              name="type"
-              class="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All rotations</option>
-              <%= for type <- Rotations.all_rotation_types() do %>
-                <option value={type} selected={@filter_type == type}>
-                  <%= Rotations.rotation_type_label(type) %>
-                </option>
-              <% end %>
-            </select>
-          </div>
+          <span
+            id="gantt-year-indicator"
+            class="ml-auto text-sm font-semibold text-gray-500 tabular-nums"
+          >
+          </span>
         </div>
 
-        <div class="overflow-x-auto">
-          <table class="min-w-full border-collapse text-xs">
+        <div id="gantt-scroll" phx-hook="YearTracker" class="overflow-x-auto">
+          <table class="border-collapse text-xs">
             <thead>
-              <tr class="bg-gray-100 sticky top-0 z-10">
-                <th class="sticky left-0 bg-gray-100 px-3 py-2 text-left font-semibold text-gray-600 w-20 border-b border-gray-200">
+              <tr class="bg-gray-100 sticky top-0 z-30">
+                <%!-- z-40 so header stickies beat both body stickies and data cells --%>
+                <th
+                  class="sticky left-0 z-40 bg-gray-100 px-2 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-300 whitespace-nowrap overflow-hidden"
+                  style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
+                >
                   ID
                 </th>
-                <th class="sticky left-20 bg-gray-100 px-3 py-2 text-left font-semibold text-gray-600 w-24 border-b border-gray-200">
+                <th
+                  class="sticky z-40 bg-gray-100 px-2 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-300 whitespace-nowrap overflow-hidden"
+                  style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
+                >
                   Name
                 </th>
-                <%= for {_idx, start_date, _end_date} <- @slots do %>
-                  <th class="px-1 py-2 text-center font-medium text-gray-500 border-b border-gray-200 min-w-[56px]">
-                    <%= Calendar.strftime(start_date, "%b %-d") %>
+                <%= for {_idx, start_date, end_date} <- @slots do %>
+                  <th
+                    class="px-1 py-2 text-center font-medium text-gray-500 border-b border-gray-200 whitespace-nowrap"
+                    style="min-width: 52px"
+                    data-slot-year={start_date.year}
+                  >
+                    <%= slot_header_label(start_date, end_date) %>
                   </th>
                 <% end %>
               </tr>
@@ -150,29 +140,36 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 <tr class="bg-gray-50">
                   <td
                     colspan={2 + length(@slots)}
-                    class="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide"
+                    class="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200"
                   >
                     R<%= year %> Residents
                   </td>
                 </tr>
                 <%= for resident <- residents do %>
                   <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
-                    <td class="sticky left-0 bg-white px-3 py-1.5 font-mono text-gray-500 border-r border-gray-100 w-20">
+                    <%!-- z-20 so body stickies beat scrolling data cells --%>
+                    <td
+                      class="sticky left-0 z-20 bg-white px-2 py-1 font-mono text-gray-500 border-r border-gray-200 overflow-hidden"
+                      style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
+                    >
                       <.link navigate={"/residents/#{resident.id}"} class="hover:text-blue-600">
                         <%= resident.position_code %>
                       </.link>
                     </td>
-                    <td class="sticky left-20 bg-white px-3 py-1.5 text-gray-700 font-medium border-r border-gray-100 w-24">
-                      <.link navigate={"/residents/#{resident.id}"} class="hover:text-blue-600">
+                    <td
+                      class="sticky z-20 bg-white px-2 py-1 text-gray-700 font-medium border-r border-gray-200 overflow-hidden"
+                      style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
+                    >
+                      <.link navigate={"/residents/#{resident.id}"} class="hover:text-blue-600 truncate block">
                         <%= resident.name %>
                       </.link>
                     </td>
-                    <%= for {slot_idx, _start, _end} <- @slots do %>
+                    <%= for {colspan, rotation} <- cell_groups(@slots, resident.rotations) do %>
                       <td
-                        class="px-0.5 py-0.5 text-center min-w-[56px]"
-                        data-resident={resident.position_code}
+                        colspan={colspan}
+                        class="px-0.5 py-0.5 text-center border-r border-gray-100"
                       >
-                        <%= render_cell(resident, slot_idx, @filter_type) %>
+                        <%= render_rotation_cell(rotation) %>
                       </td>
                     <% end %>
                   </tr>
@@ -202,7 +199,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     residents = Residents.list_residents_for_schedule(schedule.id)
     residents_with_rotations = Enum.map(residents, &load_rotations/1)
     residents_by_year = Enum.group_by(residents_with_rotations, & &1.residency_year)
-
     slots = build_slots(residents_with_rotations)
 
     assign(socket,
@@ -210,8 +206,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       schedule: schedule,
       residents_by_year: residents_by_year,
       slots: slots,
-      filter_year: nil,
-      filter_type: nil
+      filter_year: nil
     )
   end
 
@@ -230,37 +225,42 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     |> Enum.sort_by(&elem(&1, 0))
   end
 
-  defp visible_residents(residents_by_year, nil) do
-    residents_by_year
-    |> Enum.sort_by(&elem(&1, 0))
-  end
-
-  defp visible_residents(residents_by_year, year) do
-    residents_by_year
-    |> Enum.filter(fn {y, _} -> y == year end)
-    |> Enum.sort_by(&elem(&1, 0))
-  end
-
-  defp rotation_for_slot(resident, slot_idx) do
-    Enum.find(resident.rotations, &(&1.slot_index == slot_idx))
-  end
-
-  defp render_cell(resident, slot_idx, filter_type) do
-    case rotation_for_slot(resident, slot_idx) do
-      nil ->
-        Phoenix.HTML.raw(~s(<span class="text-gray-200">–</span>))
-
-      rotation ->
-        if filter_type && rotation.rotation_type != filter_type do
-          Phoenix.HTML.raw(~s(<span class="opacity-20 text-gray-400">#{abbrev(rotation.rotation_type)}</span>))
-        else
-          color = Rotations.rotation_type_color(rotation.rotation_type)
-
-          Phoenix.HTML.raw(
-            ~s(<span class="inline-block rounded px-1 py-0.5 text-xs font-medium #{color}">#{abbrev(rotation.rotation_type)}</span>)
-          )
-        end
+  @doc false
+  def slot_header_label(start_date, end_date) do
+    if start_date.month == end_date.month do
+      "#{start_date.day}–#{end_date.day} #{Calendar.strftime(start_date, "%b")}"
+    else
+      "#{Calendar.strftime(start_date, "%-d %b")}–#{Calendar.strftime(end_date, "%-d %b")}"
     end
+  end
+
+  @doc false
+  def cell_groups(slots, rotations) do
+    rotation_by_slot = Enum.into(rotations, %{}, fn r -> {r.slot_index, r} end)
+
+    slots
+    |> Enum.map(fn {idx, _start, _end} -> Map.get(rotation_by_slot, idx) end)
+    |> Enum.chunk_by(fn
+      nil -> :blank
+      r -> r.rotation_type
+    end)
+    |> Enum.map(fn group ->
+      colspan = length(group)
+      rotation = Enum.find(group, &(&1 != nil))
+      {colspan, rotation}
+    end)
+  end
+
+  defp render_rotation_cell(nil) do
+    Phoenix.HTML.raw(~s(<span class="text-gray-200">–</span>))
+  end
+
+  defp render_rotation_cell(rotation) do
+    color = Rotations.rotation_type_color(rotation.rotation_type)
+
+    Phoenix.HTML.raw(
+      ~s(<span class="inline-block rounded px-1 py-0.5 text-xs font-medium whitespace-nowrap #{color}">#{abbrev(rotation.rotation_type)}</span>)
+    )
   end
 
   @abbrev_map %{
@@ -289,13 +289,20 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   defp abbrev(rotation_type), do: Map.get(@abbrev_map, rotation_type, rotation_type)
 
+  defp visible_residents(residents_by_year, nil),
+    do: Enum.sort_by(residents_by_year, &elem(&1, 0))
+
+  defp visible_residents(residents_by_year, year) do
+    residents_by_year
+    |> Enum.filter(fn {y, _} -> y == year end)
+    |> Enum.sort_by(&elem(&1, 0))
+  end
+
   defp filter_tab_class(current, value) do
     base = "px-3 py-1 rounded-full text-sm font-medium transition-colors"
 
-    if current == value do
-      "#{base} bg-blue-600 text-white"
-    else
-      "#{base} bg-gray-100 text-gray-700 hover:bg-gray-200"
-    end
+    if current == value,
+      do: "#{base} bg-blue-600 text-white",
+      else: "#{base} bg-gray-100 text-gray-700 hover:bg-gray-200"
   end
 end
