@@ -1,0 +1,221 @@
+defmodule ResidencySchedule.Rotations do
+  import Ecto.Query
+  alias ResidencySchedule.Repo
+  alias ResidencySchedule.Rotations.Rotation
+
+  @rotation_labels %{
+    "ambulatory" => "Ambulatory",
+    "away_rotation" => "Away Rotation",
+    "elective" => "Elective",
+    "float" => "Float",
+    "strong_gynecology" => "Gynecology – Strong Memorial",
+    "highland_gynecology" => "Gynecology – Highland",
+    "highland_obstetrics" => "Obstetrics – Highland",
+    "highland_night_float" => "Night Float – Highland",
+    "highland_weekend_days" => "Weekend Days – Highland",
+    "highland_weekend_nights" => "Weekend Nights – Highland",
+    "night_float" => "Night Float – Strong",
+    "strong_obstetrics" => "Obstetrics – Strong",
+    "oncology" => "Oncology",
+    "post_call" => "Post Call",
+    "rei" => "Reproductive Endocrinology & Infertility",
+    "strong_weekend_days" => "Weekend Days – Strong",
+    "strong_weekend_nights" => "Weekend Nights – Strong",
+    "swing" => "Swing Shift",
+    "urogynecology" => "Uro-Gynecology",
+    "unknown" => "Unknown",
+    "vacation" => "Vacation"
+  }
+
+  @rotation_colors %{
+    "strong_obstetrics" => "bg-blue-500 text-white",
+    "strong_gynecology" => "bg-blue-400 text-white",
+    "strong_weekend_days" => "bg-blue-300 text-gray-800",
+    "strong_weekend_nights" => "bg-blue-800 text-white",
+    "highland_obstetrics" => "bg-cyan-500 text-white",
+    "highland_gynecology" => "bg-fuchsia-500 text-white",
+    "oncology" => "bg-rose-700 text-white",
+    "highland_weekend_days" => "bg-cyan-300 text-gray-800",
+    "highland_weekend_nights" => "bg-cyan-800 text-white",
+    "night_float" => "bg-indigo-700 text-white",
+    "highland_night_float" => "bg-indigo-400 text-white",
+    "post_call" => "bg-indigo-100 text-indigo-900",
+    "ambulatory" => "bg-teal-500 text-white",
+    "rei" => "bg-yellow-500 text-gray-900",
+    "urogynecology" => "bg-orange-400 text-white",
+    "elective" => "bg-violet-400 text-white",
+    "away_rotation" => "bg-violet-200 text-violet-900",
+    "swing" => "bg-lime-500 text-white",
+    "unknown" => "bg-gray-400 text-white",
+    "vacation" => "bg-emerald-400 text-white",
+    "float" => "bg-gray-300 text-gray-700"
+  }
+
+  @doc """
+  Returns all rotations for a resident, ordered by start_date.
+
+      iex> ResidencySchedule.Rotations.list_rotations_for_resident(0)
+      []
+  """
+  def list_rotations_for_resident(resident_id) do
+    Rotation
+    |> where(resident_id: ^resident_id)
+    |> order_by(asc: :start_date)
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns all rotations in a date range (inclusive), across all residents.
+
+      iex> ResidencySchedule.Rotations.list_rotations_in_range(~D[2023-07-01], ~D[2023-07-31])
+      []
+  """
+  def list_rotations_in_range(start_date, end_date) do
+    Rotation
+    |> where([r], r.start_date <= ^end_date and r.end_date >= ^start_date)
+    |> order_by(asc: :start_date)
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns all rotations active on a given date for a schedule, with resident preloaded.
+
+      iex> ResidencySchedule.Rotations.list_rotations_for_date(~D[2023-07-06], 0)
+      []
+  """
+  def list_rotations_for_date(date, schedule_id) do
+    from(rot in Rotation,
+      join: res in assoc(rot, :resident),
+      where: res.schedule_id == ^schedule_id,
+      where: rot.start_date <= ^date and rot.end_date >= ^date,
+      preload: [resident: res],
+      order_by: [rot.rotation_type, res.residency_year, res.schedule_number]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns all rotations for a given month and schedule, with resident preloaded.
+
+      iex> ResidencySchedule.Rotations.list_rotations_for_month(2023, 7, 0)
+      []
+  """
+  def list_rotations_for_month(year, month, schedule_id) do
+    first = Date.new!(year, month, 1)
+    last = Date.end_of_month(first)
+
+    from(rot in Rotation,
+      join: res in assoc(rot, :resident),
+      where: res.schedule_id == ^schedule_id,
+      where: rot.start_date <= ^last and rot.end_date >= ^first,
+      preload: [resident: res]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns rotations filtered by rotation type.
+
+      iex> ResidencySchedule.Rotations.list_rotations_by_type("oncology")
+      []
+  """
+  def list_rotations_by_type(rotation_type) do
+    Rotation
+    |> where(rotation_type: ^rotation_type)
+    |> order_by(asc: :start_date)
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns co-service days (same rotation type, overlapping dates) for two residents.
+
+      iex> ResidencySchedule.Rotations.list_co_service_days(0, 0)
+      []
+  """
+  def list_co_service_days(resident_a_id, resident_b_id) do
+    from(a in Rotation,
+      join: b in Rotation,
+      on: b.resident_id == ^resident_b_id and b.rotation_type == a.rotation_type,
+      where: a.resident_id == ^resident_a_id,
+      where: a.start_date <= b.end_date and a.end_date >= b.start_date,
+      join:
+        day in fragment(
+          "generate_series(GREATEST(?, ?), LEAST(?, ?), '1 day'::interval) AS day",
+          a.start_date,
+          b.start_date,
+          a.end_date,
+          b.end_date
+        ),
+      on: true,
+      select: %{
+        date: fragment("(?::date)", day),
+        rotation_type: a.rotation_type
+      },
+      order_by: fragment("(?::date)", day)
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Inserts a batch of rotation records for a resident.
+  Returns `{:ok, count}` or `{:error, reason}`.
+
+      iex> ResidencySchedule.Rotations.insert_rotations(0, [])
+      {:ok, 0}
+  """
+  def insert_rotations(resident_id, rotations) do
+    now = DateTime.utc_now(:second)
+
+    entries =
+      Enum.map(rotations, fn r ->
+        %{
+          resident_id: resident_id,
+          rotation_type: Atom.to_string(r.rotation_type),
+          start_date: r.start_date,
+          end_date: r.end_date,
+          slot_index: r.slot_index,
+          inserted_at: now,
+          updated_at: now
+        }
+      end)
+
+    {count, _} = Repo.insert_all(Rotation, entries)
+    {:ok, count}
+  end
+
+  @doc """
+  Returns the human-readable label for a rotation type string.
+
+      iex> ResidencySchedule.Rotations.rotation_type_label("oncology")
+      "Oncology"
+
+      iex> ResidencySchedule.Rotations.rotation_type_label("night_float")
+      "Night Float – Strong"
+  """
+  def rotation_type_label(rotation_type) do
+    Map.get(@rotation_labels, rotation_type, rotation_type)
+  end
+
+  @doc """
+  Returns the Tailwind CSS classes for a rotation type string.
+
+      iex> ResidencySchedule.Rotations.rotation_type_color("oncology")
+      "bg-rose-700 text-white"
+
+      iex> ResidencySchedule.Rotations.rotation_type_color("unknown_type")
+      "bg-gray-200 text-gray-600"
+  """
+  def rotation_type_color(rotation_type) do
+    Map.get(@rotation_colors, rotation_type, "bg-gray-200 text-gray-600")
+  end
+
+  @doc """
+  Returns the list of all known rotation type strings.
+
+      iex> "oncology" in ResidencySchedule.Rotations.all_rotation_types()
+      true
+  """
+  def all_rotation_types do
+    Map.keys(@rotation_labels)
+  end
+end
