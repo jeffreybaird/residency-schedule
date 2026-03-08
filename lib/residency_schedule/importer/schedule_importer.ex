@@ -38,7 +38,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   Derives the academic year from the earliest date across all residents' rotations,
   upserts the schedule, deletes and reloads residents/rotations for that year.
 
-  Returns `{:ok, %{residents: count, rotations: count}}`.
+  Returns `{:ok, %{schedule_id: id, residents: count, rotations: count}}`.
 
       iex> ResidencySchedule.Importer.ScheduleImporter.persist([])
       {:error, "No residents or rotations to import"}
@@ -70,7 +70,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
           {r_acc + 1, rot_acc + rot_count}
         end)
 
-      %{residents: resident_count, rotations: rotation_count}
+      %{schedule_id: schedule.id, residents: resident_count, rotations: rotation_count}
     end)
   end
 

@@ -23,7 +23,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           schedule: nil,
           residents_by_year: %{},
           slots: [],
-          filter_year: nil,
+          filter_year: nil
         )
       end
 
