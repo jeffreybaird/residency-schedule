@@ -25,11 +25,42 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/residency_schedule"
 import topbar from "../vendor/topbar"
 
+// YearTracker: updates a DOM element with the calendar year of the leftmost
+// visible data column in the Gantt scroll container as the user scrolls.
+const Hooks = {}
+
+Hooks.YearTracker = {
+  mounted() {
+    this.yearEl = document.getElementById("gantt-year-indicator")
+    this.updateYear()
+    this.el.addEventListener("scroll", () => this.updateYear(), {passive: true})
+  },
+
+  updated() {
+    this.updateYear()
+  },
+
+  updateYear() {
+    if (!this.yearEl) return
+    const containerRect = this.el.getBoundingClientRect()
+    // Offset past the two sticky label columns (id + name); must match @id_col_px + @name_col_px
+    const firstDataX = containerRect.left + 72 + 128
+
+    const headers = this.el.querySelectorAll("th[data-slot-year]")
+    for (const th of headers) {
+      if (th.getBoundingClientRect().right > firstDataX) {
+        this.yearEl.textContent = th.dataset.slotYear
+        return
+      }
+    }
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...colocatedHooks, ...Hooks},
 })
 
 // Show progress bar on live navigation and form submits

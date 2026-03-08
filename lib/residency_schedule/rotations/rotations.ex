@@ -137,23 +137,19 @@ defmodule ResidencySchedule.Rotations do
       join: b in Rotation,
       on: b.resident_id == ^resident_b_id and b.rotation_type == a.rotation_type,
       where: a.resident_id == ^resident_a_id,
+      where: a.rotation_type not in ["float", "post_call", "vacation"],
       where: a.start_date <= b.end_date and a.end_date >= b.start_date,
-      join:
-        day in fragment(
-          "generate_series(GREATEST(?, ?), LEAST(?, ?), '1 day'::interval) AS day",
-          a.start_date,
-          b.start_date,
-          a.end_date,
-          b.end_date
-        ),
-      on: true,
       select: %{
-        date: fragment("(?::date)", day),
+        overlap_start: fragment("GREATEST(?, ?)", a.start_date, b.start_date),
+        overlap_end: fragment("LEAST(?, ?)", a.end_date, b.end_date),
         rotation_type: a.rotation_type
-      },
-      order_by: fragment("(?::date)", day)
+      }
     )
     |> Repo.all()
+    |> Enum.flat_map(fn %{overlap_start: start, overlap_end: finish, rotation_type: type} ->
+      Date.range(start, finish) |> Enum.map(&%{date: &1, rotation_type: type})
+    end)
+    |> Enum.sort_by(& &1.date, Date)
   end
 
   @doc """

@@ -9,7 +9,7 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
       socket
       |> assign(upload_result: nil, warnings: [], error: nil)
       |> allow_upload(:schedule_csv,
-        accept: ~w(.csv),
+        accept: :any,
         max_entries: 1,
         max_file_size: 5_000_000
       )
@@ -35,8 +35,9 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
         {:ok, ScheduleImporter.import_csv(csv_binary)}
       end)
 
+    # consume_uploaded_entries unwraps {:ok, value} → returns [value]
     case result do
-      [{:ok, {:ok, summary, warnings}}] ->
+      [{:ok, summary, warnings}] ->
         socket =
           socket
           |> assign(upload_result: summary, warnings: warnings, error: nil)
@@ -44,7 +45,7 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
 
         {:noreply, socket}
 
-      [{:ok, {:error, reason}}] ->
+      [{:error, reason}] ->
         {:noreply, assign(socket, error: reason, upload_result: nil, warnings: [])}
 
       [] ->
@@ -132,7 +133,6 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
   end
 
   defp humanize_error(:too_large), do: "File is too large (max 5 MB)"
-  defp humanize_error(:not_accepted), do: "Only .csv files are accepted"
   defp humanize_error(:too_many_files), do: "Only one file at a time"
   defp humanize_error(err), do: "Upload error: #{inspect(err)}"
 end
