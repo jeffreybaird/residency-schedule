@@ -85,9 +85,8 @@ jobs:
           MIX_ENV: prod
           SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
           PHX_HOST: ${{ secrets.PHX_HOST }}
-          # ACCESS_PASSWORD is NOT set here — it lives only on the server
-          # Provide a placeholder so fetch_env! doesn't fail at release build time
-          ACCESS_PASSWORD: placeholder
+          # ACCESS_PASSWORD is NOT needed here — runtime.exs runs at boot, not
+          # at compile time. It lives only in /home/deploy/residency_schedule/.env
 
       - name: Upload release to droplet
         uses: appleboy/scp-action@v0.1.7
