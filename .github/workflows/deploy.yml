@@ -108,7 +108,8 @@ jobs:
             set -e
 
             # Run migrations before swapping (uses server .env for real DB creds)
-            source /home/deploy/residency_schedule/.env
+            # set -a exports all sourced variables to child processes
+            set -a; source /home/deploy/residency_schedule/.env; set +a
             /home/deploy/residency_schedule_new/bin/residency_schedule eval \
               "ResidencySchedule.Release.migrate()"
 
