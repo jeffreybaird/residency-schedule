@@ -13,7 +13,7 @@ if config_env() == :prod do
   config :residency_schedule, ResidencySchedule.Repo,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-    ssl: true
+    ssl: System.get_env("DB_SSL", "false") == "true"
 
   secret_key_base = System.fetch_env!("SECRET_KEY_BASE")
 
