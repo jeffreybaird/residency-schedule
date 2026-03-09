@@ -28,11 +28,21 @@ defmodule ResidencyScheduleWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import ResidencyScheduleWeb.ConnCase
+      import ResidencySchedule.DataCase, only: [seed_schedule: 0, seed_schedule: 1]
     end
   end
 
   setup tags do
     ResidencySchedule.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn()}
+  end
+
+  @doc """
+  Sets :authenticated in the session so the RequireAuth plug passes.
+  Use as `setup :authenticate_session` in any LiveView or controller test.
+  """
+  def authenticate_session(%{conn: conn}) do
+    conn = Plug.Test.init_test_session(conn, authenticated: true)
+    %{conn: conn}
   end
 end

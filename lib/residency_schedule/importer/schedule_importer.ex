@@ -75,11 +75,8 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   end
 
   defp derive_academic_year_from_residents(parsed_residents) do
-    all_dates =
-      Enum.flat_map(parsed_residents, fn r ->
-        Enum.flat_map(r.rotations, &[&1.start_date, &1.end_date])
-      end)
-
-    CsvParser.derive_academic_year(all_dates)
+    parsed_residents
+    |> Enum.flat_map(fn r -> Enum.flat_map(r.rotations, &[&1.start_date, &1.end_date]) end)
+    |> CsvParser.derive_academic_year()
   end
 end
