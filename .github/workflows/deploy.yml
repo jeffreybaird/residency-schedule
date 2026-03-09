@@ -117,8 +117,10 @@ jobs:
             # inside the deployment dir and must not be lost during rotation.
             cp /home/deploy/residency_schedule/.env /home/deploy/residency_schedule_new/.env
 
-            # Atomic swap
-            mv /home/deploy/residency_schedule /home/deploy/residency_schedule_old || true
+            # Atomic swap — remove any stale _old dir first so mv doesn't
+            # move into a subdirectory instead of renaming.
+            rm -rf /home/deploy/residency_schedule_old
+            mv /home/deploy/residency_schedule /home/deploy/residency_schedule_old
             mv /home/deploy/residency_schedule_new /home/deploy/residency_schedule
 
             # Restart service
