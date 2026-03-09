@@ -113,6 +113,10 @@ jobs:
             /home/deploy/residency_schedule_new/bin/residency_schedule eval \
               "ResidencySchedule.Release.migrate()"
 
+            # Carry the .env into the new release before swapping — it lives
+            # inside the deployment dir and must not be lost during rotation.
+            cp /home/deploy/residency_schedule/.env /home/deploy/residency_schedule_new/.env
+
             # Atomic swap
             mv /home/deploy/residency_schedule /home/deploy/residency_schedule_old || true
             mv /home/deploy/residency_schedule_new /home/deploy/residency_schedule
