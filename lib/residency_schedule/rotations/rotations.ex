@@ -52,6 +52,24 @@ defmodule ResidencySchedule.Rotations do
   }
 
   @doc """
+  Returns all distinct slots (slot_index, start_date, end_date) for a schedule,
+  ordered by slot_index. Used to compute days-off gaps for a resident.
+
+      iex> ResidencySchedule.Rotations.list_schedule_slots(0)
+      []
+  """
+  def list_schedule_slots(schedule_id) do
+    from(r in Rotation,
+      join: res in assoc(r, :resident),
+      where: res.schedule_id == ^schedule_id,
+      select: {r.slot_index, r.start_date, r.end_date},
+      distinct: true,
+      order_by: r.slot_index
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Returns all rotations for a resident, ordered by start_date.
 
       iex> ResidencySchedule.Rotations.list_rotations_for_resident(0)
