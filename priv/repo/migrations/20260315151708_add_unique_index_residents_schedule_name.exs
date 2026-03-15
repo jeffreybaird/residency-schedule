@@ -2,6 +2,6 @@ defmodule ResidencySchedule.Repo.Migrations.AddUniqueIndexResidentsScheduleName 
   use Ecto.Migration
 
   def change do
-    create unique_index(:residents, [:schedule_id, :name])
+    create index(:residents, [:schedule_id, :name])
   end
 end
