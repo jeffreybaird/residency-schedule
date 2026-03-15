@@ -27,7 +27,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
         )
       end
 
-    {:ok, socket}
+    {:ok, assign(socket, delete_confirm_id: nil, delete_error: nil)}
   end
 
   @impl true
@@ -51,29 +51,120 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   @impl true
+  def handle_event("request_delete", %{"id" => id}, socket) do
+    {:noreply, assign(socket, delete_confirm_id: String.to_integer(id), delete_error: nil)}
+  end
+
+  @impl true
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, delete_confirm_id: nil, delete_error: nil)}
+  end
+
+  @impl true
+  def handle_event("delete_schedule", %{"schedule_id" => id, "password" => password}, socket) do
+    expected = Application.fetch_env!(:residency_schedule, :delete_password)
+
+    if password == expected do
+      Schedules.delete_schedule(String.to_integer(id))
+      remaining = Schedules.list_schedules()
+
+      socket =
+        case remaining do
+          [] ->
+            assign(socket,
+              schedules: [],
+              schedule: nil,
+              residents_by_year: %{},
+              slots: [],
+              filter_year: nil
+            )
+
+          [next | _] ->
+            load_schedule_data(socket, next, remaining)
+        end
+
+      {:noreply, assign(socket, delete_confirm_id: nil, delete_error: nil)}
+    else
+      {:noreply, assign(socket, delete_error: "Incorrect password.")}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     assigns = assign(assigns, :id_col_px, @id_col_px)
     assigns = assign(assigns, :name_col_px, @name_col_px)
 
     ~H"""
     <div class="min-h-screen bg-gray-50">
-      <%= if length(@schedules) > 1 do %>
-        <div class="bg-white border-b border-gray-200 px-6 py-2 flex items-center gap-2">
-          <span class="text-sm text-gray-500">Year:</span>
+      <%= if length(@schedules) >= 1 do %>
+        <div class="bg-white border-b border-gray-200 px-6 py-2 flex items-center gap-3 flex-wrap">
+          <span class="text-sm text-gray-500">Schedule:</span>
           <%= for s <- @schedules do %>
-            <button
-              phx-click="select_schedule"
-              phx-value-id={s.id}
-              class={[
-                "px-3 py-1 rounded-full text-sm font-medium transition-colors",
-                if(@schedule && @schedule.id == s.id,
-                  do: "bg-blue-600 text-white",
-                  else: "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                )
-              ]}
+            <div class="flex items-center gap-0.5">
+              <button
+                phx-click="select_schedule"
+                phx-value-id={s.id}
+                class={[
+                  "px-3 py-1 rounded-l-full text-sm font-medium transition-colors",
+                  if(@schedule && @schedule.id == s.id,
+                    do: "bg-blue-600 text-white",
+                    else: "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  )
+                ]}
+              >
+                <%= s.label %>
+              </button>
+              <button
+                phx-click="request_delete"
+                phx-value-id={s.id}
+                class={[
+                  "px-1.5 py-1 rounded-r-full text-sm font-medium transition-colors",
+                  if(@schedule && @schedule.id == s.id,
+                    do: "bg-blue-700 text-blue-100 hover:bg-red-600 hover:text-white",
+                    else: "bg-gray-200 text-gray-500 hover:bg-red-100 hover:text-red-700"
+                  )
+                ]}
+                title={"Delete #{s.label}"}
+              >
+                &times;
+              </button>
+            </div>
+          <% end %>
+
+          <%= if @delete_confirm_id do %>
+            <% target = Enum.find(@schedules, &(&1.id == @delete_confirm_id)) %>
+            <form
+              phx-submit="delete_schedule"
+              class="flex items-center gap-2 ml-2 pl-3 border-l border-gray-200"
             >
-              <%= s.label %>
-            </button>
+              <input type="hidden" name="schedule_id" value={@delete_confirm_id} />
+              <span class="text-sm text-red-700 font-medium">
+                Delete <%= target && target.label %>?
+              </span>
+              <input
+                type="password"
+                name="password"
+                placeholder="Password"
+                autofocus
+                class="border border-gray-300 rounded px-2 py-0.5 text-sm w-32 focus:outline-none focus:ring-1 focus:ring-red-400"
+              />
+              <%= if @delete_error do %>
+                <span class="text-xs text-red-600"><%= @delete_error %></span>
+              <% end %>
+              <button
+                type="submit"
+                class="px-3 py-0.5 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+              <button
+                type="button"
+                phx-click="cancel_delete"
+                class="px-3 py-0.5 bg-gray-100 text-gray-700 rounded text-sm font-medium hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+            </form>
           <% end %>
         </div>
       <% end %>

@@ -24,5 +24,6 @@ if config_env() == :prod do
     server: true
 
   config :residency_schedule,
-    access_password: System.fetch_env!("ACCESS_PASSWORD")
+    access_password: System.fetch_env!("ACCESS_PASSWORD"),
+    delete_password: System.get_env("DELETE_PASSWORD", "admin")
 end

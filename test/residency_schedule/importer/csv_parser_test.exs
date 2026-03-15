@@ -144,4 +144,49 @@ defmodule ResidencySchedule.Importer.CsvParserTest do
       end)
     end
   end
+
+  describe "parse/1 — separator column alignment (2025-2026 fixture)" do
+    test "Clare (R3-1) has strong_weekend_nights for 2026-03-07 to 2026-03-08" do
+      csv = File.read!("test/fixtures/2025-2026.csv")
+      {:ok, residents, _warnings} = CsvParser.parse(csv)
+      clare = Enum.find(residents, &(&1.position_code == "R3-1"))
+      assert clare != nil
+
+      swn =
+        Enum.find(clare.rotations, fn r ->
+          r.start_date == ~D[2026-03-07] and r.end_date == ~D[2026-03-08]
+        end)
+
+      assert swn != nil, "Expected SWN rotation for 2026-03-07..03-08, got: #{inspect(Enum.filter(clare.rotations, &(&1.start_date.month == 3)))}"
+      assert swn.rotation_type == :strong_weekend_nights
+    end
+
+    test "Clare (R3-1) has night_float for 2026-03-09 to 2026-03-13" do
+      csv = File.read!("test/fixtures/2025-2026.csv")
+      {:ok, residents, _warnings} = CsvParser.parse(csv)
+      clare = Enum.find(residents, &(&1.position_code == "R3-1"))
+
+      nf =
+        Enum.find(clare.rotations, fn r ->
+          r.start_date == ~D[2026-03-09] and r.end_date == ~D[2026-03-13]
+        end)
+
+      assert nf != nil, "Expected NF rotation for 2026-03-09..03-13"
+      assert nf.rotation_type == :night_float
+    end
+
+    test "Clare (R3-1) has post_call for 2026-03-14 to 2026-03-15" do
+      csv = File.read!("test/fixtures/2025-2026.csv")
+      {:ok, residents, _warnings} = CsvParser.parse(csv)
+      clare = Enum.find(residents, &(&1.position_code == "R3-1"))
+
+      pc =
+        Enum.find(clare.rotations, fn r ->
+          r.start_date == ~D[2026-03-14] and r.end_date == ~D[2026-03-15]
+        end)
+
+      assert pc != nil, "Expected post_call rotation for 2026-03-14..03-15"
+      assert pc.rotation_type == :post_call
+    end
+  end
 end

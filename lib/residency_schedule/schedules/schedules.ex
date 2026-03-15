@@ -65,6 +65,19 @@ defmodule ResidencySchedule.Schedules do
   end
 
   @doc """
+  Deletes a schedule and all associated residents and rotations (via DB cascade).
+
+      iex> ResidencySchedule.Schedules.delete_schedule(0)
+      {:error, :not_found}
+  """
+  def delete_schedule(id) do
+    case Repo.get(Schedule, id) do
+      nil -> {:error, :not_found}
+      schedule -> Repo.delete(schedule)
+    end
+  end
+
+  @doc """
   Returns the most recent schedule by academic year, or nil if none exist.
 
       iex> ResidencySchedule.Schedules.latest_schedule()

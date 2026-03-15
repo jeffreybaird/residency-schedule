@@ -141,25 +141,39 @@ defmodule ResidencySchedule.Importer.CsvParser do
     start_row = Enum.at(rows, 0, [])
     end_row = Enum.at(rows, 1, [])
 
-    start_dates =
-      start_row
-      |> parse_date_row()
-      |> fix_year_rollover()
+    start_indexed = parse_indexed_date_columns(start_row)
+    end_indexed = parse_indexed_date_columns(end_row)
 
-    end_dates =
-      end_row
-      |> parse_date_row()
-      |> fix_year_rollover()
+    start_map = Map.new(start_indexed)
+    end_map = Map.new(end_indexed)
 
-    slots =
-      start_dates
+    col_indices =
+      start_indexed
+      |> Enum.map(fn {idx, _} -> idx end)
+      |> Enum.filter(&Map.has_key?(end_map, &1))
+
+    start_dates = col_indices |> Enum.map(&start_map[&1]) |> fix_year_rollover()
+    end_dates = col_indices |> Enum.map(&end_map[&1]) |> fix_year_rollover()
+
+    slots_by_col =
+      col_indices
+      |> Enum.zip(start_dates)
       |> Enum.zip(end_dates)
       |> Enum.with_index()
-      |> Enum.map(fn {{start_date, end_date}, idx} ->
-        {idx, start_date, end_date}
+      |> Enum.map(fn {{{col_idx, start_date}, end_date}, slot_idx} ->
+        {col_idx, {slot_idx, start_date, end_date}}
       end)
+      |> Map.new()
 
-    {:ok, slots}
+    {:ok, slots_by_col}
+  end
+
+  defp parse_indexed_date_columns(row) do
+    row
+    |> Enum.drop(2)
+    |> Enum.with_index()
+    |> Enum.reject(fn {val, _} -> val == "" or is_nil(val) end)
+    |> Enum.map(fn {val, idx} -> {idx, Date.from_iso8601!(val)} end)
   end
 
   defp extract_residents(rows, slots) do
@@ -204,18 +218,21 @@ defmodule ResidencySchedule.Importer.CsvParser do
     {resident, warnings}
   end
 
-  defp build_rotations(position_code, cells, slots) do
+  defp build_rotations(position_code, cells, slots_by_col) do
     cells
-    |> Enum.zip(slots)
-    |> Enum.reduce({[], []}, fn {cell, {slot_index, start_date, end_date}},
-                                {rotations, warnings} ->
+    |> Enum.with_index()
+    |> Enum.reduce({[], []}, fn {cell, col_idx}, {rotations, warnings} ->
       trimmed = String.trim(cell || "")
 
       cond do
         trimmed == "" ->
           {rotations, warnings}
 
+        not Map.has_key?(slots_by_col, col_idx) ->
+          {rotations, warnings}
+
         true ->
+          {slot_index, start_date, end_date} = slots_by_col[col_idx]
           key = String.downcase(trimmed)
 
           case Map.get(@rotation_abbreviations, key) do
