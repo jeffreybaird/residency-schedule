@@ -28,6 +28,21 @@ import topbar from "../vendor/topbar"
 // visible data column in the Gantt scroll container as the user scrolls.
 const Hooks = {}
 
+Hooks.ScrollToToday = {
+  mounted() { this.scrollToToday() },
+  updated() { this.scrollToToday() },
+  scrollToToday() {
+    const anchor = this.el.querySelector("[data-today-anchor]")
+    if (!anchor) return
+    const navEl = document.querySelector("nav")
+    const stickyEl = document.getElementById("sticky-stats")
+    const navHeight = navEl ? navEl.offsetHeight : 0
+    const statsHeight = stickyEl ? stickyEl.offsetHeight : 0
+    const anchorTop = anchor.getBoundingClientRect().top + window.scrollY
+    window.scrollTo({ top: anchorTop - navHeight - statsHeight - 8, behavior: "instant" })
+  }
+}
+
 Hooks.YearTracker = {
   mounted() {
     this.yearEl = document.getElementById("gantt-year-indicator")
