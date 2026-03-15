@@ -95,10 +95,10 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   def render(assigns) do
     ~H"""
     <div class="max-w-4xl mx-auto py-10 px-4">
-      <div class="flex items-center justify-between mb-6">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 class="text-2xl font-bold text-gray-800">Calendar</h1>
         <%= if length(@schedules) > 1 do %>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <%= for s <- @schedules do %>
               <button
                 phx-click="select_schedule"
@@ -138,9 +138,10 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         </div>
 
         <div class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <%= for day_name <- ~w[Sun Mon Tue Wed Thu Fri Sat] do %>
-            <div class="bg-gray-50 px-2 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              <%= day_name %>
+          <%= for {short, long} <- [{"Su","Sun"},{"Mo","Mon"},{"Tu","Tue"},{"We","Wed"},{"Th","Thu"},{"Fr","Fri"},{"Sa","Sat"}] do %>
+            <div class="bg-gray-50 px-1 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <span class="sm:hidden"><%= short %></span>
+              <span class="hidden sm:inline"><%= long %></span>
             </div>
           <% end %>
 
@@ -151,7 +152,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
               phx-click="select_day"
               phx-value-date={Date.to_iso8601(day)}
               class={[
-                "relative bg-white p-2 h-20 cursor-pointer border-0 transition-colors hover:bg-blue-50",
+                "relative bg-white p-1 sm:p-2 h-14 sm:h-20 cursor-pointer border-0 transition-colors hover:bg-blue-50",
                 if(in_month, do: "", else: "opacity-40")
               ]}
             >
@@ -235,13 +236,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         <% end %>
       <% else %>
         <div class="text-center py-20">
-          <p class="text-gray-500 mb-4">No schedule uploaded yet.</p>
-          <.link
-            navigate="/upload"
-            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            Upload a Schedule
-          </.link>
+          <p class="text-gray-500">No schedule uploaded yet.</p>
         </div>
       <% end %>
     </div>

@@ -7,7 +7,12 @@ defmodule ResidencySchedule.Importer.CsvParser do
     Row 1: end dates   (col A = "", col B = "",      cols C+ = date strings)
     Row 2: event annotations (skip)
     Rows 3+: resident rows (col A matches R<year>-<number>) or separator/legend rows (skip)
+
+  Names are normalized to canonical form via `NameNormalizer` so the same
+  resident's name is consistent across all schedule years.
   """
+
+  alias ResidencySchedule.Importer.NameNormalizer
 
   defstruct [:position_code, :residency_year, :schedule_number, :name, :rotations]
 
@@ -54,8 +59,8 @@ defmodule ResidencySchedule.Importer.CsvParser do
   def parse(csv_binary) do
     rows = decode_rows(csv_binary)
 
-    with {:ok, slots} <- extract_slots(rows),
-         {:ok, residents, warnings} <- extract_residents(rows, slots) do
+    with {:ok, slots, academic_year} <- extract_slots(rows),
+         {:ok, residents, warnings} <- extract_residents(rows, slots, academic_year) do
       {:ok, residents, warnings}
     end
   rescue
@@ -165,7 +170,9 @@ defmodule ResidencySchedule.Importer.CsvParser do
       end)
       |> Map.new()
 
-    {:ok, slots_by_col}
+    academic_year = if start_dates == [], do: 0, else: derive_academic_year(start_dates)
+
+    {:ok, slots_by_col, academic_year}
   end
 
   defp parse_indexed_date_columns(row) do
@@ -176,11 +183,11 @@ defmodule ResidencySchedule.Importer.CsvParser do
     |> Enum.map(fn {val, idx} -> {idx, Date.from_iso8601!(val)} end)
   end
 
-  defp extract_residents(rows, slots) do
+  defp extract_residents(rows, slots, academic_year) do
     rows
     |> Enum.filter(&resident_row?/1)
     |> Enum.reduce({[], []}, fn row, {residents, warnings} ->
-      {resident, new_warnings} = build_resident(row, slots)
+      {resident, new_warnings} = build_resident(row, slots, academic_year)
       {[resident | residents], warnings ++ new_warnings}
     end)
     |> then(fn {residents, warnings} ->
@@ -193,17 +200,15 @@ defmodule ResidencySchedule.Importer.CsvParser do
     Regex.match?(@resident_row_pattern, col_a)
   end
 
-  defp build_resident(row, slots) do
+  defp build_resident(row, slots, academic_year) do
     [position_code | rest] = row
     [name_raw | cells] = rest
 
     [_, year_str, num_str] = Regex.run(@resident_row_pattern, position_code)
     residency_year = String.to_integer(year_str)
     schedule_number = String.to_integer(num_str)
-    name = case String.trim(name_raw) do
-      "" -> position_code
-      trimmed -> trimmed
-    end
+    name = NameNormalizer.normalize(academic_year, position_code, name_raw)
+      |> then(fn n -> if n == "", do: position_code, else: n end)
 
     {rotations, warnings} = build_rotations(position_code, cells, slots)
 

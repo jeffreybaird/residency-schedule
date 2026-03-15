@@ -18,6 +18,12 @@ defmodule ResidencyScheduleWeb.Router do
     plug ResidencyScheduleWeb.Plugs.RequireAuth
   end
 
+  pipeline :admin_authenticated do
+    plug ResidencyScheduleWeb.Plugs.RequireAdmin
+  end
+
+  # ── Public auth routes ────────────────────────────────────────────────────
+
   scope "/", ResidencyScheduleWeb do
     pipe_through :browser
     get "/login", AuthController, :show
@@ -25,28 +31,38 @@ defmodule ResidencyScheduleWeb.Router do
     post "/logout", AuthController, :delete
   end
 
+  # ── Admin auth routes (unauthenticated) ──────────────────────────────────
+
+  scope "/admin", ResidencyScheduleWeb do
+    pipe_through :browser
+    get "/login", AuthController, :admin_show
+    post "/login", AuthController, :admin_create
+    post "/logout", AuthController, :admin_delete
+  end
+
+  # ── Authenticated site routes ─────────────────────────────────────────────
+
   scope "/", ResidencyScheduleWeb do
     pipe_through [:browser, :authenticated]
     live "/", ScheduleLive.Index, :index
-    live "/upload", UploadLive.Index, :index
     live "/residents/:id", ResidentLive.Show, :show
     live "/calendar", CalendarLive.Index, :index
     live "/compare", CompareLive.Index, :index
     get "/residents/:id/calendar.ics", IcalController, :show
+    post "/set-home/:resident_id", AuthController, :set_home
+    post "/unset-home", AuthController, :unset_home
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", ResidencyScheduleWeb do
-  #   pipe_through :api
-  # end
+  # ── Admin-only routes ─────────────────────────────────────────────────────
+
+  scope "/admin", ResidencyScheduleWeb do
+    pipe_through [:browser, :admin_authenticated]
+    live "/", AdminLive.Index, :index
+    live "/upload", UploadLive.Index, :index
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:residency_schedule, :dev_routes) do
-    # If you want to use the LiveDashboard in production, you should put
-    # it behind authentication and allow only admins to access it.
-    # If your application does not have an admins-only section yet,
-    # you can use Plug.BasicAuth to set up some basic authentication
-    # as long as you are also using SSL (which you should anyway).
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do

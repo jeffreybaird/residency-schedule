@@ -26,5 +26,6 @@ defmodule ResidencySchedule.Residents.Resident do
     |> cast(attrs, [:schedule_id, :position_code, :residency_year, :schedule_number, :name])
     |> validate_required([:schedule_id, :position_code, :residency_year, :schedule_number, :name])
     |> unique_constraint([:schedule_id, :position_code])
+    |> unique_constraint([:schedule_id, :name])
   end
 end

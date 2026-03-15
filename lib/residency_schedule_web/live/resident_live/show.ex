@@ -10,9 +10,15 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   @non_shift_types ~w[vacation]
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
+  def mount(%{"id" => id}, session, socket) do
+    resident_id = session["resident_id"]
     resident = Residents.get_resident!(String.to_integer(id))
     today = Date.utc_today()
+
+    year_history =
+      resident.name
+      |> Residents.list_by_canonical_name()
+      |> Enum.map(&%{id: &1.id, label: &1.schedule.label, academic_year: &1.schedule.academic_year})
 
     schedule_start = schedule_start_date(resident.rotations)
     schedule_end = schedule_end_date(resident.rotations)
@@ -36,6 +42,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     {:ok,
      assign(socket,
        resident: resident,
+       year_history: year_history,
+       is_home_resident: resident_id == String.to_integer(id),
        schedule_start: schedule_start,
        schedule_end: schedule_end,
        night_shift_counts: night_shift_counts,
@@ -70,6 +78,52 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
           <%= @resident.name %>
           <span class="text-base font-normal text-gray-500">(<%= @resident.position_code %>)</span>
         </h1>
+        <%= if length(@year_history) > 1 do %>
+          <div class="flex gap-2 mt-2">
+            <%= for year <- @year_history do %>
+              <%= if year.id == @resident.id do %>
+                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-600 text-white">
+                  <%= year.label %>
+                </span>
+              <% else %>
+                <.link
+                  navigate={"/residents/#{year.id}"}
+                  class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                >
+                  <%= year.label %>
+                </.link>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+        <%= if @is_home_resident do %>
+          <div class="inline-flex items-center gap-1 mt-2">
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+              ✓ My Resident
+            </span>
+            <form action="/unset-home" method="post" class="inline">
+              <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+              <input type="hidden" name="resident_id" value={@resident.id} />
+              <button
+                type="submit"
+                class="px-2 py-1 rounded-full text-xs text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                title="Unset My Resident"
+              >
+                ✕
+              </button>
+            </form>
+          </div>
+        <% else %>
+          <form action={"/set-home/#{@resident.id}"} method="post" class="inline mt-2">
+            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+            <button
+              type="submit"
+              class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700 transition-colors"
+            >
+              Set as My Resident
+            </button>
+          </form>
+        <% end %>
       </div>
 
       <%= if @schedule_start && @schedule_end do %>
@@ -86,11 +140,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
         </div>
 
         <%!-- Sticky stats container --%>
-        <div id="sticky-stats" class="sticky top-14 z-40 bg-white -mx-4 px-4 py-2 mb-4 shadow-[0_4px_8px_rgba(0,0,0,0.06)]">
-          <%!-- Single card with strong outer border --%>
+        <div id="sticky-stats" class="sticky top-14 z-40 bg-white mb-3">
           <div class="border-2 border-gray-300 rounded-xl overflow-hidden">
             <%!-- Card header: resident name + label + collapse toggle --%>
-            <div class="flex items-center justify-between px-4 py-2 bg-gray-50 border-b-2 border-gray-300">
+            <div class="flex items-center justify-between px-4 py-2 bg-gray-100 border-b-2 border-gray-300">
               <span class="text-xs font-semibold text-gray-600">
                 <span class="text-gray-800"><%= @resident.name %></span>
                 <span class="text-gray-400 mx-1">·</span>
@@ -122,8 +175,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             </div>
 
             <%= if @stats_expanded do %>
-              <%!-- Stats grid: no individual borders, internal dividers only --%>
-              <div class="grid grid-cols-2 divide-x divide-y divide-gray-100">
+              <%!-- Stats grid: light grey fill, subtle internal dividers --%>
+              <div class="grid grid-cols-2 divide-x divide-y divide-gray-200 bg-gray-50">
                 <div class="px-4 py-3">
                   <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                     Total Shifts
@@ -152,10 +205,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
               <%!-- Night shift breakdown (expandable row inside the card) --%>
               <%= if @night_shift_counts != [] do %>
-                <div class="border-t border-gray-200">
+                <div class="border-t border-gray-200 bg-gray-50">
                   <button
                     phx-click="toggle_night_shifts"
-                    class="flex items-center justify-between w-full px-4 py-2 text-xs font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                    class="flex items-center justify-between w-full px-4 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
                   >
                     <span class="flex items-center gap-1.5">
                       <svg
@@ -208,9 +261,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
           </div>
         </div>
 
-        <div id="rotation-table" phx-hook="ScrollToToday" class="-mx-4">
+        <div id="rotation-table" phx-hook="ScrollToToday" class="border-2 border-gray-300 rounded-xl overflow-auto overscroll-contain">
           <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-50 border-t border-gray-200">
+            <thead class="sticky top-0 z-10 bg-gray-100">
               <tr>
                 <th class="px-4 py-3 text-left font-semibold text-gray-600">Rotation</th>
                 <th class="px-4 py-3 text-left font-semibold text-gray-600">Start</th>

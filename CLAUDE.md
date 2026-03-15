@@ -16,6 +16,8 @@ architectural spec.
 
 ## Code Style Rules
 
+## **NOTE: EVERY ADDITIONAL CODE WRITTEN THAT ADDS BEHAVIOR MUST BE ACCOMPANIED BY A TEST THAT VALIDATES SAID BEHAVIOR** 
+
 ### 1. Single Responsibility — One Function, One Job
 
 Every function does exactly one thing. If you find yourself writing `and` in a
@@ -89,6 +91,7 @@ end
 Rules for doctests:
 - Use `iex>` format, not prose descriptions of what the function returns
 - Cover the happy path only — edge cases belong in unit tests
+- The doctests should always exercise the most intended pathway, for example if there is a collection being parsed, the test should not have an empty collection as the test data.
 - If the function returns a struct or large map, test a specific field:
   `iex> result.rotation_type` rather than the whole struct
 - Doctests for functions that hit the database are **exempt** — use unit tests instead
