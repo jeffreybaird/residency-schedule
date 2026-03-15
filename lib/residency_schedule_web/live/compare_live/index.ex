@@ -22,6 +22,9 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
           co_service_days: [],
           co_service_ranges: [],
           total_days: 0,
+          shared_shifts_remaining: 0,
+          today: Date.utc_today(),
+          today_anchor_date_start: nil,
           summary: []
         )
       else
@@ -34,6 +37,9 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
           co_service_days: [],
           co_service_ranges: [],
           total_days: 0,
+          shared_shifts_remaining: 0,
+          today: Date.utc_today(),
+          today_anchor_date_start: nil,
           summary: []
         )
       end
@@ -53,7 +59,11 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
        resident_a_id: nil,
        resident_b_id: nil,
        co_service_days: [],
+       co_service_ranges: [],
        total_days: 0,
+       shared_shifts_remaining: 0,
+       today: Date.utc_today(),
+       today_anchor_date_start: nil,
        summary: []
      )}
   end
@@ -76,7 +86,8 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
   def render(assigns) do
     ~H"""
     <div class="max-w-4xl mx-auto py-10 px-4">
-      <div class="flex items-center justify-between mb-6">
+      <%!-- Non-sticky: title + schedule switcher --%>
+      <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold text-gray-800">Compare Schedules</h1>
         <%= if length(@schedules) > 1 do %>
           <div class="flex items-center gap-2">
@@ -100,52 +111,77 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
       </div>
 
       <%= if @schedule do %>
-        <div class="grid grid-cols-2 gap-6 mb-8">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Resident A</label>
-            <form phx-change="select_resident_a">
-              <select
-                name="resident_id"
-                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select a resident…</option>
-                <%= for r <- @residents do %>
-                  <option value={r.id} selected={@resident_a_id == r.id}>
-                    <%= r.name %> (<%= r.position_code %>)
-                  </option>
-                <% end %>
-              </select>
-            </form>
-          </div>
+        <%!-- Sticky: dropdowns + stats card --%>
+        <div id="sticky-stats" class="sticky top-14 z-40 bg-white -mx-4 px-4 py-2 mb-4 shadow-[0_4px_8px_rgba(0,0,0,0.06)]">
+          <div class="border-2 border-gray-300 rounded-xl overflow-hidden">
+            <%!-- Card header --%>
+            <div class="px-4 py-2 bg-gray-50 border-b-2 border-gray-300">
+              <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
+                Compare Residents
+              </span>
+            </div>
 
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Resident B</label>
-            <form phx-change="select_resident_b">
-              <select
-                name="resident_id"
-                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select a resident…</option>
-                <%= for r <- @residents do %>
-                  <option value={r.id} selected={@resident_b_id == r.id}>
-                    <%= r.name %> (<%= r.position_code %>)
-                  </option>
-                <% end %>
-              </select>
-            </form>
+            <%!-- Dropdowns --%>
+            <div class="grid grid-cols-2 divide-x divide-gray-200">
+              <div class="px-4 py-3">
+                <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Resident A</p>
+                <form phx-change="select_resident_a">
+                  <select
+                    name="resident_id"
+                    class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select a resident…</option>
+                    <%= for r <- @residents do %>
+                      <option value={r.id} selected={@resident_a_id == r.id}>
+                        <%= r.name %> (<%= r.position_code %>)
+                      </option>
+                    <% end %>
+                  </select>
+                </form>
+              </div>
+              <div class="px-4 py-3">
+                <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Resident B</p>
+                <form phx-change="select_resident_b">
+                  <select
+                    name="resident_id"
+                    class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select a resident…</option>
+                    <%= for r <- @residents do %>
+                      <option value={r.id} selected={@resident_b_id == r.id}>
+                        <%= r.name %> (<%= r.position_code %>)
+                      </option>
+                    <% end %>
+                  </select>
+                </form>
+              </div>
+            </div>
+
+            <%!-- Stats row (only when both residents selected) --%>
+            <%= if @resident_a_id && @resident_b_id do %>
+              <div class="grid grid-cols-2 divide-x divide-gray-100 border-t-2 border-gray-300">
+                <div class="px-4 py-3">
+                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                    Shared Shifts
+                  </p>
+                  <p class="text-xl font-bold text-gray-800"><%= @total_days %></p>
+                </div>
+                <div class="px-4 py-3">
+                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                    Shared Shifts Remaining
+                  </p>
+                  <p class="text-xl font-bold text-gray-800"><%= @shared_shifts_remaining %></p>
+                </div>
+              </div>
+            <% end %>
           </div>
         </div>
 
         <%= if @resident_a_id && @resident_b_id do %>
-          <div class="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-xl text-center">
-            <p class="text-2xl font-bold text-blue-700"><%= @total_days %></p>
-            <p class="text-sm text-blue-600">days working the same service together</p>
-          </div>
-
           <%= if @summary != [] do %>
-            <div class="mb-6 border rounded-xl overflow-hidden">
+            <div class="mb-4 -mx-4">
               <table class="min-w-full divide-y divide-gray-200 text-sm">
-                <thead class="bg-gray-50">
+                <thead class="bg-gray-50 border-t border-gray-200">
                   <tr>
                     <th class="px-4 py-3 text-left font-semibold text-gray-600">Service</th>
                     <th class="px-4 py-3 text-right font-semibold text-gray-600">Days</th>
@@ -171,9 +207,9 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
           <% end %>
 
           <%= if @co_service_ranges != [] do %>
-            <div class="border rounded-xl overflow-hidden">
+            <div id="co-service-table" phx-hook="ScrollToToday" class="-mx-4">
               <table class="min-w-full divide-y divide-gray-200 text-sm">
-                <thead class="bg-gray-50">
+                <thead class="bg-gray-50 border-t border-gray-200">
                   <tr>
                     <th class="px-4 py-3 text-left font-semibold text-gray-600">Dates</th>
                     <th class="px-4 py-3 text-left font-semibold text-gray-600">Service</th>
@@ -182,8 +218,18 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                   <%= for range <- @co_service_ranges do %>
+                    <% past = Date.compare(range.date_end, @today) == :lt %>
                     <% color = Rotations.rotation_type_color(range.rotation_type) %>
-                    <tr class="hover:bg-gray-50">
+                    <tr
+                      data-today-anchor={if range.date_start == @today_anchor_date_start, do: "true"}
+                      class={[
+                        if(past, do: "opacity-40"),
+                        if(past,
+                          do: nil,
+                          else: "hover:bg-gray-100 hover:shadow-sm hover:relative hover:z-20 transition-colors"
+                        )
+                      ]}
+                    >
                       <td class="px-4 py-2 text-gray-700">
                         <%= date_range_label(range.date_start, range.date_end) %>
                       </td>
@@ -201,7 +247,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
               </table>
             </div>
           <% else %>
-            <p class="text-center text-gray-400 py-8">No shared service days found.</p>
+            <p class="text-center text-gray-400 py-8">No shared shifts found.</p>
           <% end %>
         <% end %>
       <% else %>
@@ -224,8 +270,12 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
 
   defp maybe_load_comparison(socket) do
     %{resident_a_id: a_id, resident_b_id: b_id} = socket.assigns
+    today = Date.utc_today()
     co_service_days = Rotations.list_co_service_days(a_id, b_id)
     total_days = length(co_service_days)
+
+    shared_shifts_remaining =
+      Enum.count(co_service_days, fn %{date: d} -> Date.compare(d, today) != :lt end)
 
     summary =
       co_service_days
@@ -235,10 +285,18 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
 
     co_service_ranges = merge_consecutive_days(co_service_days)
 
+    today_anchor_date_start =
+      case Enum.find(co_service_ranges, fn r -> Date.compare(r.date_end, today) != :lt end) do
+        nil -> nil
+        range -> range.date_start
+      end
+
     assign(socket,
       co_service_days: co_service_days,
       co_service_ranges: co_service_ranges,
       total_days: total_days,
+      shared_shifts_remaining: shared_shifts_remaining,
+      today_anchor_date_start: today_anchor_date_start,
       summary: summary
     )
   end

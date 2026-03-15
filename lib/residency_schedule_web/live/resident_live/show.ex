@@ -4,7 +4,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
 
-  @night_shift_types ~w[night_float highland_night_float strong_weekend_nights highland_weekend_nights]
+  @strong_night_types ~w[night_float strong_weekend_nights]
+  @highland_night_types ~w[highland_night_float highland_weekend_nights]
+  @night_shift_types @strong_night_types ++ @highland_night_types
   @non_shift_types ~w[vacation]
 
   @impl true
@@ -20,9 +22,16 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     off_slots = compute_off_slots(resident.rotations, schedule_slots)
     all_entries = merge_entries(resident.rotations, off_slots)
 
+    today_anchor_slot_index =
+      case Enum.find(all_entries, fn e -> Date.compare(e.end_date, today) != :lt end) do
+        nil -> nil
+        entry -> entry.slot_index
+      end
+
     total_shifts = compute_total_shifts(resident.rotations)
     shifts_remaining = compute_shifts_remaining(resident.rotations, today)
-    night_shifts_remaining = compute_night_shifts_remaining(resident.rotations, today)
+    night_shifts_remaining_strong = compute_night_shifts_remaining(resident.rotations, today, @strong_night_types)
+    night_shifts_remaining_highland = compute_night_shifts_remaining(resident.rotations, today, @highland_night_types)
 
     {:ok,
      assign(socket,
@@ -31,17 +40,32 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
        schedule_end: schedule_end,
        night_shift_counts: night_shift_counts,
        all_entries: all_entries,
+       today: today,
+       today_anchor_slot_index: today_anchor_slot_index,
        total_shifts: total_shifts,
        shifts_remaining: shifts_remaining,
-       night_shifts_remaining: night_shifts_remaining
+       night_shifts_remaining_strong: night_shifts_remaining_strong,
+       night_shifts_remaining_highland: night_shifts_remaining_highland,
+       stats_expanded: true,
+       night_shifts_expanded: false
      )}
+  end
+
+  @impl true
+  def handle_event("toggle_stats", _params, socket) do
+    {:noreply, assign(socket, stats_expanded: !socket.assigns.stats_expanded)}
+  end
+
+  @impl true
+  def handle_event("toggle_night_shifts", _params, socket) do
+    {:noreply, assign(socket, night_shifts_expanded: !socket.assigns.night_shifts_expanded)}
   end
 
   @impl true
   def render(assigns) do
     ~H"""
     <div class="max-w-4xl mx-auto py-10 px-4">
-      <div class="mb-8">
+      <div class="mb-4">
         <h1 class="text-2xl font-bold text-gray-800">
           <%= @resident.name %>
           <span class="text-base font-normal text-gray-500">(<%= @resident.position_code %>)</span>
@@ -49,7 +73,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       </div>
 
       <%= if @schedule_start && @schedule_end do %>
-        <div class="mb-6 text-sm text-gray-500">
+        <div class="mb-4 text-sm text-gray-500">
           <%= Calendar.strftime(@schedule_start, "%B %-d, %Y") %> –
           <%= Calendar.strftime(@schedule_end, "%B %-d, %Y") %>
           &nbsp;·&nbsp;
@@ -61,59 +85,132 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
           </a>
         </div>
 
-        <%!-- Stats row --%>
-        <div class="mb-6 grid grid-cols-3 gap-4">
-          <div class="border rounded-xl px-5 py-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-              Total Shifts
-            </p>
-            <p class="text-2xl font-bold text-gray-800"><%= @total_shifts %></p>
-          </div>
-          <div class="border rounded-xl px-5 py-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-              Shifts Remaining
-            </p>
-            <p class="text-2xl font-bold text-gray-800"><%= @shifts_remaining %></p>
-          </div>
-          <div class="border rounded-xl px-5 py-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-              Night Shifts Remaining
-            </p>
-            <p class="text-2xl font-bold text-gray-800"><%= @night_shifts_remaining %></p>
+        <%!-- Sticky stats container --%>
+        <div id="sticky-stats" class="sticky top-14 z-40 bg-white -mx-4 px-4 py-2 mb-4 shadow-[0_4px_8px_rgba(0,0,0,0.06)]">
+          <%!-- Single card with strong outer border --%>
+          <div class="border-2 border-gray-300 rounded-xl overflow-hidden">
+            <%!-- Card header: resident name + label + collapse toggle --%>
+            <div class="flex items-center justify-between px-4 py-2 bg-gray-50 border-b-2 border-gray-300">
+              <span class="text-xs font-semibold text-gray-600">
+                <span class="text-gray-800"><%= @resident.name %></span>
+                <span class="text-gray-400 mx-1">·</span>
+                <span class="uppercase tracking-widest text-gray-500">Schedule Stats</span>
+              </span>
+              <button
+                phx-click="toggle_stats"
+                class={[
+                  "flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-0.5 transition-colors",
+                  if(@stats_expanded,
+                    do: "bg-gray-200 text-gray-600 hover:bg-gray-300",
+                    else: "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                  )
+                ]}
+              >
+                <svg
+                  class={["w-3 h-3 transition-transform", if(@stats_expanded, do: "rotate-90", else: "")]}
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M7.293 4.707a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                <%= if @stats_expanded, do: "Collapse", else: "Expand" %>
+              </button>
+            </div>
+
+            <%= if @stats_expanded do %>
+              <%!-- Stats grid: no individual borders, internal dividers only --%>
+              <div class="grid grid-cols-2 divide-x divide-y divide-gray-100">
+                <div class="px-4 py-3">
+                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                    Total Shifts
+                  </p>
+                  <p class="text-xl font-bold text-gray-800"><%= @total_shifts %></p>
+                </div>
+                <div class="px-4 py-3">
+                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                    Shifts Remaining
+                  </p>
+                  <p class="text-xl font-bold text-gray-800"><%= @shifts_remaining %></p>
+                </div>
+                <div class="px-4 py-3">
+                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                    Night Shifts Remaining – Strong
+                  </p>
+                  <p class="text-xl font-bold text-gray-800"><%= @night_shifts_remaining_strong %></p>
+                </div>
+                <div class="px-4 py-3">
+                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                    Night Shifts Remaining – Highland
+                  </p>
+                  <p class="text-xl font-bold text-gray-800"><%= @night_shifts_remaining_highland %></p>
+                </div>
+              </div>
+
+              <%!-- Night shift breakdown (expandable row inside the card) --%>
+              <%= if @night_shift_counts != [] do %>
+                <div class="border-t border-gray-200">
+                  <button
+                    phx-click="toggle_night_shifts"
+                    class="flex items-center justify-between w-full px-4 py-2 text-xs font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                  >
+                    <span class="flex items-center gap-1.5">
+                      <svg
+                        class={["w-2.5 h-2.5 text-gray-400 transition-transform", if(@night_shifts_expanded, do: "rotate-90", else: "")]}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M7.293 4.707a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                      Night Shift Breakdown
+                    </span>
+                    <span class={[
+                      "rounded-full px-2 py-0.5 transition-colors",
+                      if(@night_shifts_expanded,
+                        do: "bg-gray-200 text-gray-600",
+                        else: "bg-gray-100 text-gray-500"
+                      )
+                    ]}>
+                      <%= if @night_shifts_expanded, do: "Collapse", else: "Expand" %>
+                    </span>
+                  </button>
+                  <%= if @night_shifts_expanded do %>
+                    <div class="divide-y divide-gray-100 border-t border-gray-100">
+                      <%= for {type, days} <- @night_shift_counts do %>
+                        <% color = Rotations.rotation_type_color(type) %>
+                        <div class="flex items-center justify-between px-4 py-2">
+                          <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
+                            <%= Rotations.rotation_type_label(type) %>
+                          </span>
+                          <span class="text-sm font-semibold text-gray-700">
+                            <%= days %> day<%= if days != 1, do: "s" %>
+                          </span>
+                        </div>
+                      <% end %>
+                      <div class="flex items-center justify-between px-4 py-2 bg-gray-50">
+                        <span class="text-sm font-medium text-gray-600">Total</span>
+                        <span class="text-sm font-bold text-gray-800">
+                          <%= @night_shift_counts |> Enum.map(&elem(&1, 1)) |> Enum.sum() %> days
+                        </span>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+            <% end %>
           </div>
         </div>
 
-        <%!-- Night shift summary --%>
-        <%= if @night_shift_counts != [] do %>
-          <div class="mb-6 border rounded-xl overflow-hidden">
-            <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
-              <h2 class="text-sm font-semibold text-gray-700">Night Shifts</h2>
-            </div>
-            <div class="divide-y divide-gray-100">
-              <%= for {type, days} <- @night_shift_counts do %>
-                <% color = Rotations.rotation_type_color(type) %>
-                <div class="flex items-center justify-between px-4 py-3">
-                  <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
-                    <%= Rotations.rotation_type_label(type) %>
-                  </span>
-                  <span class="text-sm font-semibold text-gray-700">
-                    <%= days %> day<%= if days != 1, do: "s" %>
-                  </span>
-                </div>
-              <% end %>
-              <div class="flex items-center justify-between px-4 py-3 bg-gray-50">
-                <span class="text-sm font-medium text-gray-600">Total</span>
-                <span class="text-sm font-bold text-gray-800">
-                  <%= @night_shift_counts |> Enum.map(&elem(&1, 1)) |> Enum.sum() %> days
-                </span>
-              </div>
-            </div>
-          </div>
-        <% end %>
-
-        <div class="border rounded-xl overflow-hidden">
+        <div id="rotation-table" phx-hook="ScrollToToday" class="-mx-4">
           <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-50">
+            <thead class="bg-gray-50 border-t border-gray-200">
               <tr>
                 <th class="px-4 py-3 text-left font-semibold text-gray-600">Rotation</th>
                 <th class="px-4 py-3 text-left font-semibold text-gray-600">Start</th>
@@ -123,9 +220,13 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             </thead>
             <tbody class="divide-y divide-gray-100">
               <%= for entry <- @all_entries do %>
+                <% past = Date.compare(entry.end_date, @today) == :lt %>
                 <% color = entry_color(entry.rotation_type) %>
                 <% label = entry_label(entry.rotation_type) %>
-                <tr class={if entry.rotation_type == "off", do: "bg-gray-50", else: "hover:bg-gray-50"}>
+                <tr
+                  data-today-anchor={if entry.slot_index == @today_anchor_slot_index, do: "true"}
+                  class={entry_row_class(entry.rotation_type, past)}
+                >
                   <td class="px-4 py-2">
                     <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
                       <%= label %>
@@ -159,6 +260,16 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
   defp entry_label("off"), do: "OFF"
   defp entry_label(rotation_type), do: Rotations.rotation_type_label(rotation_type)
+
+  defp entry_row_class("off", true), do: ["opacity-40", "bg-gray-50"]
+
+  defp entry_row_class("off", false),
+    do: ["bg-gray-50", "hover:bg-gray-100", "hover:shadow-sm", "hover:relative", "hover:z-20", "transition-colors"]
+
+  defp entry_row_class(_type, true), do: "opacity-40"
+
+  defp entry_row_class(_type, false),
+    do: ["hover:bg-gray-100", "hover:shadow-sm", "hover:relative", "hover:z-20", "transition-colors"]
 
   defp compute_off_slots(rotations, schedule_slots) do
     resident_slot_indices = MapSet.new(rotations, & &1.slot_index)
@@ -205,9 +316,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     |> Enum.sum()
   end
 
-  defp compute_night_shifts_remaining(rotations, today) do
+  defp compute_night_shifts_remaining(rotations, today, types) do
     rotations
-    |> Enum.filter(fn r -> r.rotation_type in @night_shift_types end)
+    |> Enum.filter(fn r -> r.rotation_type in types end)
     |> Enum.reject(fn r -> Date.compare(r.end_date, today) == :lt end)
     |> Enum.map(fn r ->
       effective_start = Enum.max([r.start_date, today], Date)
