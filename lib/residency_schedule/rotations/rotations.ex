@@ -54,9 +54,6 @@ defmodule ResidencySchedule.Rotations do
   @doc """
   Returns all distinct slots (slot_index, start_date, end_date) for a schedule,
   ordered by slot_index. Used to compute days-off gaps for a resident.
-
-      iex> ResidencySchedule.Rotations.list_schedule_slots(0)
-      []
   """
   def list_schedule_slots(schedule_id) do
     from(r in Rotation,
@@ -71,9 +68,6 @@ defmodule ResidencySchedule.Rotations do
 
   @doc """
   Returns all rotations for a resident, ordered by start_date.
-
-      iex> ResidencySchedule.Rotations.list_rotations_for_resident(0)
-      []
   """
   def list_rotations_for_resident(resident_id) do
     Rotation
@@ -84,9 +78,6 @@ defmodule ResidencySchedule.Rotations do
 
   @doc """
   Returns all rotations in a date range (inclusive), across all residents.
-
-      iex> ResidencySchedule.Rotations.list_rotations_in_range(~D[2023-07-01], ~D[2023-07-31])
-      []
   """
   def list_rotations_in_range(start_date, end_date) do
     Rotation
@@ -97,9 +88,6 @@ defmodule ResidencySchedule.Rotations do
 
   @doc """
   Returns all rotations active on a given date for a schedule, with resident preloaded.
-
-      iex> ResidencySchedule.Rotations.list_rotations_for_date(~D[2023-07-06], 0)
-      []
   """
   def list_rotations_for_date(date, schedule_id) do
     from(rot in Rotation,
@@ -114,9 +102,6 @@ defmodule ResidencySchedule.Rotations do
 
   @doc """
   Returns all rotations for a given month and schedule, with resident preloaded.
-
-      iex> ResidencySchedule.Rotations.list_rotations_for_month(2023, 7, 0)
-      []
   """
   def list_rotations_for_month(year, month, schedule_id) do
     first = Date.new!(year, month, 1)
@@ -133,9 +118,6 @@ defmodule ResidencySchedule.Rotations do
 
   @doc """
   Returns rotations filtered by rotation type.
-
-      iex> ResidencySchedule.Rotations.list_rotations_by_type("oncology")
-      []
   """
   def list_rotations_by_type(rotation_type) do
     Rotation
@@ -146,9 +128,6 @@ defmodule ResidencySchedule.Rotations do
 
   @doc """
   Returns co-service days (same rotation type, overlapping dates) for two residents.
-
-      iex> ResidencySchedule.Rotations.list_co_service_days(0, 0)
-      []
   """
   def list_co_service_days(resident_a_id, resident_b_id) do
     from(a in Rotation,
@@ -173,9 +152,6 @@ defmodule ResidencySchedule.Rotations do
   @doc """
   Inserts a batch of rotation records for a resident.
   Returns `{:ok, count}` or `{:error, reason}`.
-
-      iex> ResidencySchedule.Rotations.insert_rotations(0, [])
-      {:ok, 0}
   """
   def insert_rotations(resident_id, rotations) do
     now = DateTime.utc_now(:second)

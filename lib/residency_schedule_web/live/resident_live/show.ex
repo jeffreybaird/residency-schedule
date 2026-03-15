@@ -76,54 +76,62 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       <div class="mb-4">
         <h1 class="text-2xl font-bold text-gray-800">
           <%= @resident.name %>
-          <span class="text-base font-normal text-gray-500">(<%= @resident.position_code %>)</span>
+          <span
+            class="text-base font-normal text-gray-500"
+            title={"Year #{@resident.residency_year}, resident #{@resident.schedule_number}"}
+          >(<%= @resident.position_code %>)</span>
         </h1>
-        <%= if length(@year_history) > 1 do %>
-          <div class="flex gap-2 mt-2">
+        <div class="flex items-center justify-between gap-2 mt-2">
+          <div class="flex gap-2 flex-wrap">
             <%= for year <- @year_history do %>
               <%= if year.id == @resident.id do %>
-                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-600 text-white">
+                <span
+                  class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-600 text-white"
+                  title="Currently viewing this year"
+                >
                   <%= year.label %>
                 </span>
               <% else %>
                 <.link
                   navigate={"/residents/#{year.id}"}
                   class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                  title={"View #{@resident.name}'s #{year.label} schedule"}
                 >
                   <%= year.label %>
                 </.link>
               <% end %>
             <% end %>
           </div>
-        <% end %>
-        <%= if @is_home_resident do %>
-          <div class="inline-flex items-center gap-1 mt-2">
-            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-              ✓ My Resident
-            </span>
-            <form action="/unset-home" method="post" class="inline">
+          <%= if @is_home_resident do %>
+            <div class="inline-flex items-center gap-1 shrink-0">
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                ✓ My Resident
+              </span>
+              <form action="/unset-home" method="post" class="inline">
+                <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+                <input type="hidden" name="resident_id" value={@resident.id} />
+                <button
+                  type="submit"
+                  class="px-2 py-1 rounded-full text-xs text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                  title="Remove My Resident — the nav link will no longer point here"
+                >
+                  ✕
+                </button>
+              </form>
+            </div>
+          <% else %>
+            <form action={"/set-home/#{@resident.id}"} method="post" class="inline shrink-0">
               <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
-              <input type="hidden" name="resident_id" value={@resident.id} />
               <button
                 type="submit"
-                class="px-2 py-1 rounded-full text-xs text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                title="Unset My Resident"
+                class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700 transition-colors"
+                title="Pin this resident — adds a My Resident shortcut to the nav"
               >
-                ✕
+                Set as My Resident
               </button>
             </form>
-          </div>
-        <% else %>
-          <form action={"/set-home/#{@resident.id}"} method="post" class="inline mt-2">
-            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
-            <button
-              type="submit"
-              class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700 transition-colors"
-            >
-              Set as My Resident
-            </button>
-          </form>
-        <% end %>
+          <% end %>
+        </div>
       </div>
 
       <%= if @schedule_start && @schedule_end do %>
@@ -134,6 +142,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
           <a
             href={"/residents/#{@resident.id}/calendar.ics"}
             class="text-blue-600 hover:text-blue-800"
+            title="Download this schedule as an iCalendar file to import into Google Calendar, Apple Calendar, or Outlook"
           >
             Download .ics
           </a>
@@ -177,25 +186,25 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             <%= if @stats_expanded do %>
               <%!-- Stats grid: light grey fill, subtle internal dividers --%>
               <div class="grid grid-cols-2 divide-x divide-y divide-gray-200 bg-gray-50">
-                <div class="px-4 py-3">
+                <div class="px-4 py-3" title="Total scheduled service blocks (excludes vacation)">
                   <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                     Total Shifts
                   </p>
                   <p class="text-xl font-bold text-gray-800"><%= @total_shifts %></p>
                 </div>
-                <div class="px-4 py-3">
+                <div class="px-4 py-3" title="Service blocks with a start date on or after today">
                   <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                     Shifts Remaining
                   </p>
                   <p class="text-xl font-bold text-gray-800"><%= @shifts_remaining %></p>
                 </div>
-                <div class="px-4 py-3">
+                <div class="px-4 py-3" title="Night float and weekend night blocks at Strong Memorial remaining">
                   <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                     Night Shifts Remaining – Strong
                   </p>
                   <p class="text-xl font-bold text-gray-800"><%= @night_shifts_remaining_strong %></p>
                 </div>
-                <div class="px-4 py-3">
+                <div class="px-4 py-3" title="Night float and weekend night blocks at Highland remaining">
                   <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                     Night Shifts Remaining – Highland
                   </p>

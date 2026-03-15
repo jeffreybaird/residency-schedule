@@ -6,9 +6,6 @@ defmodule ResidencySchedule.Residents do
 
   @doc """
   Returns all residents ordered by residency_year ASC, schedule_number ASC.
-
-      iex> ResidencySchedule.Residents.list_residents()
-      []
   """
   def list_residents do
     Resident
@@ -18,9 +15,6 @@ defmodule ResidencySchedule.Residents do
 
   @doc """
   Returns residents for a given schedule, ordered by residency_year, schedule_number.
-
-      iex> ResidencySchedule.Residents.list_residents_for_schedule(0)
-      []
   """
   def list_residents_for_schedule(schedule_id) do
     Resident
@@ -31,9 +25,6 @@ defmodule ResidencySchedule.Residents do
 
   @doc """
   Returns residents for a given schedule filtered by residency year.
-
-      iex> ResidencySchedule.Residents.list_residents_by_year(0, 4)
-      []
   """
   def list_residents_by_year(schedule_id, residency_year) do
     Resident
@@ -45,9 +36,6 @@ defmodule ResidencySchedule.Residents do
   @doc """
   Gets a single resident by id. Preloads rotations ordered by start_date.
   Raises if not found.
-
-      iex> ResidencySchedule.Residents.get_resident!(0)
-      ** (Ecto.NoResultsError)
   """
   def get_resident!(id) do
     Resident
@@ -57,9 +45,6 @@ defmodule ResidencySchedule.Residents do
 
   @doc """
   Gets a resident by position code. Raises if not found.
-
-      iex> ResidencySchedule.Residents.get_resident_by_position!("R9-99")
-      ** (Ecto.NoResultsError)
   """
   def get_resident_by_position!(position_code) do
     Repo.get_by!(Resident, position_code: position_code)
@@ -68,9 +53,6 @@ defmodule ResidencySchedule.Residents do
   @doc """
   Returns all schedule appearances for a resident with the given canonical name,
   ordered by academic year ascending. Each result includes the schedule preloaded.
-
-      iex> ResidencySchedule.Residents.list_by_canonical_name("Nobody")
-      []
   """
   def list_by_canonical_name(canonical_name) do
     Resident
@@ -84,9 +66,6 @@ defmodule ResidencySchedule.Residents do
   @doc """
   Finds the most recent resident whose canonical name matches the given password
   (case-insensitive). Returns `nil` if no match is found.
-
-      iex> ResidencySchedule.Residents.find_by_password("nobody-at-all")
-      nil
   """
   def find_by_password(password) do
     normalized = String.downcase(String.trim(password))
@@ -102,10 +81,6 @@ defmodule ResidencySchedule.Residents do
   @doc """
   Inserts a resident for the given schedule.
   Returns `{:ok, resident}` or `{:error, changeset}`.
-
-      iex> {:error, changeset} = ResidencySchedule.Residents.insert_resident(0, %{position_code: nil, residency_year: nil, schedule_number: nil, name: nil})
-      iex> changeset.valid?
-      false
   """
   def insert_resident(schedule_id, attrs) do
     %Resident{}
