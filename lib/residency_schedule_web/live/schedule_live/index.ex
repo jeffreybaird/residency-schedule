@@ -293,18 +293,25 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   # --- Private helpers ---
 
   defp load_schedule_data(socket, schedule, schedules) do
-    residents = Residents.list_residents_for_schedule(schedule.id)
-    residents_with_rotations = Enum.map(residents, &load_rotations/1)
-    residents_by_year = Enum.group_by(residents_with_rotations, & &1.residency_year)
-    slots = build_slots(residents_with_rotations)
+    residents = fetch_residents_with_rotations(schedule.id)
 
     assign(socket,
       schedules: schedules,
       schedule: schedule,
-      residents_by_year: residents_by_year,
-      slots: slots,
+      residents_by_year: group_residents_by_year(residents),
+      slots: build_slots(residents),
       filter_year: nil
     )
+  end
+
+  defp fetch_residents_with_rotations(schedule_id) do
+    schedule_id
+    |> Residents.list_residents_for_schedule()
+    |> Enum.map(&load_rotations/1)
+  end
+
+  defp group_residents_by_year(residents) do
+    Enum.group_by(residents, & &1.residency_year)
   end
 
   defp load_rotations(resident) do
