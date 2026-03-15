@@ -87,10 +87,10 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
     ~H"""
     <div class="max-w-4xl mx-auto py-10 px-4">
       <%!-- Non-sticky: title + schedule switcher --%>
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h1 class="text-2xl font-bold text-gray-800">Compare Schedules</h1>
         <%= if length(@schedules) > 1 do %>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <%= for s <- @schedules do %>
               <button
                 phx-click="select_schedule"
@@ -112,17 +112,17 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
 
       <%= if @schedule do %>
         <%!-- Sticky: dropdowns + stats card --%>
-        <div id="sticky-stats" class="sticky top-14 z-40 bg-white -mx-4 px-4 py-2 mb-4 shadow-[0_4px_8px_rgba(0,0,0,0.06)]">
+        <div id="sticky-stats" class="sticky top-14 z-40 bg-white mb-3">
           <div class="border-2 border-gray-300 rounded-xl overflow-hidden">
             <%!-- Card header --%>
-            <div class="px-4 py-2 bg-gray-50 border-b-2 border-gray-300">
+            <div class="px-4 py-2 bg-gray-100 border-b-2 border-gray-300">
               <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
                 Compare Residents
               </span>
             </div>
 
             <%!-- Dropdowns --%>
-            <div class="grid grid-cols-2 divide-x divide-gray-200">
+            <div class="grid grid-cols-2 divide-x divide-gray-200 bg-gray-50">
               <div class="px-4 py-3">
                 <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Resident A</p>
                 <form phx-change="select_resident_a">
@@ -159,7 +159,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
 
             <%!-- Stats row (only when both residents selected) --%>
             <%= if @resident_a_id && @resident_b_id do %>
-              <div class="grid grid-cols-2 divide-x divide-gray-100 border-t-2 border-gray-300">
+              <div class="grid grid-cols-2 divide-x divide-gray-200 border-t-2 border-gray-300 bg-gray-50">
                 <div class="px-4 py-3">
                   <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                     Shared Shifts
@@ -179,9 +179,9 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
 
         <%= if @resident_a_id && @resident_b_id do %>
           <%= if @summary != [] do %>
-            <div class="mb-4 -mx-4">
+            <div class="mb-3 border-2 border-gray-300 rounded-xl overflow-hidden">
               <table class="min-w-full divide-y divide-gray-200 text-sm">
-                <thead class="bg-gray-50 border-t border-gray-200">
+                <thead class="bg-gray-100">
                   <tr>
                     <th class="px-4 py-3 text-left font-semibold text-gray-600">Service</th>
                     <th class="px-4 py-3 text-right font-semibold text-gray-600">Days</th>
@@ -207,9 +207,9 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
           <% end %>
 
           <%= if @co_service_ranges != [] do %>
-            <div id="co-service-table" phx-hook="ScrollToToday" class="-mx-4">
+            <div id="co-service-table" phx-hook="ScrollToToday" class="border-2 border-gray-300 rounded-xl overflow-auto overscroll-contain">
               <table class="min-w-full divide-y divide-gray-200 text-sm">
-                <thead class="bg-gray-50 border-t border-gray-200">
+                <thead class="sticky top-0 z-10 bg-gray-100">
                   <tr>
                     <th class="px-4 py-3 text-left font-semibold text-gray-600">Dates</th>
                     <th class="px-4 py-3 text-left font-semibold text-gray-600">Service</th>
@@ -252,13 +252,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
         <% end %>
       <% else %>
         <div class="text-center py-20">
-          <p class="text-gray-500 mb-4">No schedule uploaded yet.</p>
-          <.link
-            navigate="/upload"
-            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            Upload a Schedule
-          </.link>
+          <p class="text-gray-500">No schedule uploaded yet.</p>
         </div>
       <% end %>
     </div>

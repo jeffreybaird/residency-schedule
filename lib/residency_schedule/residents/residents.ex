@@ -2,6 +2,7 @@ defmodule ResidencySchedule.Residents do
   import Ecto.Query
   alias ResidencySchedule.Repo
   alias ResidencySchedule.Residents.Resident
+  alias ResidencySchedule.Schedules.Schedule
 
   @doc """
   Returns all residents ordered by residency_year ASC, schedule_number ASC.
@@ -62,6 +63,40 @@ defmodule ResidencySchedule.Residents do
   """
   def get_resident_by_position!(position_code) do
     Repo.get_by!(Resident, position_code: position_code)
+  end
+
+  @doc """
+  Returns all schedule appearances for a resident with the given canonical name,
+  ordered by academic year ascending. Each result includes the schedule preloaded.
+
+      iex> ResidencySchedule.Residents.list_by_canonical_name("Nobody")
+      []
+  """
+  def list_by_canonical_name(canonical_name) do
+    Resident
+    |> join(:inner, [r], s in Schedule, on: r.schedule_id == s.id)
+    |> where([r, _s], r.name == ^canonical_name)
+    |> order_by([_r, s], asc: s.academic_year)
+    |> preload(:schedule)
+    |> Repo.all()
+  end
+
+  @doc """
+  Finds the most recent resident whose canonical name matches the given password
+  (case-insensitive). Returns `nil` if no match is found.
+
+      iex> ResidencySchedule.Residents.find_by_password("nobody-at-all")
+      nil
+  """
+  def find_by_password(password) do
+    normalized = String.downcase(String.trim(password))
+
+    Resident
+    |> join(:inner, [r], s in Schedule, on: r.schedule_id == s.id)
+    |> where([r, _s], fragment("lower(trim(?))", r.name) == ^normalized)
+    |> order_by([_r, s], desc: s.academic_year)
+    |> limit(1)
+    |> Repo.one()
   end
 
   @doc """

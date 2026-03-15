@@ -29,17 +29,60 @@ import topbar from "../vendor/topbar"
 const Hooks = {}
 
 Hooks.ScrollToToday = {
-  mounted() { this.scrollToToday() },
-  updated() { this.scrollToToday() },
+  mounted() {
+    this.updateTableHeight()
+    this.scrollToToday()
+    const stickyEl = document.getElementById("sticky-stats")
+    if (stickyEl) {
+      this._statsObserver = new ResizeObserver(() => this.updateTableHeight())
+      this._statsObserver.observe(stickyEl)
+    }
+    this._resizeHandler = () => this.updateTableHeight()
+    window.addEventListener("resize", this._resizeHandler)
+    this._scrollHandler = () => this.updateHeaderSticky()
+    this.el.addEventListener("scroll", this._scrollHandler, {passive: true})
+  },
+  updated() {
+    this.updateTableHeight()
+    this.scrollToToday()
+  },
+  destroyed() {
+    if (this._statsObserver) this._statsObserver.disconnect()
+    if (this._resizeHandler) window.removeEventListener("resize", this._resizeHandler)
+    if (this._scrollHandler) this.el.removeEventListener("scroll", this._scrollHandler)
+  },
+  stickyOffset() {
+    const navEl = document.querySelector("nav")
+    const stickyEl = document.getElementById("sticky-stats")
+    return (navEl ? navEl.offsetHeight : 0) + (stickyEl ? stickyEl.offsetHeight : 0)
+  },
+  updateTableHeight() {
+    const offset = this.stickyOffset()
+    this.el.style.maxHeight = (window.innerHeight - offset - 40) + "px"
+  },
+  updateHeaderSticky() {
+    const thead = this.el.querySelector("thead")
+    if (!thead) return
+    const firstRow = this.el.querySelector("tbody tr")
+    if (!firstRow) return
+    const rowHeight = firstRow.offsetHeight
+    const remaining = this.el.scrollHeight - this.el.scrollTop - this.el.clientHeight
+    if (remaining < rowHeight) {
+      thead.style.position = "relative"
+      thead.style.top = ""
+    } else {
+      thead.style.position = "sticky"
+      thead.style.top = "0px"
+    }
+  },
   scrollToToday() {
     const anchor = this.el.querySelector("[data-today-anchor]")
     if (!anchor) return
-    const navEl = document.querySelector("nav")
-    const stickyEl = document.getElementById("sticky-stats")
-    const navHeight = navEl ? navEl.offsetHeight : 0
-    const statsHeight = stickyEl ? stickyEl.offsetHeight : 0
-    const anchorTop = anchor.getBoundingClientRect().top + window.scrollY
-    window.scrollTo({ top: anchorTop - navHeight - statsHeight - 8, behavior: "instant" })
+    const thead = this.el.querySelector("thead")
+    const theadHeight = thead ? thead.offsetHeight : 0
+    const containerRect = this.el.getBoundingClientRect()
+    const anchorRect = anchor.getBoundingClientRect()
+    this.el.scrollTop += anchorRect.top - containerRect.top - theadHeight - 8
   }
 }
 

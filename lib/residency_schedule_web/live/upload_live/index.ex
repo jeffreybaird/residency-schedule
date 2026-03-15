@@ -123,8 +123,8 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
           >
             Import Schedule
           </button>
-          <.link navigate="/" class="py-2 px-4 text-sm text-gray-600 hover:text-gray-800">
-            Cancel
+          <.link navigate="/admin" class="py-2 px-4 text-sm text-gray-600 hover:text-gray-800">
+            Back to Admin
           </.link>
         </div>
       </.form>

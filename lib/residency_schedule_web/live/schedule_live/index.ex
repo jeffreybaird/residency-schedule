@@ -10,9 +10,10 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   @name_col_px 128
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
     schedules = Schedules.list_schedules()
     schedule = List.first(schedules)
+    is_admin = session["admin"] == true
 
     socket =
       if schedule do
@@ -27,7 +28,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
         )
       end
 
-    {:ok, assign(socket, delete_confirm_id: nil, delete_error: nil)}
+    {:ok, assign(socket, delete_confirm_id: nil, delete_error: nil, is_admin: is_admin)}
   end
 
   @impl true
@@ -97,7 +98,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     ~H"""
     <div class="min-h-screen bg-gray-50">
       <%= if length(@schedules) >= 1 do %>
-        <div class="bg-white border-b border-gray-200 px-6 py-2 flex items-center gap-3 flex-wrap">
+        <div class="bg-white border-b border-gray-200 px-4 sm:px-6 py-2 flex items-center gap-3 flex-wrap">
           <span class="text-sm text-gray-500">Schedule:</span>
           <%= for s <- @schedules do %>
             <div class="flex items-center gap-0.5">
@@ -105,7 +106,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 phx-click="select_schedule"
                 phx-value-id={s.id}
                 class={[
-                  "px-3 py-1 rounded-l-full text-sm font-medium transition-colors",
+                  "px-3 py-1 text-sm font-medium transition-colors",
+                  if(@is_admin, do: "rounded-l-full", else: "rounded-full"),
                   if(@schedule && @schedule.id == s.id,
                     do: "bg-blue-600 text-white",
                     else: "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -114,20 +116,22 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
               >
                 <%= s.label %>
               </button>
-              <button
-                phx-click="request_delete"
-                phx-value-id={s.id}
-                class={[
-                  "px-1.5 py-1 rounded-r-full text-sm font-medium transition-colors",
-                  if(@schedule && @schedule.id == s.id,
-                    do: "bg-blue-700 text-blue-100 hover:bg-red-600 hover:text-white",
-                    else: "bg-gray-200 text-gray-500 hover:bg-red-100 hover:text-red-700"
-                  )
-                ]}
-                title={"Delete #{s.label}"}
-              >
-                &times;
-              </button>
+              <%= if @is_admin do %>
+                <button
+                  phx-click="request_delete"
+                  phx-value-id={s.id}
+                  class={[
+                    "px-1.5 py-1 rounded-r-full text-sm font-medium transition-colors",
+                    if(@schedule && @schedule.id == s.id,
+                      do: "bg-blue-700 text-blue-100 hover:bg-red-600 hover:text-white",
+                      else: "bg-gray-200 text-gray-500 hover:bg-red-100 hover:text-red-700"
+                    )
+                  ]}
+                  title={"Delete #{s.label}"}
+                >
+                  &times;
+                </button>
+              <% end %>
             </div>
           <% end %>
 
@@ -170,8 +174,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       <% end %>
 
       <%= if @schedule do %>
-        <div class="px-6 py-4 flex items-center gap-6 border-b border-gray-200 bg-white">
-          <div class="flex items-center gap-2">
+        <div class="px-4 sm:px-6 py-4 flex flex-wrap items-center gap-4 border-b border-gray-200 bg-white">
+          <div class="flex flex-wrap items-center gap-2">
             <span class="text-sm text-gray-500 font-medium">Year:</span>
             <button
               phx-click="filter_year"
@@ -272,12 +276,14 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       <% else %>
         <div class="flex flex-col items-center justify-center py-24 text-center">
           <p class="text-gray-500 mb-4">No schedule uploaded yet.</p>
-          <.link
-            navigate="/upload"
-            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Upload a Schedule
-          </.link>
+          <%= if @is_admin do %>
+            <.link
+              navigate="/admin/upload"
+              class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Upload a Schedule
+            </.link>
+          <% end %>
         </div>
       <% end %>
     </div>
