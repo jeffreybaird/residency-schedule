@@ -150,7 +150,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
         <%!-- Sticky stats container --%>
         <div id="sticky-stats" class="sticky top-14 z-40 bg-white mb-3">
-          <div class="border-2 border-gray-300 rounded-xl overflow-hidden">
+          <div class="border-2 border-gray-300 rounded-xl overflow-y-auto max-h-[30vh]">
             <%!-- Card header: resident name + label + collapse toggle --%>
             <div class="flex items-center justify-between px-4 py-2 bg-gray-100 border-b-2 border-gray-300">
               <span class="text-xs font-semibold text-gray-600">
