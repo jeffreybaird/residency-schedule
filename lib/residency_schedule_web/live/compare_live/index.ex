@@ -127,7 +127,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
       <%= if @schedule do %>
         <%!-- Sticky: dropdowns + stats + summary breakdown card --%>
         <div id="sticky-stats" class="sticky top-14 z-40 bg-white mb-3">
-          <div class="border-2 border-gray-300 rounded-xl overflow-hidden">
+          <div class="border-2 border-gray-300 rounded-xl overflow-y-auto max-h-[30vh]">
             <%!-- Card header --%>
             <div class="flex items-center justify-between px-4 py-2 bg-gray-100 border-b-2 border-gray-300">
               <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
