@@ -6,44 +6,13 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    schedule = Schedules.latest_schedule()
+    any_schedules? = Schedules.list_schedules() != []
+    current_month = Date.utc_today() |> Date.beginning_of_month()
+    rotation_index = if any_schedules?, do: build_rotation_index(current_month), else: %{}
 
-    socket =
-      if schedule do
-        current_month = initial_month(schedule)
-        rotation_index = build_rotation_index(schedule.id, current_month)
-
-        assign(socket,
-          schedule: schedule,
-          schedules: Schedules.list_schedules(),
-          current_month: current_month,
-          rotation_index: rotation_index,
-          selected_date: nil,
-          day_detail: []
-        )
-      else
-        assign(socket,
-          schedule: nil,
-          schedules: [],
-          current_month: Date.utc_today() |> Date.beginning_of_month(),
-          rotation_index: %{},
-          selected_date: nil,
-          day_detail: []
-        )
-      end
-
-    {:ok, socket}
-  end
-
-  @impl true
-  def handle_event("select_schedule", %{"id" => id}, socket) do
-    schedule = Schedules.get_schedule!(String.to_integer(id))
-    current_month = initial_month(schedule)
-    rotation_index = build_rotation_index(schedule.id, current_month)
-
-    {:noreply,
+    {:ok,
      assign(socket,
-       schedule: schedule,
+       any_schedules?: any_schedules?,
        current_month: current_month,
        rotation_index: rotation_index,
        selected_date: nil,
@@ -54,12 +23,11 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   @impl true
   def handle_event("prev_month", _params, socket) do
     new_month = Date.shift(socket.assigns.current_month, month: -1)
-    rotation_index = build_rotation_index(socket.assigns.schedule.id, new_month)
 
     {:noreply,
      assign(socket,
        current_month: new_month,
-       rotation_index: rotation_index,
+       rotation_index: build_rotation_index(new_month),
        selected_date: nil,
        day_detail: []
      )}
@@ -68,12 +36,11 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   @impl true
   def handle_event("next_month", _params, socket) do
     new_month = Date.shift(socket.assigns.current_month, month: 1)
-    rotation_index = build_rotation_index(socket.assigns.schedule.id, new_month)
 
     {:noreply,
      assign(socket,
        current_month: new_month,
-       rotation_index: rotation_index,
+       rotation_index: build_rotation_index(new_month),
        selected_date: nil,
        day_detail: []
      )}
@@ -97,28 +64,9 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     <div class="max-w-4xl mx-auto py-10 px-4">
       <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 class="text-2xl font-bold text-gray-800">Calendar</h1>
-        <%= if length(@schedules) > 1 do %>
-          <div class="flex flex-wrap items-center gap-2">
-            <%= for s <- @schedules do %>
-              <button
-                phx-click="select_schedule"
-                phx-value-id={s.id}
-                class={[
-                  "px-3 py-1 rounded-full text-sm font-medium transition-colors",
-                  if(@schedule && @schedule.id == s.id,
-                    do: "bg-blue-600 text-white",
-                    else: "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  )
-                ]}
-              >
-                <%= s.label %>
-              </button>
-            <% end %>
-          </div>
-        <% end %>
       </div>
 
-      <%= if @schedule do %>
+      <%= if @any_schedules? do %>
         <div class="flex items-center justify-between mb-4">
           <button
             phx-click="prev_month"
@@ -243,24 +191,9 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     """
   end
 
-  defp initial_month(schedule) do
-    today = Date.utc_today()
-    schedule_start = Date.new!(schedule.academic_year, 7, 1)
-    schedule_end = Date.new!(schedule.academic_year + 1, 6, 30)
-
-    if Date.compare(today, schedule_start) != :lt and
-         Date.compare(today, schedule_end) != :gt do
-      Date.beginning_of_month(today)
-    else
-      Date.beginning_of_month(schedule_start)
-    end
-  end
-
-  defp build_rotation_index(schedule_id, current_month) do
-    year = current_month.year
-    month = current_month.month
-
-    Rotations.list_rotations_for_month(year, month, schedule_id)
+  defp build_rotation_index(current_month) do
+    current_month.year
+    |> Rotations.list_rotations_for_month_all_schedules(current_month.month)
     |> Enum.flat_map(fn rot ->
       Date.range(rot.start_date, rot.end_date)
       |> Enum.map(&{&1, rot})
