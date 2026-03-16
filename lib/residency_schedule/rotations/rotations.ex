@@ -117,6 +117,21 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
+  Returns all rotations for a given month across all schedules, with resident preloaded.
+  """
+  def list_rotations_for_month_all_schedules(year, month) do
+    first = Date.new!(year, month, 1)
+    last = Date.end_of_month(first)
+
+    from(rot in Rotation,
+      join: res in assoc(rot, :resident),
+      where: rot.start_date <= ^last and rot.end_date >= ^first,
+      preload: [resident: res]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Returns rotations filtered by rotation type.
   """
   def list_rotations_by_type(rotation_type) do
