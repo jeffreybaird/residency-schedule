@@ -7,6 +7,7 @@ defmodule ResidencySchedule.Residents.Resident do
     field :residency_year, :integer
     field :schedule_number, :integer
     field :name, :string
+    field :calendar_token, :string
 
     belongs_to :schedule, ResidencySchedule.Schedules.Schedule
     has_many :rotations, ResidencySchedule.Rotations.Rotation
@@ -17,15 +18,16 @@ defmodule ResidencySchedule.Residents.Resident do
   @doc """
   Changeset for creating or updating a resident.
 
-      iex> changeset = ResidencySchedule.Residents.Resident.changeset(%ResidencySchedule.Residents.Resident{}, %{schedule_id: 1, position_code: "R4-1", residency_year: 4, schedule_number: 1, name: "Alexis"})
+      iex> changeset = ResidencySchedule.Residents.Resident.changeset(%ResidencySchedule.Residents.Resident{}, %{schedule_id: 1, position_code: "R4-1", residency_year: 4, schedule_number: 1, name: "Alexis", calendar_token: "some-uuid"})
       iex> changeset.valid?
       true
   """
   def changeset(resident, attrs) do
     resident
-    |> cast(attrs, [:schedule_id, :position_code, :residency_year, :schedule_number, :name])
+    |> cast(attrs, [:schedule_id, :position_code, :residency_year, :schedule_number, :name, :calendar_token])
     |> validate_required([:schedule_id, :position_code, :residency_year, :schedule_number, :name])
     |> unique_constraint([:schedule_id, :position_code])
     |> unique_constraint([:schedule_id, :name])
+    |> unique_constraint(:calendar_token)
   end
 end
