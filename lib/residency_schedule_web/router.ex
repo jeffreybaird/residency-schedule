@@ -29,6 +29,7 @@ defmodule ResidencyScheduleWeb.Router do
     get "/login", AuthController, :show
     post "/login", AuthController, :create
     post "/logout", AuthController, :delete
+    get "/feed/:token/calendar.ics", IcalController, :feed
   end
 
   # ── Admin auth routes (unauthenticated) ──────────────────────────────────

@@ -79,12 +79,25 @@ defmodule ResidencySchedule.Residents do
   end
 
   @doc """
-  Inserts a resident for the given schedule.
+  Inserts a resident for the given schedule. Automatically assigns a unique
+  calendar_token if one is not already present in attrs.
   Returns `{:ok, resident}` or `{:error, changeset}`.
   """
   def insert_resident(schedule_id, attrs) do
+    attrs_with_token = Map.put_new(attrs, :calendar_token, Ecto.UUID.generate())
+
     %Resident{}
-    |> Resident.changeset(Map.put(attrs, :schedule_id, schedule_id))
+    |> Resident.changeset(Map.put(attrs_with_token, :schedule_id, schedule_id))
     |> Repo.insert()
+  end
+
+  @doc """
+  Gets a resident by their unique calendar token. Preloads rotations ordered by start_date.
+  Raises if not found. Exempt from doctest — hits the database.
+  """
+  def get_resident_by_token!(token) do
+    Resident
+    |> Repo.get_by!(calendar_token: token)
+    |> Repo.preload(rotations: from(r in ResidencySchedule.Rotations.Rotation, order_by: r.start_date))
   end
 end

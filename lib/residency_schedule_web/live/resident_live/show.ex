@@ -143,17 +143,33 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
           <a
             href={"/residents/#{@resident.id}/calendar.ics"}
             class="text-blue-600 hover:text-blue-800"
-            title="Download this schedule as an iCalendar file to import into Google Calendar, Apple Calendar, or Outlook"
+            title="One-time download — import into any calendar app"
           >
             Download .ics
+          </a>
+          <span class="text-gray-300 mx-1">·</span>
+          <a
+            href={"/feed/#{@resident.calendar_token}/calendar.ics"}
+            class="text-blue-600 hover:text-blue-800"
+            title="Subscribe — paste this URL into Google Calendar's 'Add from URL' to get live updates"
+            onclick="navigator.clipboard.writeText(window.location.origin + this.getAttribute('href')); event.preventDefault(); this.textContent = 'Copied!'; setTimeout(() => this.textContent = 'Subscribe URL', 1500);"
+          >
+            Subscribe URL
           </a>
         </div>
 
         <%!-- Sticky stats container --%>
         <div id="sticky-stats" class="sticky top-14 z-40 bg-white mb-3">
-          <div class="border-2 border-gray-300 rounded-xl overflow-y-auto max-h-[30vh]">
-            <%!-- Card header: resident name + label + collapse toggle --%>
-            <div class="flex items-center justify-between px-4 py-2 bg-gray-100 border-b-2 border-gray-300">
+          <%!-- Stats card: scrollable body, toggle button anchored at bottom outside scroll --%>
+          <div class={[
+            "border-2 border-gray-300",
+            if(@stats_expanded && @night_shift_counts != [],
+              do: "rounded-t-xl",
+              else: "rounded-xl"
+            )
+          ]}>
+            <%!-- Card header --%>
+            <div class="flex items-center justify-between px-4 py-2 bg-gray-100 border-b-2 border-gray-300 rounded-t-xl">
               <span class="text-xs font-semibold text-gray-600">
                 <span class="text-gray-800"><%= @resident.name %></span>
                 <span class="text-gray-400 mx-1">·</span>
@@ -185,37 +201,42 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             </div>
 
             <%= if @stats_expanded do %>
-              <%!-- Stats grid: light grey fill, subtle internal dividers --%>
-              <div class="grid grid-cols-2 divide-x divide-y divide-gray-200 bg-gray-50">
-                <div class="px-4 py-3" title="Total scheduled service blocks (excludes vacation)">
-                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
-                    Total Shifts
-                  </p>
-                  <p class="text-xl font-bold text-gray-800"><%= @total_shifts %></p>
-                </div>
-                <div class="px-4 py-3" title="Service blocks with a start date on or after today">
-                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
-                    Shifts Remaining
-                  </p>
-                  <p class="text-xl font-bold text-gray-800"><%= @shifts_remaining %></p>
-                </div>
-                <div class="px-4 py-3" title="Night float and weekend night blocks at Strong Memorial remaining">
-                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
-                    Night Shifts Remaining – Strong
-                  </p>
-                  <p class="text-xl font-bold text-gray-800"><%= @night_shifts_remaining_strong %></p>
-                </div>
-                <div class="px-4 py-3" title="Night float and weekend night blocks at Highland remaining">
-                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
-                    Night Shifts Remaining – Highland
-                  </p>
-                  <p class="text-xl font-bold text-gray-800"><%= @night_shifts_remaining_highland %></p>
+              <%!-- Stats grid: scrollable, capped height --%>
+              <div class="overflow-y-auto max-h-[25vh]">
+                <div class="grid grid-cols-2 divide-x divide-y divide-gray-200 bg-gray-50">
+                  <div class="px-4 py-3" title="Total scheduled service blocks (excludes vacation)">
+                    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                      Total Shifts
+                    </p>
+                    <p class="text-xl font-bold text-gray-800"><%= @total_shifts %></p>
+                  </div>
+                  <div class="px-4 py-3" title="Service blocks with a start date on or after today">
+                    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                      Shifts Remaining
+                    </p>
+                    <p class="text-xl font-bold text-gray-800"><%= @shifts_remaining %></p>
+                  </div>
+                  <div class="px-4 py-3" title="Night float and weekend night blocks at Strong Memorial remaining">
+                    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                      Night Shifts Remaining – Strong
+                    </p>
+                    <p class="text-xl font-bold text-gray-800"><%= @night_shifts_remaining_strong %></p>
+                  </div>
+                  <div class="px-4 py-3" title="Night float and weekend night blocks at Highland remaining">
+                    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                      Night Shifts Remaining – Highland
+                    </p>
+                    <p class="text-xl font-bold text-gray-800"><%= @night_shifts_remaining_highland %></p>
+                  </div>
                 </div>
               </div>
 
-              <%!-- Night shift breakdown (expandable row inside the card) --%>
+              <%!-- Night shift toggle: anchored at card bottom, never inside the scroll area --%>
               <%= if @night_shift_counts != [] do %>
-                <div class="border-t border-gray-200 bg-gray-50">
+                <div class={[
+                  "border-t border-gray-200",
+                  if(@stats_expanded && @night_shift_counts != [], do: "", else: "rounded-b-xl")
+                ]}>
                   <button
                     phx-click="toggle_night_shifts"
                     class="flex items-center justify-between w-full px-4 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
@@ -244,31 +265,35 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                       <%= if @night_shifts_expanded, do: "Collapse", else: "Expand" %>
                     </span>
                   </button>
-                  <%= if @night_shifts_expanded do %>
-                    <div class="divide-y divide-gray-100 border-t border-gray-100">
-                      <%= for {type, days} <- @night_shift_counts do %>
-                        <% color = Rotations.rotation_type_color(type) %>
-                        <div class="flex items-center justify-between px-4 py-2">
-                          <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
-                            <%= Rotations.rotation_type_label(type) %>
-                          </span>
-                          <span class="text-sm font-semibold text-gray-700">
-                            <%= days %> day<%= if days != 1, do: "s" %>
-                          </span>
-                        </div>
-                      <% end %>
-                      <div class="flex items-center justify-between px-4 py-2 bg-gray-50">
-                        <span class="text-sm font-medium text-gray-600">Total</span>
-                        <span class="text-sm font-bold text-gray-800">
-                          <%= @night_shift_counts |> Enum.map(&elem(&1, 1)) |> Enum.sum() %> days
-                        </span>
-                      </div>
-                    </div>
-                  <% end %>
                 </div>
               <% end %>
             <% end %>
           </div>
+
+          <%!-- Night shift breakdown drawer: expands below the card --%>
+          <%= if @stats_expanded && @night_shifts_expanded && @night_shift_counts != [] do %>
+            <div class="border-2 border-t-0 border-gray-300 rounded-b-xl overflow-hidden">
+              <div class="divide-y divide-gray-100">
+                <%= for {type, days} <- @night_shift_counts do %>
+                  <% color = Rotations.rotation_type_color(type) %>
+                  <div class="flex items-center justify-between px-4 py-2 bg-white">
+                    <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
+                      <%= Rotations.rotation_type_label(type) %>
+                    </span>
+                    <span class="text-sm font-semibold text-gray-700">
+                      <%= days %> day<%= if days != 1, do: "s" %>
+                    </span>
+                  </div>
+                <% end %>
+                <div class="flex items-center justify-between px-4 py-2 bg-gray-50">
+                  <span class="text-sm font-medium text-gray-600">Total</span>
+                  <span class="text-sm font-bold text-gray-800">
+                    <%= @night_shift_counts |> Enum.map(&elem(&1, 1)) |> Enum.sum() %> days
+                  </span>
+                </div>
+              </div>
+            </div>
+          <% end %>
         </div>
 
         <div id="rotation-table" phx-hook="ScrollToToday" class="border-2 border-gray-300 rounded-xl overflow-auto overscroll-contain">

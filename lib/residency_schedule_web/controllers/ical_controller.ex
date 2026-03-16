@@ -6,6 +6,15 @@ defmodule ResidencyScheduleWeb.IcalController do
 
   def show(conn, %{"id" => id}) do
     resident = Residents.get_resident!(String.to_integer(id))
+    send_ical(conn, resident)
+  end
+
+  def feed(conn, %{"token" => token}) do
+    resident = Residents.get_resident_by_token!(token)
+    send_ical(conn, resident)
+  end
+
+  defp send_ical(conn, resident) do
     ical = Ical.build(resident)
 
     conn
