@@ -332,7 +332,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
   defp maybe_load_comparison(socket) do
     %{resident_a_id: a_id, resident_b_id: b_id} = socket.assigns
     today = Date.utc_today()
-    co_service_days = Rotations.list_co_service_days(a_id, b_id)
+    co_service_days = Rotations.list_effective_co_service_days(a_id, b_id)
     total_days = length(co_service_days)
 
     shared_shifts_remaining =

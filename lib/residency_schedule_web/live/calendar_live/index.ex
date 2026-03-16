@@ -3,18 +3,24 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
   alias ResidencySchedule.Schedules
   alias ResidencySchedule.Rotations
+  alias ResidencySchedule.ShiftOverrides
 
   @impl true
   def mount(_params, _session, socket) do
     any_schedules? = Schedules.list_schedules() != []
     current_month = Date.utc_today() |> Date.beginning_of_month()
-    rotation_index = if any_schedules?, do: build_rotation_index(current_month), else: %{}
+
+    {rotation_index, override_index} =
+      if any_schedules?,
+        do: build_indexes(current_month),
+        else: {%{}, %{}}
 
     {:ok,
      assign(socket,
        any_schedules?: any_schedules?,
        current_month: current_month,
        rotation_index: rotation_index,
+       override_index: override_index,
        selected_date: nil,
        day_detail: []
      )}
@@ -23,11 +29,13 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   @impl true
   def handle_event("prev_month", _params, socket) do
     new_month = Date.shift(socket.assigns.current_month, month: -1)
+    {rotation_index, override_index} = build_indexes(new_month)
 
     {:noreply,
      assign(socket,
        current_month: new_month,
-       rotation_index: build_rotation_index(new_month),
+       rotation_index: rotation_index,
+       override_index: override_index,
        selected_date: nil,
        day_detail: []
      )}
@@ -36,11 +44,13 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   @impl true
   def handle_event("next_month", _params, socket) do
     new_month = Date.shift(socket.assigns.current_month, month: 1)
+    {rotation_index, override_index} = build_indexes(new_month)
 
     {:noreply,
      assign(socket,
        current_month: new_month,
-       rotation_index: build_rotation_index(new_month),
+       rotation_index: rotation_index,
+       override_index: override_index,
        selected_date: nil,
        day_detail: []
      )}
@@ -49,7 +59,14 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   @impl true
   def handle_event("select_day", %{"date" => date_str}, socket) do
     date = Date.from_iso8601!(date_str)
-    day_detail = Map.get(socket.assigns.rotation_index, date, []) |> group_by_type()
+
+    day_detail =
+      build_effective_day_detail(
+        date,
+        Map.get(socket.assigns.rotation_index, date, []),
+        Map.get(socket.assigns.override_index, date, [])
+      )
+
     {:noreply, assign(socket, selected_date: date, day_detail: day_detail)}
   end
 
@@ -126,12 +143,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         <%!-- Day detail modal --%>
         <%= if @selected_date do %>
           <div class="fixed inset-0 z-50 flex items-center justify-center">
-            <%!-- Backdrop --%>
-            <div
-              phx-click="close_modal"
-              class="absolute inset-0 bg-black/40"
-            ></div>
-            <%!-- Panel --%>
+            <div phx-click="close_modal" class="absolute inset-0 bg-black/40"></div>
             <div class="relative bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 z-10 max-h-[80vh] overflow-y-auto">
               <div class="flex items-start justify-between mb-4">
                 <h3 class="text-lg font-semibold text-gray-800">
@@ -149,7 +161,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                 <p class="text-sm text-gray-400">No rotations recorded for this day.</p>
               <% else %>
                 <div class="space-y-4">
-                  <%= for {type, rotations} <- @day_detail do %>
+                  <%= for {type, entries} <- @day_detail do %>
                     <% color = Rotations.rotation_type_color(type) %>
                     <div>
                       <div class="flex items-center gap-2 mb-2">
@@ -157,21 +169,32 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                           <%= Rotations.rotation_type_label(type) %>
                         </span>
                         <span class="text-xs text-gray-400">
-                          <%= length(rotations) %> resident<%= if length(rotations) != 1, do: "s" %>
+                          <%= length(entries) %> resident<%= if length(entries) != 1, do: "s" %>
                         </span>
                       </div>
                       <ul class="space-y-1 pl-1">
-                        <%= for rot <- Enum.sort_by(rotations, &{&1.resident.residency_year, &1.resident.schedule_number}) do %>
-                          <li class="flex items-center gap-2 text-sm text-gray-700">
+                        <%= for entry <- entries do %>
+                          <li class="flex items-center gap-2 text-sm">
                             <span class="text-xs text-gray-400 font-mono w-10">
-                              <%= rot.resident.position_code %>
+                              <%= entry.resident.position_code %>
                             </span>
                             <.link
-                              navigate={"/residents/#{rot.resident.id}"}
-                              class="hover:text-blue-600 hover:underline"
+                              navigate={"/residents/#{entry.resident.id}"}
+                              class={[
+                                "hover:text-blue-600 hover:underline",
+                                if(entry.overridden, do: "line-through text-gray-400", else: "text-gray-700")
+                              ]}
                             >
-                              <%= rot.resident.name %>
+                              <%= entry.resident.name %>
                             </.link>
+                            <%= if entry.overridden do %>
+                              <span class="text-xs text-gray-400 italic">
+                                → <%= entry.covered_by.name %>
+                              </span>
+                            <% end %>
+                            <%= if entry.is_coverage do %>
+                              <span class="text-xs text-blue-500 italic">(covering)</span>
+                            <% end %>
                           </li>
                         <% end %>
                       </ul>
@@ -191,14 +214,61 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     """
   end
 
-  defp build_rotation_index(current_month) do
-    current_month.year
-    |> Rotations.list_rotations_for_month_all_schedules(current_month.month)
-    |> Enum.flat_map(fn rot ->
-      Date.range(rot.start_date, rot.end_date)
-      |> Enum.map(&{&1, rot})
-    end)
-    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+  # Builds both the rotation index (date → [rotation]) and the override index (date → [override]).
+  defp build_indexes(current_month) do
+    rotations = Rotations.list_rotations_for_month_all_schedules(current_month.year, current_month.month)
+    overrides = ShiftOverrides.list_overrides_for_month(current_month.year, current_month.month)
+
+    rotation_index =
+      rotations
+      |> Enum.flat_map(fn rot ->
+        Date.range(rot.start_date, rot.end_date) |> Enum.map(&{&1, rot})
+      end)
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+
+    override_index =
+      overrides
+      |> Enum.flat_map(fn o ->
+        Date.range(o.override_start_date, o.override_end_date) |> Enum.map(&{&1, o})
+      end)
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+
+    {rotation_index, override_index}
+  end
+
+  # Builds the effective day detail entries for the modal, reflecting overrides.
+  # Each entry is %{resident, rotation_type, overridden, covered_by, is_coverage}.
+  defp build_effective_day_detail(_date, rotations, overrides) do
+    # Map rotation_id → override for fast lookup
+    override_by_rotation = Map.new(overrides, fn o -> {o.rotation_id, o} end)
+
+    # Set of covering resident IDs active today (they appear under the overridden rotation)
+    covering_today = MapSet.new(overrides, & &1.covering_resident_id)
+
+    effective =
+      Enum.flat_map(rotations, fn rot ->
+        if MapSet.member?(covering_today, rot.resident_id) do
+          # This resident is covering someone else today — suppress from their own rotation
+          []
+        else
+          case Map.get(override_by_rotation, rot.id) do
+            nil ->
+              [%{resident: rot.resident, rotation_type: rot.rotation_type, overridden: false, covered_by: nil, is_coverage: false}]
+
+            override ->
+              # Original resident is being covered — show crossed out, then the covering resident
+              [
+                %{resident: rot.resident, rotation_type: rot.rotation_type, overridden: true, covered_by: override.covering_resident, is_coverage: false},
+                %{resident: override.covering_resident, rotation_type: rot.rotation_type, overridden: false, covered_by: nil, is_coverage: true}
+              ]
+          end
+        end
+      end)
+
+    effective
+    |> Enum.sort_by(fn e -> {e.rotation_type, e.resident.residency_year, e.resident.schedule_number} end)
+    |> Enum.group_by(& &1.rotation_type)
+    |> Enum.sort_by(&elem(&1, 0))
   end
 
   defp group_by_type(rotations) do

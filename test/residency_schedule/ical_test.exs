@@ -108,19 +108,18 @@ defmodule ResidencySchedule.IcalTest do
     end
   end
 
-  # ── build/1 ─────────────────────────────────────────────────────────────────
+  # ── build_from_segments/2 ───────────────────────────────────────────────────
 
-  describe "build/1" do
+  describe "build_from_segments/2" do
     test "produces a valid VCALENDAR structure" do
-      resident = %{name: "Test", rotations: []}
-      result = Ical.build(resident)
+      result = Ical.build_from_segments([], "Test")
       assert result =~ "BEGIN:VCALENDAR"
       assert result =~ "END:VCALENDAR"
     end
 
     test "night shift block generates per-day 6pm→6am events" do
-      rotation = %{id: 1, rotation_type: "night_float", start_date: ~D[2026-03-09], end_date: ~D[2026-03-10]}
-      result = Ical.build(%{name: "Test", rotations: [rotation]})
+      seg = %{rotation_type: "night_float", start_date: ~D[2026-03-09], end_date: ~D[2026-03-10]}
+      result = Ical.build_from_segments([seg], "Test")
       assert result =~ "DTSTART:20260308T180000"
       assert result =~ "DTEND:20260309T060000"
       assert result =~ "DTSTART:20260309T180000"
@@ -128,8 +127,8 @@ defmodule ResidencySchedule.IcalTest do
     end
 
     test "day shift block generates per-day 6am→6pm events" do
-      rotation = %{id: 1, rotation_type: "ambulatory", start_date: ~D[2026-03-02], end_date: ~D[2026-03-03]}
-      result = Ical.build(%{name: "Test", rotations: [rotation]})
+      seg = %{rotation_type: "ambulatory", start_date: ~D[2026-03-02], end_date: ~D[2026-03-03]}
+      result = Ical.build_from_segments([seg], "Test")
       assert result =~ "DTSTART:20260302T060000"
       assert result =~ "DTEND:20260302T180000"
       assert result =~ "DTSTART:20260303T060000"
@@ -137,58 +136,79 @@ defmodule ResidencySchedule.IcalTest do
     end
 
     test "vacation generates a single all-day event spanning the full block" do
-      vac = %{id: 1, rotation_type: "vacation", start_date: ~D[2026-03-09], end_date: ~D[2026-03-15]}
-      result = Ical.build(%{name: "Test", rotations: [vac]})
+      seg = %{rotation_type: "vacation", start_date: ~D[2026-03-09], end_date: ~D[2026-03-15]}
+      result = Ical.build_from_segments([seg], "Test")
       assert result =~ "DTSTART;VALUE=DATE:20260309"
       assert result =~ "DTEND;VALUE=DATE:20260316"
-      # Only one VEVENT (not per-day)
       assert length(Regex.scan(~r/BEGIN:VEVENT/, result)) == 1
     end
 
     test "post_call generates a single all-day event" do
-      pc = %{id: 1, rotation_type: "post_call", start_date: ~D[2026-03-14], end_date: ~D[2026-03-15]}
-      result = Ical.build(%{name: "Test", rotations: [pc]})
+      seg = %{rotation_type: "post_call", start_date: ~D[2026-03-14], end_date: ~D[2026-03-15]}
+      result = Ical.build_from_segments([seg], "Test")
       assert result =~ "DTSTART;VALUE=DATE:20260314"
       assert result =~ "DTEND;VALUE=DATE:20260316"
     end
 
     test "float generates a single all-day event" do
-      fl = %{id: 1, rotation_type: "float", start_date: ~D[2026-03-02], end_date: ~D[2026-03-06]}
-      result = Ical.build(%{name: "Test", rotations: [fl]})
+      seg = %{rotation_type: "float", start_date: ~D[2026-03-02], end_date: ~D[2026-03-06]}
+      result = Ical.build_from_segments([seg], "Test")
       assert result =~ "DTSTART;VALUE=DATE:20260302"
       assert result =~ "DTEND;VALUE=DATE:20260307"
     end
 
     test "last day of day-shift block trimmed when immediately followed by night shift" do
-      amb = %{id: 1, rotation_type: "ambulatory", start_date: ~D[2026-02-23], end_date: ~D[2026-02-27]}
-      swn = %{id: 2, rotation_type: "strong_weekend_nights", start_date: ~D[2026-02-28], end_date: ~D[2026-03-01]}
-      result = Ical.build(%{name: "Test", rotations: [amb, swn]})
+      amb = %{rotation_type: "ambulatory", start_date: ~D[2026-02-23], end_date: ~D[2026-02-27]}
+      swn = %{rotation_type: "strong_weekend_nights", start_date: ~D[2026-02-28], end_date: ~D[2026-03-01]}
+      result = Ical.build_from_segments([amb, swn], "Test")
       assert result =~ "DTSTART:20260226T060000"
       refute result =~ "DTSTART:20260227T060000"
       assert result =~ "DTSTART:20260227T180000"
     end
 
     test "all-day block trimmed when immediately followed by night shift" do
-      pc = %{id: 1, rotation_type: "post_call", start_date: ~D[2026-03-14], end_date: ~D[2026-03-15]}
-      nf = %{id: 2, rotation_type: "night_float", start_date: ~D[2026-03-16], end_date: ~D[2026-03-20]}
-      result = Ical.build(%{name: "Test", rotations: [pc, nf]})
-      # DTEND should be 03-15 (exclusive), meaning only 03-14 is shown
+      pc = %{rotation_type: "post_call", start_date: ~D[2026-03-14], end_date: ~D[2026-03-15]}
+      nf = %{rotation_type: "night_float", start_date: ~D[2026-03-16], end_date: ~D[2026-03-20]}
+      result = Ical.build_from_segments([pc, nf], "Test")
       assert result =~ "DTSTART;VALUE=DATE:20260314"
       assert result =~ "DTEND;VALUE=DATE:20260315"
     end
 
     test "last day NOT trimmed when next shift is a day shift" do
-      amb1 = %{id: 1, rotation_type: "ambulatory", start_date: ~D[2026-03-02], end_date: ~D[2026-03-06]}
-      amb2 = %{id: 2, rotation_type: "ambulatory", start_date: ~D[2026-03-07], end_date: ~D[2026-03-08]}
-      result = Ical.build(%{name: "Test", rotations: [amb1, amb2]})
+      amb1 = %{rotation_type: "ambulatory", start_date: ~D[2026-03-02], end_date: ~D[2026-03-06]}
+      amb2 = %{rotation_type: "ambulatory", start_date: ~D[2026-03-07], end_date: ~D[2026-03-08]}
+      result = Ical.build_from_segments([amb1, amb2], "Test")
       assert result =~ "DTSTART:20260306T060000"
     end
 
     test "last day NOT trimmed when there is a gap before the night shift" do
-      amb = %{id: 1, rotation_type: "ambulatory", start_date: ~D[2026-03-02], end_date: ~D[2026-03-06]}
-      nf = %{id: 2, rotation_type: "night_float", start_date: ~D[2026-03-08], end_date: ~D[2026-03-10]}
-      result = Ical.build(%{name: "Test", rotations: [amb, nf]})
+      amb = %{rotation_type: "ambulatory", start_date: ~D[2026-03-02], end_date: ~D[2026-03-06]}
+      nf = %{rotation_type: "night_float", start_date: ~D[2026-03-08], end_date: ~D[2026-03-10]}
+      result = Ical.build_from_segments([amb, nf], "Test")
       assert result =~ "DTSTART:20260306T060000"
+    end
+
+    test "segments with covered_by set are excluded" do
+      covering_resident = %{name: "Emily"}
+
+      seg_free = %{rotation_type: "ambulatory", start_date: ~D[2026-03-01], end_date: ~D[2026-03-07], covered_by: nil}
+      seg_covered = %{rotation_type: "ambulatory", start_date: ~D[2026-03-08], end_date: ~D[2026-03-14], covered_by: covering_resident}
+
+      result = Ical.build_from_segments([seg_free, seg_covered], "Clare")
+      # Free segment appears
+      assert result =~ "DTSTART:20260301T060000"
+      # Covered segment does not appear
+      refute result =~ "DTSTART:20260308T060000"
+    end
+
+    test "coverage segments (is_coverage: true) are included" do
+      original_resident = %{name: "Clare"}
+
+      seg = %{rotation_type: "night_float", start_date: ~D[2026-03-08], end_date: ~D[2026-03-10],
+              covered_by: nil, is_coverage: true, original_resident: original_resident}
+
+      result = Ical.build_from_segments([seg], "Emily")
+      assert result =~ "DTSTART:20260307T180000"
     end
   end
 end

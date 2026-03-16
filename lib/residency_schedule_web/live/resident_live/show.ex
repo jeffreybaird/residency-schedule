@@ -26,7 +26,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
     schedule_slots = Rotations.list_schedule_slots(resident.schedule_id)
     off_slots = compute_off_slots(resident.rotations, schedule_slots)
-    all_entries = merge_entries(resident.rotations, off_slots)
+    effective_segs = Rotations.effective_segments_for_resident(resident.id)
+    all_entries = merge_effective_entries(effective_segs, off_slots)
 
     today_anchor_slot_index =
       case Enum.find(all_entries, fn e -> Date.compare(e.end_date, today) != :lt end) do
@@ -283,16 +284,30 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             <tbody class="divide-y divide-gray-100">
               <%= for entry <- @all_entries do %>
                 <% past = Date.compare(entry.end_date, @today) == :lt %>
+                <% covered = Map.get(entry, :covered_by) %>
+                <% is_coverage = Map.get(entry, :is_coverage, false) %>
                 <% color = entry_color(entry.rotation_type) %>
                 <% label = entry_label(entry.rotation_type) %>
                 <tr
                   data-today-anchor={if entry.slot_index == @today_anchor_slot_index, do: "true"}
-                  class={entry_row_class(entry.rotation_type, past)}
+                  class={[entry_row_class(entry.rotation_type, past), if(covered, do: "opacity-60", else: "")]}
                 >
                   <td class="px-4 py-2">
-                    <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
-                      <%= label %>
-                    </span>
+                    <div class="flex flex-col gap-0.5">
+                      <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color} #{if covered, do: "line-through opacity-70", else: ""}"}>
+                        <%= label %>
+                      </span>
+                      <%= if covered do %>
+                        <span class="text-xs text-gray-400 italic">
+                          covered by <%= covered.name %>
+                        </span>
+                      <% end %>
+                      <%= if is_coverage do %>
+                        <span class="text-xs text-blue-500 italic">
+                          covering <%= entry.original_resident.name %>
+                        </span>
+                      <% end %>
+                    </div>
                   </td>
                   <td class={["px-4 py-2", if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")]}>
                     <%= Calendar.strftime(entry.start_date, "%b %-d, %Y") %>
@@ -345,18 +360,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     end)
   end
 
-  defp merge_entries(rotations, off_slots) do
-    rotation_maps =
-      Enum.map(rotations, fn r ->
-        %{
-          slot_index: r.slot_index,
-          start_date: r.start_date,
-          end_date: r.end_date,
-          rotation_type: r.rotation_type
-        }
-      end)
-
-    (rotation_maps ++ off_slots)
+  defp merge_effective_entries(effective_segs, off_slots) do
+    (effective_segs ++ off_slots)
     |> Enum.sort_by(& &1.start_date, Date)
   end
 
