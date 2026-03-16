@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-18 -12 156 140">
+
+  <!-- 4-pointed sparkle stars -->
+  <path d="M60 -10 L62.2 -2 L70 0 L62.2 2 L60 10 L57.8 2 L50 0 L57.8 -2Z" fill="#7C1D46"/>
+  <path d="M16 90 L17.4 95 L22 96 L17.4 97 L16 102 L14.6 97 L10 96 L14.6 95Z" fill="#7C1D46"/>
+  <path d="M104 90 L105.4 95 L110 96 L105.4 97 L104 102 L102.6 97 L98 96 L102.6 95Z" fill="#7C1D46"/>
+  <path d="M20 12 L21 16 L25 17 L21 18 L20 22 L19 18 L15 17 L19 16Z" fill="#7C1D46"/>
+
+  <!-- Left ovary -->
+  <ellipse cx="-3" cy="50" rx="13" ry="11" fill="#7C1D46"/>
+  <ellipse cx="-3" cy="50" rx="11" ry="9.5" fill="#FFF5F7"/>
+  <!-- Left fimbriae -->
+  <path d="M5 41 Q8 36 5 32" stroke="#7C1D46" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M0 40 Q1 34 3 31" stroke="#7C1D46" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M-6 43 Q-10 38 -8 34" stroke="#7C1D46" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Right ovary -->
+  <ellipse cx="123" cy="50" rx="13" ry="11" fill="#7C1D46"/>
+  <ellipse cx="123" cy="50" rx="11" ry="9.5" fill="#FFF5F7"/>
+  <!-- Right fimbriae -->
+  <path d="M115 41 Q112 36 115 32" stroke="#7C1D46" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M120 40 Q119 34 117 31" stroke="#7C1D46" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M126 43 Q130 38 128 34" stroke="#7C1D46" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Left tube: sweeps up then curves down to ovary -->
+  <path d="M27 38 C12 18 -10 28 -3 50"
+    stroke="#7C1D46" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <path d="M27 38 C12 18 -10 28 -3 50"
+    stroke="#F9A8D4" stroke-width="6" fill="none" stroke-linecap="round"/>
+
+  <!-- Right tube -->
+  <path d="M93 38 C108 18 130 28 123 50"
+    stroke="#7C1D46" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <path d="M93 38 C108 18 130 28 123 50"
+    stroke="#F9A8D4" stroke-width="6" fill="none" stroke-linecap="round"/>
+
+  <!-- Uterus body outline -->
+  <path d="M60 94
+    C44 94 30 85 27 72
+    C24 59 24 46 28 37
+    C32 28 41 22 60 22
+    C79 22 88 28 92 37
+    C96 46 96 59 93 72
+    C90 85 76 94 60 94Z"
+    fill="#7C1D46"/>
+
+  <!-- Uterus body fill -->
+  <path d="M60 91
+    C45 91 32 83 29 71
+    C26 59 26 46 30 38
+    C34 30 43 25 60 25
+    C77 25 86 30 90 38
+    C94 46 94 59 91 71
+    C88 83 75 91 60 91Z"
+    fill="#F9A8D4"/>
+
+  <!-- Inner cavity highlight -->
+  <path d="M60 83
+    C49 83 40 76 38 66
+    C36 56 37 46 41 40
+    C45 35 51 32 60 32
+    C69 32 75 35 79 40
+    C83 46 84 56 82 66
+    C80 76 71 83 60 83Z"
+    fill="#FCE7F3" opacity="0.6"/>
+
+  <!-- Fundal notch -->
+  <path d="M51 26 Q60 34 69 26"
+    stroke="#7C1D46" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+
+  <!-- Cervix outline -->
+  <path d="M52 90 L52 107 Q52 114 60 114 Q68 114 68 107 L68 90Z" fill="#7C1D46"/>
+  <!-- Cervix fill -->
+  <path d="M54 90 L54 107 Q54 112 60 112 Q66 112 66 107 L66 90Z" fill="#F472B6"/>
+  <!-- Cervical os -->
+  <ellipse cx="60" cy="109" rx="3" ry="2" fill="#9D174D"/>
+
+  <!-- Left eye -->
+  <circle cx="48" cy="60" r="6.5" fill="#3D1A2B"/>
+  <circle cx="50.5" cy="57.5" r="2.2" fill="white"/>
+  <circle cx="50" cy="57" r="1" fill="white" opacity="0.6"/>
+
+  <!-- Right eye -->
+  <circle cx="72" cy="60" r="6.5" fill="#3D1A2B"/>
+  <circle cx="74.5" cy="57.5" r="2.2" fill="white"/>
+  <circle cx="74" cy="57" r="1" fill="white" opacity="0.6"/>
+
+  <!-- Smile -->
+  <path d="M50 72 Q60 80 70 72"
+    stroke="#7C1D46" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+
+  <!-- Blush cheeks -->
+  <ellipse cx="40" cy="68" rx="7" ry="4.5" fill="#FB7185" opacity="0.45"/>
+  <ellipse cx="80" cy="68" rx="7" ry="4.5" fill="#FB7185" opacity="0.45"/>
+
+</svg>

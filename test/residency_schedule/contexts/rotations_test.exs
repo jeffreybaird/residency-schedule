@@ -103,6 +103,37 @@ defmodule ResidencySchedule.RotationsTest do
     end
   end
 
+  describe "list_rotations_for_month_all_schedules/2" do
+    test "returns rotations from all schedules that overlap the given month", %{schedule: _sched} do
+      # ra has oncology 2023-07-03..07-07, rb has night_float same dates — both in July 2023
+      rotations = Rotations.list_rotations_for_month_all_schedules(2023, 7)
+      types = Enum.map(rotations, & &1.rotation_type)
+      assert "oncology" in types
+      assert "night_float" in types
+    end
+
+    test "returns rotations from a second schedule in the same month", %{} do
+      {:ok, sched2} = Schedules.upsert_schedule(2024, "2024–2025")
+      {:ok, res2} = Residents.insert_resident(sched2.id, %{
+        position_code: "R1-1", residency_year: 1, schedule_number: 1, name: "Jordan"
+      })
+      rots = [%{slot_index: 0, start_date: ~D[2024-07-01], end_date: ~D[2024-07-14], rotation_type: :ambulatory}]
+      {:ok, _} = Rotations.insert_rotations(res2.id, rots)
+
+      rotations = Rotations.list_rotations_for_month_all_schedules(2024, 7)
+      assert Enum.any?(rotations, &(&1.rotation_type == "ambulatory"))
+    end
+
+    test "returns empty list when no rotations overlap the given month" do
+      assert Rotations.list_rotations_for_month_all_schedules(2000, 1) == []
+    end
+
+    test "preloads resident association", %{ra: _ra} do
+      [rot | _] = Rotations.list_rotations_for_month_all_schedules(2023, 7)
+      assert %ResidencySchedule.Residents.Resident{} = rot.resident
+    end
+  end
+
   describe "list_co_service_days/2" do
     test "excludes float and post_call rotations", %{schedule: sched} do
       {:ok, r3} = Residents.insert_resident(sched.id, %{
@@ -124,6 +155,25 @@ defmodule ResidencySchedule.RotationsTest do
       days = Rotations.list_co_service_days(ra.id, r3.id)
       float_days = Enum.filter(days, &(&1.rotation_type == "float"))
       assert float_days == []
+    end
+
+    test "excludes elective rotations", %{schedule: sched} do
+      {:ok, rc} = Residents.insert_resident(sched.id, %{
+        position_code: "R2-1", residency_year: 2, schedule_number: 1, name: "Morgan"
+      })
+      elective_rots = [
+        %{slot_index: 11, start_date: ~D[2023-09-01], end_date: ~D[2023-09-07], rotation_type: :elective}
+      ]
+      {:ok, _} = Rotations.insert_rotations(rc.id, elective_rots)
+
+      {:ok, rd} = Residents.insert_resident(sched.id, %{
+        position_code: "R2-2", residency_year: 2, schedule_number: 2, name: "Quinn"
+      })
+      {:ok, _} = Rotations.insert_rotations(rd.id, elective_rots)
+
+      days = Rotations.list_co_service_days(rc.id, rd.id)
+      elective_days = Enum.filter(days, &(&1.rotation_type == "elective"))
+      assert elective_days == []
     end
 
     test "returns days where two residents share the same service", %{ra: ra, rb: rb} do
