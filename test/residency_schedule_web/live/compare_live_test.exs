@@ -34,7 +34,7 @@ defmodule ResidencyScheduleWeb.CompareLiveTest do
       assert html =~ "Resident B"
     end
 
-    test "selecting two residents shows shared shifts", %{view: view} do
+    test "selecting two residents shows shared shifts stats", %{view: view} do
       residents = ResidencySchedule.Residents.list_residents()
       [a, b | _] = residents
 
@@ -51,7 +51,6 @@ defmodule ResidencyScheduleWeb.CompareLiveTest do
     end
 
     test "no shared shifts message shown when residents share no service", %{view: view} do
-      # Select the same resident for both — yields no co-service from DB query
       residents = ResidencySchedule.Residents.list_residents()
       [a, b | _] = residents
 
@@ -66,6 +65,56 @@ defmodule ResidencyScheduleWeb.CompareLiveTest do
 
       # Either shows a co-service table or a "No shared shifts" message
       assert html =~ "Shared Shifts" or html =~ "No shared shifts"
+    end
+
+    test "toggle_stats collapses and hides dropdowns", %{view: view} do
+      html = view |> element("button[phx-click='toggle_stats']") |> render_click()
+      refute html =~ "Resident A"
+      refute html =~ "Resident B"
+    end
+
+    test "toggle_stats expands again after collapsing", %{view: view} do
+      view |> element("button[phx-click='toggle_stats']") |> render_click()
+      html = view |> element("button[phx-click='toggle_stats']") |> render_click()
+      assert html =~ "Resident A"
+      assert html =~ "Resident B"
+    end
+
+    test "summary breakdown is pre-collapsed and expands on toggle", %{view: view} do
+      residents = ResidencySchedule.Residents.list_residents()
+      [a, b | _] = residents
+
+      view
+      |> element("form[phx-change='select_resident_a']")
+      |> render_change(%{"resident_id" => to_string(a.id)})
+
+      html =
+        view
+        |> element("form[phx-change='select_resident_b']")
+        |> render_change(%{"resident_id" => to_string(b.id)})
+
+      # Breakdown button is present but content is pre-collapsed
+      assert html =~ "Shared Shift Breakdown"
+
+      expanded_html = view |> element("button[phx-click='toggle_summary']") |> render_click()
+      assert expanded_html =~ "Collapse"
+    end
+
+    test "toggle_summary collapses after expanding", %{view: view} do
+      residents = ResidencySchedule.Residents.list_residents()
+      [a, b | _] = residents
+
+      view
+      |> element("form[phx-change='select_resident_a']")
+      |> render_change(%{"resident_id" => to_string(a.id)})
+
+      view
+      |> element("form[phx-change='select_resident_b']")
+      |> render_change(%{"resident_id" => to_string(b.id)})
+
+      view |> element("button[phx-click='toggle_summary']") |> render_click()
+      html = view |> element("button[phx-click='toggle_summary']") |> render_click()
+      assert html =~ "Expand"
     end
   end
 end
