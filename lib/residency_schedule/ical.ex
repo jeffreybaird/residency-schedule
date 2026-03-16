@@ -5,36 +5,43 @@ defmodule ResidencySchedule.Ical do
   @all_day_types ~w[vacation post_call float]
 
   @doc """
-  Builds an iCal (VCALENDAR) string for a resident's full schedule.
+  Builds an iCal (VCALENDAR) string from a list of effective segments for a resident.
 
-  Night shift types (night float, weekend nights) generate 6pm→6am events,
-  with the start time shifted to the evening before each listed date. Day shifts
-  generate 6am→6pm events. Vacation, post-call, and float are rendered as a
-  single all-day event spanning the full block.
+  Segments with `covered_by` set are excluded (someone else is working those dates).
+  Coverage segments (`is_coverage: true`) are included as their rotation type since
+  the resident is actively working those days.
 
-  When a day-shift or all-day block is immediately followed by a night-shift block,
-  the last day of the preceding block is omitted — that day is a transition day
-  with no day-shift work.
-
-      iex> resident = %{name: "Test", rotations: []}
-      iex> result = ResidencySchedule.Ical.build(resident)
+      iex> result = ResidencySchedule.Ical.build_from_segments([], "Test")
       iex> String.contains?(result, "BEGIN:VCALENDAR")
       true
   """
-  def build(resident) do
+  def build_from_segments(segments, resident_name) do
     events =
-      resident.rotations
+      segments
+      |> Enum.reject(fn s -> Map.get(s, :covered_by) != nil end)
       |> Enum.sort_by(& &1.start_date, Date)
-      |> build_all_events(resident)
+      |> build_all_events(%{name: resident_name})
 
     """
     BEGIN:VCALENDAR
     VERSION:2.0
     PRODID:-//ResidencySchedule//EN
     CALSCALE:GREGORIAN
-    X-WR-CALNAME:#{resident.name} – Schedule
+    X-WR-CALNAME:#{resident_name} – Schedule
     #{Enum.join(events, "")}END:VCALENDAR
     """
+  end
+
+  @doc """
+  Builds an iCal (VCALENDAR) string for a resident's full schedule,
+  accounting for shift overrides. Covered periods are excluded from the
+  output; coverage assignments (covering someone else) are included.
+
+  Exempt from doctest — hits the database. See unit tests for coverage.
+  """
+  def build(resident) do
+    segments = Rotations.effective_segments_for_resident(resident.id)
+    build_from_segments(segments, resident.name)
   end
 
   @doc """
@@ -124,26 +131,26 @@ defmodule ResidencySchedule.Ical do
 
   # ── Private ──────────────────────────────────────────────────────────────────
 
-  defp build_all_events(sorted_rotations, resident) do
-    sorted_rotations
+  defp build_all_events(sorted_segments, resident) do
+    sorted_segments
     |> Enum.with_index()
-    |> Enum.flat_map(fn {rotation, idx} ->
-      next = Enum.at(sorted_rotations, idx + 1)
-      trim = trim_last_day?(rotation, next)
+    |> Enum.flat_map(fn {seg, idx} ->
+      next = Enum.at(sorted_segments, idx + 1)
+      trim = trim_last_day?(seg, next)
 
-      if all_day?(rotation.rotation_type) do
-        [build_all_day_event(resident, rotation, trim)]
+      if all_day?(seg.rotation_type) do
+        [build_all_day_event(resident, seg, trim)]
       else
-        build_timed_events(resident, rotation, trim)
+        build_timed_events(resident, seg, trim)
       end
     end)
   end
 
-  defp build_all_day_event(resident, rotation, trim_last) do
-    uid = "rotation-#{rotation.id}@residency-schedule"
-    label = Rotations.rotation_type_label(rotation.rotation_type)
-    dtstart = format_date(rotation.start_date)
-    effective_end = if trim_last, do: rotation.end_date, else: Date.add(rotation.end_date, 1)
+  defp build_all_day_event(resident, seg, trim_last) do
+    uid = "seg-#{seg.rotation_type}-#{Date.to_iso8601(seg.start_date)}@residency-schedule"
+    label = Rotations.rotation_type_label(seg.rotation_type)
+    dtstart = format_date(seg.start_date)
+    effective_end = if trim_last, do: seg.end_date, else: Date.add(seg.end_date, 1)
     dtend = format_date(effective_end)
 
     """
@@ -157,18 +164,18 @@ defmodule ResidencySchedule.Ical do
     """
   end
 
-  defp build_timed_events(resident, rotation, trim_last) do
-    rotation.start_date
-    |> Date.range(rotation.end_date)
+  defp build_timed_events(resident, seg, trim_last) do
+    seg.start_date
+    |> Date.range(seg.end_date)
     |> Enum.to_list()
     |> then(fn dates -> if trim_last, do: Enum.drop(dates, -1), else: dates end)
-    |> Enum.map(&build_timed_event(resident, rotation, &1))
+    |> Enum.map(&build_timed_event(resident, seg, &1))
   end
 
-  defp build_timed_event(resident, rotation, date) do
-    uid = "rotation-#{rotation.id}-#{date}@residency-schedule"
-    label = Rotations.rotation_type_label(rotation.rotation_type)
-    {dtstart, dtend} = event_times(rotation.rotation_type, date)
+  defp build_timed_event(resident, seg, date) do
+    uid = "seg-#{seg.rotation_type}-#{Date.to_iso8601(seg.start_date)}-#{date}@residency-schedule"
+    label = Rotations.rotation_type_label(seg.rotation_type)
+    {dtstart, dtend} = event_times(seg.rotation_type, date)
 
     """
     BEGIN:VEVENT

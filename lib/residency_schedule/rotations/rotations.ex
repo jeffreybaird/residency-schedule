@@ -165,6 +165,173 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
+  Computes effective rotation segments for a resident, accounting for shift overrides.
+
+  Returns a sorted list of maps, each with:
+  - `:rotation_type` — the rotation type string
+  - `:start_date` — effective start date of this segment
+  - `:end_date` — effective end date of this segment
+  - `:slot_index` — original slot index (-1 for coverage assignments)
+  - `:is_coverage` — true when this segment is a coverage assignment for another resident
+  - `:covered_by` — the covering Resident struct when someone is covering this segment, else nil
+  - `:original_resident` — the Resident being covered when `is_coverage: true`, else nil
+
+      iex> ResidencySchedule.Rotations.effective_segments_for_resident(0)
+      []
+  """
+  def effective_segments_for_resident(resident_id) do
+    alias ResidencySchedule.ShiftOverrides
+
+    rotations = list_rotations_for_resident(resident_id)
+    overrides_as_original = ShiftOverrides.list_overrides_for_resident_as_original(resident_id)
+    overrides_as_cover = ShiftOverrides.list_overrides_for_resident_as_cover(resident_id)
+
+    # Build date blocks to remove from own rotations:
+    # {:covered_by, resident} — someone is covering for this resident during these dates
+    # :covering_elsewhere     — this resident is covering someone else; remove from own rotation
+    covered_blocks =
+      Enum.map(overrides_as_original, fn o ->
+        {o.override_start_date, o.override_end_date, {:covered_by, o.covering_resident}}
+      end)
+
+    covering_blocks =
+      Enum.map(overrides_as_cover, fn o ->
+        {o.override_start_date, o.override_end_date, :covering_elsewhere}
+      end)
+
+    all_blocks = covered_blocks ++ covering_blocks
+
+    own_segments =
+      Enum.flat_map(rotations, fn rot ->
+        overlapping =
+          all_blocks
+          |> Enum.filter(fn {bs, be, _} ->
+            Date.compare(bs, rot.end_date) != :gt and Date.compare(be, rot.start_date) != :lt
+          end)
+          |> Enum.sort_by(&elem(&1, 0), Date)
+
+        split_by_blocks(rot, overlapping)
+      end)
+
+    coverage_segments =
+      Enum.map(overrides_as_cover, fn o ->
+        %{
+          rotation_type: o.rotation.rotation_type,
+          start_date: o.override_start_date,
+          end_date: o.override_end_date,
+          slot_index: -1,
+          is_coverage: true,
+          covered_by: nil,
+          original_resident: o.rotation.resident
+        }
+      end)
+
+    (own_segments ++ coverage_segments)
+    |> Enum.sort_by(& &1.start_date, Date)
+  end
+
+  # Splits a rotation into segments, removing date blocks (coverage periods) from it.
+  # Returns free segments (covered_by: nil) and covered segments (covered_by: resident).
+  # Periods where this resident is covering elsewhere are simply omitted.
+  defp split_by_blocks(rotation, []) do
+    [
+      %{
+        rotation_type: rotation.rotation_type,
+        start_date: rotation.start_date,
+        end_date: rotation.end_date,
+        slot_index: rotation.slot_index,
+        is_coverage: false,
+        covered_by: nil,
+        original_resident: nil
+      }
+    ]
+  end
+
+  defp split_by_blocks(rotation, blocks) do
+    base = %{
+      rotation_type: rotation.rotation_type,
+      slot_index: rotation.slot_index,
+      is_coverage: false,
+      original_resident: nil,
+      start_date: rotation.start_date,
+      end_date: rotation.end_date,
+      covered_by: nil
+    }
+
+    clamped =
+      blocks
+      |> Enum.map(fn {bs, be, meta} ->
+        {Enum.max([bs, rotation.start_date], Date), Enum.min([be, rotation.end_date], Date), meta}
+      end)
+      |> Enum.filter(fn {bs, be, _} -> Date.compare(bs, be) != :gt end)
+      |> Enum.sort_by(&elem(&1, 0), Date)
+
+    {segments, current} =
+      Enum.reduce(clamped, {[], rotation.start_date}, fn {bs, be, meta}, {segs, start} ->
+        effective_bs = Enum.max([bs, start], Date)
+
+        pre =
+          if Date.compare(start, effective_bs) == :lt do
+            [%{base | start_date: start, end_date: Date.add(effective_bs, -1), covered_by: nil}]
+          else
+            []
+          end
+
+        covered =
+          case meta do
+            {:covered_by, resident} ->
+              [%{base | start_date: effective_bs, end_date: be, covered_by: resident}]
+
+            :covering_elsewhere ->
+              []
+          end
+
+        next_start = Date.add(be, 1)
+        {segs ++ pre ++ covered, Enum.max([start, next_start], Date)}
+      end)
+
+    post =
+      if Date.compare(current, rotation.end_date) != :gt do
+        [%{base | start_date: current, end_date: rotation.end_date, covered_by: nil}]
+      else
+        []
+      end
+
+    Enum.filter(segments ++ post, fn seg ->
+      Date.compare(seg.start_date, seg.end_date) != :gt
+    end)
+  end
+
+  @doc """
+  Computes effective co-service days for two residents, accounting for shift overrides.
+  Returns a list of `%{date: Date, rotation_type: String}` maps for days both residents
+  are on the same service (excluding float, post_call, vacation, ambulatory, elective).
+  """
+  def list_effective_co_service_days(resident_a_id, resident_b_id) do
+    excluded = ~w[float post_call vacation ambulatory elective]
+
+    segs_a =
+      effective_segments_for_resident(resident_a_id)
+      |> Enum.reject(fn s -> s.covered_by != nil or s.rotation_type in excluded end)
+
+    segs_b =
+      effective_segments_for_resident(resident_b_id)
+      |> Enum.reject(fn s -> s.covered_by != nil or s.rotation_type in excluded end)
+
+    for a <- segs_a,
+        b <- segs_b,
+        a.rotation_type == b.rotation_type,
+        Date.compare(a.start_date, b.end_date) != :gt,
+        Date.compare(a.end_date, b.start_date) != :lt do
+      overlap_start = Enum.max([a.start_date, b.start_date], Date)
+      overlap_end = Enum.min([a.end_date, b.end_date], Date)
+      Date.range(overlap_start, overlap_end) |> Enum.map(&%{date: &1, rotation_type: a.rotation_type})
+    end
+    |> List.flatten()
+    |> Enum.sort_by(& &1.date, Date)
+  end
+
+  @doc """
   Inserts a batch of rotation records for a resident.
   Returns `{:ok, count}` or `{:error, reason}`.
   """
