@@ -134,7 +134,7 @@ defmodule ResidencySchedule.Rotations do
       join: b in Rotation,
       on: b.resident_id == ^resident_b_id and b.rotation_type == a.rotation_type,
       where: a.resident_id == ^resident_a_id,
-      where: a.rotation_type not in ["float", "post_call", "vacation", "ambulatory"],
+      where: a.rotation_type not in ["float", "post_call", "vacation", "ambulatory", "elective"],
       where: a.start_date <= b.end_date and a.end_date >= b.start_date,
       select: %{
         overlap_start: fragment("GREATEST(?, ?)", a.start_date, b.start_date),

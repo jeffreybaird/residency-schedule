@@ -25,7 +25,9 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
           shared_shifts_remaining: 0,
           today: Date.utc_today(),
           today_anchor_date_start: nil,
-          summary: []
+          summary: [],
+          stats_expanded: true,
+          summary_expanded: false
         )
       else
         assign(socket,
@@ -40,7 +42,9 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
           shared_shifts_remaining: 0,
           today: Date.utc_today(),
           today_anchor_date_start: nil,
-          summary: []
+          summary: [],
+          stats_expanded: true,
+          summary_expanded: false
         )
       end
 
@@ -83,6 +87,16 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
   end
 
   @impl true
+  def handle_event("toggle_stats", _params, socket) do
+    {:noreply, assign(socket, stats_expanded: !socket.assigns.stats_expanded)}
+  end
+
+  @impl true
+  def handle_event("toggle_summary", _params, socket) do
+    {:noreply, assign(socket, summary_expanded: !socket.assigns.summary_expanded)}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="max-w-4xl mx-auto py-10 px-4">
@@ -111,101 +125,154 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
       </div>
 
       <%= if @schedule do %>
-        <%!-- Sticky: dropdowns + stats card --%>
+        <%!-- Sticky: dropdowns + stats + summary breakdown card --%>
         <div id="sticky-stats" class="sticky top-14 z-40 bg-white mb-3">
           <div class="border-2 border-gray-300 rounded-xl overflow-hidden">
             <%!-- Card header --%>
-            <div class="px-4 py-2 bg-gray-100 border-b-2 border-gray-300">
+            <div class="flex items-center justify-between px-4 py-2 bg-gray-100 border-b-2 border-gray-300">
               <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
                 Compare Residents
               </span>
+              <button
+                phx-click="toggle_stats"
+                class={[
+                  "flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-0.5 transition-colors",
+                  if(@stats_expanded,
+                    do: "bg-gray-200 text-gray-600 hover:bg-gray-300",
+                    else: "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                  )
+                ]}
+              >
+                <svg
+                  class={["w-3 h-3 transition-transform", if(@stats_expanded, do: "rotate-90", else: "")]}
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M7.293 4.707a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                <%= if @stats_expanded, do: "Collapse", else: "Expand" %>
+              </button>
             </div>
 
-            <%!-- Dropdowns --%>
-            <div class="grid grid-cols-2 divide-x divide-gray-200 bg-gray-50">
-              <div class="px-4 py-3">
-                <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Resident A</p>
-                <form phx-change="select_resident_a">
-                  <select
-                    name="resident_id"
-                    class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select a resident…</option>
-                    <%= for r <- @residents do %>
-                      <option value={r.id} selected={@resident_a_id == r.id}>
-                        <%= r.name %> (<%= r.position_code %>)
-                      </option>
-                    <% end %>
-                  </select>
-                </form>
+            <%= if @stats_expanded do %>
+              <%!-- Dropdowns --%>
+              <div class="grid grid-cols-2 divide-x divide-gray-200 bg-gray-50">
+                <div class="px-4 py-3">
+                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Resident A</p>
+                  <form phx-change="select_resident_a">
+                    <select
+                      name="resident_id"
+                      class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select a resident…</option>
+                      <%= for r <- @residents do %>
+                        <option value={r.id} selected={@resident_a_id == r.id}>
+                          <%= r.name %> (<%= r.position_code %>)
+                        </option>
+                      <% end %>
+                    </select>
+                  </form>
+                </div>
+                <div class="px-4 py-3">
+                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Resident B</p>
+                  <form phx-change="select_resident_b">
+                    <select
+                      name="resident_id"
+                      class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select a resident…</option>
+                      <%= for r <- @residents do %>
+                        <option value={r.id} selected={@resident_b_id == r.id}>
+                          <%= r.name %> (<%= r.position_code %>)
+                        </option>
+                      <% end %>
+                    </select>
+                  </form>
+                </div>
               </div>
-              <div class="px-4 py-3">
-                <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Resident B</p>
-                <form phx-change="select_resident_b">
-                  <select
-                    name="resident_id"
-                    class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select a resident…</option>
-                    <%= for r <- @residents do %>
-                      <option value={r.id} selected={@resident_b_id == r.id}>
-                        <%= r.name %> (<%= r.position_code %>)
-                      </option>
-                    <% end %>
-                  </select>
-                </form>
-              </div>
-            </div>
 
-            <%!-- Stats row (only when both residents selected) --%>
-            <%= if @resident_a_id && @resident_b_id do %>
-              <div class="grid grid-cols-2 divide-x divide-gray-200 border-t-2 border-gray-300 bg-gray-50">
-                <div class="px-4 py-3">
-                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
-                    Shared Shifts
-                  </p>
-                  <p class="text-xl font-bold text-gray-800"><%= @total_days %></p>
+              <%!-- Stats row + summary breakdown (only when both residents selected) --%>
+              <%= if @resident_a_id && @resident_b_id do %>
+                <div class="grid grid-cols-2 divide-x divide-gray-200 border-t-2 border-gray-300 bg-gray-50">
+                  <div class="px-4 py-3">
+                    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                      Shared Shifts
+                    </p>
+                    <p class="text-xl font-bold text-gray-800"><%= @total_days %></p>
+                  </div>
+                  <div class="px-4 py-3">
+                    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                      Shared Shifts Remaining
+                    </p>
+                    <p class="text-xl font-bold text-gray-800"><%= @shared_shifts_remaining %></p>
+                  </div>
                 </div>
-                <div class="px-4 py-3">
-                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
-                    Shared Shifts Remaining
-                  </p>
-                  <p class="text-xl font-bold text-gray-800"><%= @shared_shifts_remaining %></p>
-                </div>
-              </div>
+
+                <%!-- Summary breakdown (like night shift breakdown on resident show) --%>
+                <%= if @summary != [] do %>
+                  <div class="border-t border-gray-200 bg-gray-50">
+                    <button
+                      phx-click="toggle_summary"
+                      class="flex items-center justify-between w-full px-4 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                    >
+                      <span class="flex items-center gap-1.5">
+                        <svg
+                          class={["w-2.5 h-2.5 text-gray-400 transition-transform", if(@summary_expanded, do: "rotate-90", else: "")]}
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fill-rule="evenodd"
+                            d="M7.293 4.707a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                        Shared Shift Breakdown
+                      </span>
+                      <span class={[
+                        "rounded-full px-2 py-0.5 transition-colors",
+                        if(@summary_expanded,
+                          do: "bg-gray-200 text-gray-600",
+                          else: "bg-gray-100 text-gray-500"
+                        )
+                      ]}>
+                        <%= if @summary_expanded, do: "Collapse", else: "Expand" %>
+                      </span>
+                    </button>
+                    <%= if @summary_expanded do %>
+                      <div class="divide-y divide-gray-100 border-t border-gray-100">
+                        <%= for {type, days} <- @summary do %>
+                          <% color = Rotations.rotation_type_color(type) %>
+                          <div class="flex items-center justify-between px-4 py-2">
+                            <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
+                              <%= Rotations.rotation_type_label(type) %>
+                            </span>
+                            <span class="text-sm font-semibold text-gray-700">
+                              <%= days %> day<%= if days != 1, do: "s" %>
+                            </span>
+                          </div>
+                        <% end %>
+                        <div class="flex items-center justify-between px-4 py-2 bg-gray-50">
+                          <span class="text-sm font-medium text-gray-600">Total</span>
+                          <span class="text-sm font-bold text-gray-800">
+                            <%= @total_days %> days
+                          </span>
+                        </div>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+              <% end %>
             <% end %>
           </div>
         </div>
 
+        <%!-- Co-service date range table (like rotation-table on resident show) --%>
         <%= if @resident_a_id && @resident_b_id do %>
-          <%= if @summary != [] do %>
-            <div class="mb-3 border-2 border-gray-300 rounded-xl overflow-hidden">
-              <table class="min-w-full divide-y divide-gray-200 text-sm">
-                <thead class="bg-gray-100">
-                  <tr>
-                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Service</th>
-                    <th class="px-4 py-3 text-right font-semibold text-gray-600">Days</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                  <%= for {type, days} <- @summary do %>
-                    <% color = Rotations.rotation_type_color(type) %>
-                    <tr>
-                      <td class="px-4 py-2">
-                        <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
-                          <%= Rotations.rotation_type_label(type) %>
-                        </span>
-                      </td>
-                      <td class="px-4 py-2 text-right text-gray-700">
-                        <%= days %>
-                      </td>
-                    </tr>
-                  <% end %>
-                </tbody>
-              </table>
-            </div>
-          <% end %>
-
           <%= if @co_service_ranges != [] do %>
             <div id="co-service-table" phx-hook="ScrollToToday" class="border-2 border-gray-300 rounded-xl overflow-auto overscroll-contain">
               <table class="min-w-full divide-y divide-gray-200 text-sm">

@@ -90,11 +90,21 @@ Hooks.YearTracker = {
   mounted() {
     this.yearEl = document.getElementById("gantt-year-indicator")
     this.updateYear()
+    this.scrollToToday()
     this.el.addEventListener("scroll", () => this.updateYear(), {passive: true})
   },
 
   updated() {
     this.updateYear()
+  },
+
+  scrollToToday() {
+    const todayTh = this.el.querySelector("th[data-today-slot]")
+    if (!todayTh) return
+    const containerRect = this.el.getBoundingClientRect()
+    const thRect = todayTh.getBoundingClientRect()
+    const stickyWidth = 72 + 128 // @id_col_px + @name_col_px
+    this.el.scrollLeft += thRect.left - containerRect.left - stickyWidth - 8
   },
 
   updateYear() {

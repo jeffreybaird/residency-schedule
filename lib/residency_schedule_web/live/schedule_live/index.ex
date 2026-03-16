@@ -28,7 +28,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
         )
       end
 
-    {:ok, assign(socket, delete_confirm_id: nil, delete_error: nil, is_admin: is_admin)}
+    {:ok, assign(socket, delete_confirm_id: nil, delete_error: nil, is_admin: is_admin, today: Date.utc_today())}
   end
 
   @impl true
@@ -220,10 +220,16 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                   Name
                 </th>
                 <%= for {_idx, start_date, end_date} <- @slots do %>
+                  <% slot_past = Date.compare(end_date, @today) == :lt %>
+                  <% slot_today = not slot_past and Date.compare(start_date, @today) != :gt %>
                   <th
-                    class="px-1 py-2 text-center font-medium text-gray-500 border-b border-gray-200 whitespace-nowrap"
+                    class={[
+                      "px-1 py-2 text-center font-medium border-b border-gray-200 whitespace-nowrap",
+                      if(slot_past, do: "text-gray-300", else: "text-gray-500")
+                    ]}
                     style="min-width: 52px"
                     data-slot-year={start_date.year}
+                    data-today-slot={if slot_today, do: "true"}
                   >
                     <%= slot_header_label(start_date, end_date) %>
                   </th>
@@ -260,11 +266,12 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                       </.link>
                     </td>
                     <%= for {colspan, rotation} <- cell_groups(@slots, resident.rotations) do %>
+                      <% past = rotation != nil && Date.compare(rotation.end_date, @today) == :lt %>
                       <td
                         colspan={colspan}
                         class="px-0.5 py-0.5 text-center border-r border-gray-100"
                       >
-                        <%= render_rotation_cell(rotation) %>
+                        <%= render_rotation_cell(rotation, past) %>
                       </td>
                     <% end %>
                   </tr>
@@ -355,15 +362,16 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     end)
   end
 
-  defp render_rotation_cell(nil) do
+  defp render_rotation_cell(nil, _past) do
     Phoenix.HTML.raw(~s(<span class="text-gray-200">–</span>))
   end
 
-  defp render_rotation_cell(rotation) do
+  defp render_rotation_cell(rotation, past) do
     color = Rotations.rotation_type_color(rotation.rotation_type)
+    opacity = if past, do: " opacity-40", else: ""
 
     Phoenix.HTML.raw(
-      ~s(<span class="inline-block rounded px-1 py-0.5 text-xs font-medium whitespace-nowrap #{color}">#{abbrev(rotation.rotation_type)}</span>)
+      ~s(<span class="inline-block rounded px-1 py-0.5 text-xs font-medium whitespace-nowrap#{opacity} #{color}">#{abbrev(rotation.rotation_type)}</span>)
     )
   end
 
