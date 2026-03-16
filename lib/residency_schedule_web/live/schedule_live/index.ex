@@ -203,7 +203,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
         </div>
 
         <div id="gantt-scroll" phx-hook="YearTracker" class="overflow-x-auto">
-          <table class="border-collapse text-xs">
+          <table class="border-separate border-spacing-0 text-xs">
             <thead>
               <tr class="bg-gray-100 sticky top-0 z-30">
                 <%!-- z-40 so header stickies beat both body stickies and data cells --%>
