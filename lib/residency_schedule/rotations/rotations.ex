@@ -2,6 +2,7 @@ defmodule ResidencySchedule.Rotations do
   import Ecto.Query
   alias ResidencySchedule.Repo
   alias ResidencySchedule.Rotations.Rotation
+  alias ResidencySchedule.Residents.ScheduleResident
 
   @rotation_labels %{
     "ambulatory" => "Ambulatory",
@@ -22,6 +23,7 @@ defmodule ResidencySchedule.Rotations do
     "strong_weekend_days" => "Weekend Days – Strong",
     "strong_weekend_nights" => "Weekend Nights – Strong",
     "swing" => "Swing Shift",
+    "ultrasound" => "Ultrasound",
     "urogynecology" => "Uro-Gynecology",
     "unknown" => "Unknown",
     "vacation" => "Vacation"
@@ -46,6 +48,7 @@ defmodule ResidencySchedule.Rotations do
     "elective" => "bg-violet-400 text-white",
     "away_rotation" => "bg-violet-200 text-violet-900",
     "swing" => "bg-lime-500 text-white",
+    "ultrasound" => "bg-sky-400 text-white",
     "unknown" => "bg-gray-400 text-white",
     "vacation" => "bg-emerald-400 text-white",
     "float" => "bg-gray-300 text-gray-700"
@@ -57,8 +60,8 @@ defmodule ResidencySchedule.Rotations do
   """
   def list_schedule_slots(schedule_id) do
     from(r in Rotation,
-      join: res in assoc(r, :resident),
-      where: res.schedule_id == ^schedule_id,
+      join: sr in assoc(r, :schedule_resident),
+      where: sr.schedule_id == ^schedule_id,
       select: {r.slot_index, r.start_date, r.end_date},
       distinct: true,
       order_by: r.slot_index
@@ -67,11 +70,11 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
-  Returns all rotations for a resident, ordered by start_date.
+  Returns all rotations for a schedule resident, ordered by start_date.
   """
-  def list_rotations_for_resident(resident_id) do
+  def list_rotations_for_resident(schedule_resident_id) do
     Rotation
-    |> where(resident_id: ^resident_id)
+    |> where(schedule_resident_id: ^schedule_resident_id)
     |> order_by(asc: :start_date)
     |> Repo.all()
   end
@@ -87,46 +90,53 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
-  Returns all rotations active on a given date for a schedule, with resident preloaded.
+  Returns all rotations active on a given date for a schedule, with schedule_resident preloaded.
+  The schedule_resident virtual name field is populated from the associated Resident.
   """
   def list_rotations_for_date(date, schedule_id) do
+    sr_query = ScheduleResident.with_name_query()
+
     from(rot in Rotation,
-      join: res in assoc(rot, :resident),
-      where: res.schedule_id == ^schedule_id,
+      join: sr in assoc(rot, :schedule_resident),
+      where: sr.schedule_id == ^schedule_id,
       where: rot.start_date <= ^date and rot.end_date >= ^date,
-      preload: [resident: res],
-      order_by: [rot.rotation_type, res.residency_year, res.schedule_number]
+      preload: [schedule_resident: ^sr_query],
+      order_by: [rot.rotation_type, sr.residency_year, sr.schedule_number]
     )
     |> Repo.all()
   end
 
   @doc """
-  Returns all rotations for a given month and schedule, with resident preloaded.
+  Returns all rotations for a given month and schedule, with schedule_resident preloaded.
+  The schedule_resident virtual name field is populated from the associated Resident.
   """
   def list_rotations_for_month(year, month, schedule_id) do
     first = Date.new!(year, month, 1)
     last = Date.end_of_month(first)
+    sr_query = ScheduleResident.with_name_query()
 
     from(rot in Rotation,
-      join: res in assoc(rot, :resident),
-      where: res.schedule_id == ^schedule_id,
+      join: sr in assoc(rot, :schedule_resident),
+      where: sr.schedule_id == ^schedule_id,
       where: rot.start_date <= ^last and rot.end_date >= ^first,
-      preload: [resident: res]
+      preload: [schedule_resident: ^sr_query]
     )
     |> Repo.all()
   end
 
   @doc """
-  Returns all rotations for a given month across all schedules, with resident preloaded.
+  Returns all rotations for a given month across all schedules, with schedule_resident preloaded.
+  The schedule_resident virtual name field is populated from the associated Resident.
   """
   def list_rotations_for_month_all_schedules(year, month) do
     first = Date.new!(year, month, 1)
     last = Date.end_of_month(first)
+    sr_query = ScheduleResident.with_name_query()
 
     from(rot in Rotation,
-      join: res in assoc(rot, :resident),
+      join: sr in assoc(rot, :schedule_resident),
       where: rot.start_date <= ^last and rot.end_date >= ^first,
-      preload: [resident: res]
+      preload: [schedule_resident: ^sr_query]
     )
     |> Repo.all()
   end
@@ -142,13 +152,13 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
-  Returns co-service days (same rotation type, overlapping dates) for two residents.
+  Returns co-service days (same rotation type, overlapping dates) for two schedule residents.
   """
-  def list_co_service_days(resident_a_id, resident_b_id) do
+  def list_co_service_days(schedule_resident_a_id, schedule_resident_b_id) do
     from(a in Rotation,
       join: b in Rotation,
-      on: b.resident_id == ^resident_b_id and b.rotation_type == a.rotation_type,
-      where: a.resident_id == ^resident_a_id,
+      on: b.schedule_resident_id == ^schedule_resident_b_id and b.rotation_type == a.rotation_type,
+      where: a.schedule_resident_id == ^schedule_resident_a_id,
       where: a.rotation_type not in ["float", "post_call", "vacation", "ambulatory", "elective"],
       where: a.start_date <= b.end_date and a.end_date >= b.start_date,
       select: %{
@@ -165,7 +175,7 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
-  Computes effective rotation segments for a resident, accounting for shift overrides.
+  Computes effective rotation segments for a schedule resident, accounting for shift overrides.
 
   Returns a sorted list of maps, each with:
   - `:rotation_type` — the rotation type string
@@ -173,25 +183,22 @@ defmodule ResidencySchedule.Rotations do
   - `:end_date` — effective end date of this segment
   - `:slot_index` — original slot index (-1 for coverage assignments)
   - `:is_coverage` — true when this segment is a coverage assignment for another resident
-  - `:covered_by` — the covering Resident struct when someone is covering this segment, else nil
-  - `:original_resident` — the Resident being covered when `is_coverage: true`, else nil
+  - `:covered_by` — the covering ScheduleResident struct when someone is covering this segment, else nil
+  - `:original_resident` — the ScheduleResident being covered when `is_coverage: true`, else nil
 
       iex> ResidencySchedule.Rotations.effective_segments_for_resident(0)
       []
   """
-  def effective_segments_for_resident(resident_id) do
+  def effective_segments_for_resident(schedule_resident_id) do
     alias ResidencySchedule.ShiftOverrides
 
-    rotations = list_rotations_for_resident(resident_id)
-    overrides_as_original = ShiftOverrides.list_overrides_for_resident_as_original(resident_id)
-    overrides_as_cover = ShiftOverrides.list_overrides_for_resident_as_cover(resident_id)
+    rotations = list_rotations_for_resident(schedule_resident_id)
+    overrides_as_original = ShiftOverrides.list_overrides_for_resident_as_original(schedule_resident_id)
+    overrides_as_cover = ShiftOverrides.list_overrides_for_resident_as_cover(schedule_resident_id)
 
-    # Build date blocks to remove from own rotations:
-    # {:covered_by, resident} — someone is covering for this resident during these dates
-    # :covering_elsewhere     — this resident is covering someone else; remove from own rotation
     covered_blocks =
       Enum.map(overrides_as_original, fn o ->
-        {o.override_start_date, o.override_end_date, {:covered_by, o.covering_resident}}
+        {o.override_start_date, o.override_end_date, {:covered_by, o.covering_schedule_resident}}
       end)
 
     covering_blocks =
@@ -222,7 +229,7 @@ defmodule ResidencySchedule.Rotations do
           slot_index: -1,
           is_coverage: true,
           covered_by: nil,
-          original_resident: o.rotation.resident
+          original_resident: o.rotation.schedule_resident
         }
       end)
 
@@ -230,9 +237,6 @@ defmodule ResidencySchedule.Rotations do
     |> Enum.sort_by(& &1.start_date, Date)
   end
 
-  # Splits a rotation into segments, removing date blocks (coverage periods) from it.
-  # Returns free segments (covered_by: nil) and covered segments (covered_by: resident).
-  # Periods where this resident is covering elsewhere are simply omitted.
   defp split_by_blocks(rotation, []) do
     [
       %{
@@ -303,19 +307,19 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
-  Computes effective co-service days for two residents, accounting for shift overrides.
+  Computes effective co-service days for two schedule residents, accounting for shift overrides.
   Returns a list of `%{date: Date, rotation_type: String}` maps for days both residents
   are on the same service (excluding float, post_call, vacation, ambulatory, elective).
   """
-  def list_effective_co_service_days(resident_a_id, resident_b_id) do
+  def list_effective_co_service_days(schedule_resident_a_id, schedule_resident_b_id) do
     excluded = ~w[float post_call vacation ambulatory elective]
 
     segs_a =
-      effective_segments_for_resident(resident_a_id)
+      effective_segments_for_resident(schedule_resident_a_id)
       |> Enum.reject(fn s -> s.covered_by != nil or s.rotation_type in excluded end)
 
     segs_b =
-      effective_segments_for_resident(resident_b_id)
+      effective_segments_for_resident(schedule_resident_b_id)
       |> Enum.reject(fn s -> s.covered_by != nil or s.rotation_type in excluded end)
 
     for a <- segs_a,
@@ -332,16 +336,16 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
-  Inserts a batch of rotation records for a resident.
+  Inserts a batch of rotation records for a schedule resident.
   Returns `{:ok, count}` or `{:error, reason}`.
   """
-  def insert_rotations(resident_id, rotations) do
+  def insert_rotations(schedule_resident_id, rotations) do
     now = DateTime.utc_now(:second)
 
     entries =
       Enum.map(rotations, fn r ->
         %{
-          resident_id: resident_id,
+          schedule_resident_id: schedule_resident_id,
           rotation_type: Atom.to_string(r.rotation_type),
           start_date: r.start_date,
           end_date: r.end_date,

@@ -138,7 +138,7 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
           "start_date" => "2020-07-01",
           "end_date" => "2020-07-14",
           "rotation_id" => to_string(rotation.id),
-          "covering_resident_id" => ""
+          "covering_schedule_resident_id" => ""
         })
 
       # Clare M is in sched_a — should appear as a covering option
@@ -156,7 +156,7 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
           "start_date" => "2020-07-01",
           "end_date" => "2020-07-14",
           "rotation_id" => "",
-          "covering_resident_id" => ""
+          "covering_schedule_resident_id" => ""
         })
 
       refute html =~ "Clare M"

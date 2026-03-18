@@ -395,7 +395,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     "strong_weekend_nights" => "SWN",
     "swing" => "Swing",
     "urogynecology" => "UG",
-    "unknown" => "USN",
+    "ultrasound" => "US",
+    "unknown" => "?",
     "vacation" => "Vac"
   }
 

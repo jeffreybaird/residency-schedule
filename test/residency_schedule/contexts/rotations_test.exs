@@ -128,9 +128,9 @@ defmodule ResidencySchedule.RotationsTest do
       assert Rotations.list_rotations_for_month_all_schedules(2000, 1) == []
     end
 
-    test "preloads resident association", %{ra: _ra} do
+    test "preloads schedule_resident association", %{ra: _ra} do
       [rot | _] = Rotations.list_rotations_for_month_all_schedules(2023, 7)
-      assert %ResidencySchedule.Residents.Resident{} = rot.resident
+      assert %ResidencySchedule.Residents.ScheduleResident{} = rot.schedule_resident
     end
   end
 

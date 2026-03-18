@@ -3,11 +3,11 @@ defmodule ResidencySchedule.ShiftOverrides.ShiftOverride do
   import Ecto.Changeset
 
   alias ResidencySchedule.Rotations.Rotation
-  alias ResidencySchedule.Residents.Resident
+  alias ResidencySchedule.Residents.ScheduleResident
 
   schema "shift_overrides" do
     belongs_to :rotation, Rotation
-    belongs_to :covering_resident, Resident
+    belongs_to :covering_schedule_resident, ScheduleResident
     field :override_start_date, :date
     field :override_end_date, :date
     timestamps(type: :utc_datetime)
@@ -16,15 +16,15 @@ defmodule ResidencySchedule.ShiftOverrides.ShiftOverride do
   @doc """
   Validates a shift override changeset.
 
-      iex> attrs = %{rotation_id: 1, covering_resident_id: 2, override_start_date: ~D[2023-07-08], override_end_date: ~D[2023-07-14]}
+      iex> attrs = %{rotation_id: 1, covering_schedule_resident_id: 2, override_start_date: ~D[2023-07-08], override_end_date: ~D[2023-07-14]}
       iex> cs = ResidencySchedule.ShiftOverrides.ShiftOverride.changeset(%ResidencySchedule.ShiftOverrides.ShiftOverride{}, attrs)
       iex> cs.valid?
       true
   """
   def changeset(override, attrs) do
     override
-    |> cast(attrs, [:rotation_id, :covering_resident_id, :override_start_date, :override_end_date])
-    |> validate_required([:rotation_id, :covering_resident_id, :override_start_date, :override_end_date])
+    |> cast(attrs, [:rotation_id, :covering_schedule_resident_id, :override_start_date, :override_end_date])
+    |> validate_required([:rotation_id, :covering_schedule_resident_id, :override_start_date, :override_end_date])
     |> validate_date_order()
   end
 

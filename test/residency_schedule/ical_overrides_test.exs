@@ -44,7 +44,7 @@ defmodule ResidencySchedule.IcalOverridesTest do
       {:ok, _} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,
-          covering_resident_id: emily.id,
+          covering_schedule_resident_id: emily.id,
           override_start_date: ~D[2023-07-08],
           override_end_date: ~D[2023-07-14]
         })
@@ -61,7 +61,7 @@ defmodule ResidencySchedule.IcalOverridesTest do
       {:ok, _} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,
-          covering_resident_id: emily.id,
+          covering_schedule_resident_id: emily.id,
           override_start_date: ~D[2023-07-08],
           override_end_date: ~D[2023-07-14]
         })

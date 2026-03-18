@@ -62,7 +62,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
     covering_residents =
       case rotation_id && Enum.find(available, fn rot -> to_string(rot.id) == rotation_id end) do
         nil -> []
-        rot -> Residents.list_residents_for_schedule(rot.resident.schedule_id)
+        rot -> Residents.list_residents_for_schedule(rot.schedule_resident.schedule_id)
       end
 
     {:noreply,
@@ -87,7 +87,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
          end_date when not is_nil(end_date) <- socket.assigns.override_end_date do
       attrs = %{
         rotation_id: String.to_integer(rotation_id),
-        covering_resident_id: String.to_integer(covering_id),
+        covering_schedule_resident_id: String.to_integer(covering_id),
         override_start_date: start_date,
         override_end_date: end_date
       }
@@ -284,7 +284,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                   <option value="">— select resident —</option>
                   <%= for rot <- @available_rotations do %>
                     <option value={rot.id} selected={to_string(rot.id) == to_string(@override_rotation_id)}>
-                      <%= rot.resident.name %> (<%= rot.resident.position_code %>) — <%= Calendar.strftime(rot.start_date, "%b %-d") %> – <%= Calendar.strftime(rot.end_date, "%b %-d, %Y") %>
+                      <%= rot.schedule_resident.name %> (<%= rot.schedule_resident.position_code %>) — <%= Calendar.strftime(rot.start_date, "%b %-d") %> – <%= Calendar.strftime(rot.end_date, "%b %-d, %Y") %>
                     </option>
                   <% end %>
                 </select>
@@ -345,9 +345,9 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                       <span class={"inline-block rounded px-1.5 py-0.5 text-xs font-medium mr-1 #{Rotations.rotation_type_color(o.rotation.rotation_type)}"}>
                         <%= Rotations.rotation_type_label(o.rotation.rotation_type) %>
                       </span>
-                      <span class="font-medium"><%= o.rotation.resident.name %></span>
+                      <span class="font-medium"><%= o.rotation.schedule_resident.name %></span>
                       <span class="text-gray-400 mx-1">covered by</span>
-                      <span class="font-medium"><%= o.covering_resident.name %></span>
+                      <span class="font-medium"><%= o.covering_schedule_resident.name %></span>
                       <span class="text-gray-400 text-xs ml-1">
                         <%= Calendar.strftime(o.override_start_date, "%b %-d") %>–<%= Calendar.strftime(o.override_end_date, "%b %-d, %Y") %>
                       </span>

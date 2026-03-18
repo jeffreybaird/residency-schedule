@@ -38,7 +38,9 @@ defmodule ResidencySchedule.Importer.CsvParser do
     "swn" => :strong_weekend_nights,
     "swing" => :swing,
     "ug" => :urogynecology,
-    "usn" => :unknown,
+    "us" => :ultrasound,
+    # "usn" is the legacy abbreviation for ultrasound, replaced by "us" in 2025-2026
+    "usn" => :ultrasound,
     "vac" => :vacation
   }
 

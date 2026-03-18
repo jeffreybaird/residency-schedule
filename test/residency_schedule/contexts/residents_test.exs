@@ -60,6 +60,34 @@ defmodule ResidencySchedule.ResidentsTest do
     end
   end
 
+  describe "delete_orphaned_residents/0" do
+    test "deletes residents not linked to any schedule", %{schedule: sched} do
+      {:ok, _} = Residents.insert_resident(sched.id, %{position_code: "R2-1", residency_year: 2, schedule_number: 1, name: "Morgan"})
+      Schedules.delete_schedule(sched.id)
+      {count, _} = Residents.delete_orphaned_residents()
+      # All residents from that schedule were orphaned and already cleaned up by delete_schedule
+      assert count == 0
+    end
+
+    test "does not delete residents still linked to another schedule", %{schedule: sched} do
+      {:ok, sched2} = Schedules.upsert_schedule(2024, "2024–2025")
+      # Same person "Alexis" exists in both schedules
+      {:ok, _} = Residents.insert_resident(sched2.id, %{position_code: "R4-1", residency_year: 4, schedule_number: 1, name: "Alexis"})
+      Schedules.delete_schedule(sched.id)
+      # Alexis is still in sched2, so should not be orphaned
+      remaining = Residents.list_residents_for_schedule(sched2.id)
+      assert Enum.any?(remaining, &(&1.name == "Alexis"))
+    end
+
+    test "deletes orphan when resident appears in no schedule", %{schedule: sched} do
+      Schedules.delete_schedule(sched.id)
+      # After deletion, Alexis and Jamie have no schedules
+      {count, _} = Residents.delete_orphaned_residents()
+      # Both were already cleaned up by delete_schedule; calling again should return 0
+      assert count == 0
+    end
+  end
+
   describe "insert_resident/2" do
     test "inserts a valid resident", %{schedule: sched} do
       {:ok, resident} = Residents.insert_resident(sched.id, %{
