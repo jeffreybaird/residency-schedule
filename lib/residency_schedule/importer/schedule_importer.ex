@@ -3,8 +3,9 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   Imports parsed CSV data into the database.
 
   Strategy: upsert the schedule record for the given academic year,
-  then wipe and reload all residents and rotations for that year only.
-  Other years are untouched.
+  then wipe and reload all schedule residents and rotations for that year only.
+  Other years are untouched. Resident (person) records are never deleted —
+  find_or_create semantics ensure each physical person has exactly one row.
   """
 
   alias ResidencySchedule.Repo
@@ -12,7 +13,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   alias ResidencySchedule.Schedules
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
-  alias ResidencySchedule.Residents.Resident
+  alias ResidencySchedule.Residents.ScheduleResident
 
   import Ecto.Query
 
@@ -36,29 +37,44 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   Imports a list of parsed `%CsvParser{}` structs into the database.
 
   Derives the academic year from the earliest date across all residents' rotations,
-  upserts the schedule, deletes and reloads residents/rotations for that year.
+  upserts the schedule, deletes and reloads schedule_residents/rotations for that year.
+  Resident (person) records are preserved and reused across re-imports.
 
   Returns `{:ok, %{schedule_id: id, residents: count, rotations: count}}`.
 
       iex> ResidencySchedule.Importer.ScheduleImporter.persist([])
       {:error, "No residents or rotations to import"}
   """
-  def persist([]) do
-    {:error, "No residents or rotations to import"}
-  end
+  def persist([]), do: {:error, "No residents or rotations to import"}
 
   def persist(parsed_residents) do
-    academic_year = derive_academic_year_from_residents(parsed_residents)
+    persist(parsed_residents, derive_academic_year_from_residents(parsed_residents))
+  end
+
+  @doc """
+  Imports a list of parsed `%CsvParser{}` structs for an explicit academic year.
+
+  Used by the schedule builder so the target year is always the loaded/generated year,
+  not re-derived from rotation dates (which can be sparse or empty).
+
+  Returns `{:ok, %{schedule_id: id, residents: count, rotations: count}}`.
+
+      iex> ResidencySchedule.Importer.ScheduleImporter.persist([], 2026)
+      {:error, "No residents or rotations to import"}
+  """
+  def persist([], _academic_year), do: {:error, "No residents or rotations to import"}
+
+  def persist(parsed_residents, academic_year) do
     label = Schedules.academic_year_label(academic_year)
 
     Repo.transaction(fn ->
       {:ok, schedule} = Schedules.upsert_schedule(academic_year, label)
 
-      Repo.delete_all(from(r in Resident, where: r.schedule_id == ^schedule.id))
+      Repo.delete_all(from(sr in ScheduleResident, where: sr.schedule_id == ^schedule.id))
 
       {resident_count, rotation_count} =
         Enum.reduce(parsed_residents, {0, 0}, fn parsed, {r_acc, rot_acc} ->
-          {:ok, resident} =
+          {:ok, schedule_resident} =
             Residents.insert_resident(schedule.id, %{
               position_code: parsed.position_code,
               residency_year: parsed.residency_year,
@@ -66,7 +82,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
               name: parsed.name
             })
 
-          {:ok, rot_count} = Rotations.insert_rotations(resident.id, parsed.rotations)
+          {:ok, rot_count} = Rotations.insert_rotations(schedule_resident.id, parsed.rotations)
           {r_acc + 1, rot_acc + rot_count}
         end)
 

@@ -66,6 +66,12 @@
             <a href="/admin" class="px-3 py-1.5 rounded-md text-sm text-amber-600 hover:bg-amber-50 hover:text-amber-800 transition-colors">
               Admin
             </a>
+            <a href="/admin/build" class="px-3 py-1.5 rounded-md text-sm text-amber-600 hover:bg-amber-50 hover:text-amber-800 transition-colors">
+              Build
+            </a>
+            <a href="/admin/edit" class="px-3 py-1.5 rounded-md text-sm text-amber-600 hover:bg-amber-50 hover:text-amber-800 transition-colors">
+              Edit
+            </a>
           <% end %>
           <span class="w-px h-4 bg-gray-200 mx-1"></span>
           <form action="/logout" method="post">
@@ -96,6 +102,8 @@
             <% end %>
             <%= if get_session(@conn, :admin) do %>
               <a href="/admin" class="block px-4 py-2 text-sm text-amber-600 hover:bg-amber-50">Admin</a>
+              <a href="/admin/build" class="block px-4 py-2 text-sm text-amber-600 hover:bg-amber-50">Build</a>
+              <a href="/admin/edit" class="block px-4 py-2 text-sm text-amber-600 hover:bg-amber-50">Edit</a>
             <% end %>
             <div class="border-t border-gray-100 mt-1 pt-1">
               <form action="/logout" method="post">

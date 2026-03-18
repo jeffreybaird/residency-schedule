@@ -123,6 +123,185 @@ Hooks.YearTracker = {
   }
 }
 
+// ResidentDrag: HTML5 drag-and-drop for moving resident names within a year group.
+// Attached to each name <td>. The input inside stays editable — drag only
+// starts when mousedown occurs on the cell itself (not inside the input).
+// Cells in between the source and current target shift in real time to preview the move.
+
+// Scan all name inputs in the builder and apply/remove duplicate-name error styling
+// instantly on every keystroke. The server still computes the authoritative
+// duplicate_name_indices on blur, but this provides immediate client-side feedback.
+function checkAllDuplicateNames() {
+  const inputs = Array.from(document.querySelectorAll("[data-res-year] input[type='text']"))
+  const counts = {}
+  inputs.forEach(inp => {
+    const val = inp.value.trim().toLowerCase()
+    if (val) counts[val] = (counts[val] || 0) + 1
+  })
+  inputs.forEach(inp => {
+    const isDup = counts[inp.value.trim().toLowerCase()] > 1
+    if (isDup) {
+      inp.classList.add("border-red-400", "text-red-700")
+      inp.classList.remove("border-transparent", "text-gray-700", "hover:border-gray-300", "focus:border-blue-400")
+      inp.setAttribute("title", "Name must be unique")
+    } else {
+      inp.classList.remove("border-red-400", "text-red-700")
+      inp.classList.add("border-transparent", "text-gray-700", "hover:border-gray-300", "focus:border-blue-400")
+      inp.removeAttribute("title")
+    }
+  })
+}
+
+function residentDragYearCells(year) {
+  return Array.from(document.querySelectorAll(`[data-res-year="${year}"]`))
+    .sort((a, b) => parseInt(a.dataset.resIdx) - parseInt(b.dataset.resIdx))
+}
+
+// Transform the .name-cell-inner div (NOT the <td>) so the <td> keeps its hit-test
+// area fixed — prevents the feedback loop that causes shaking.
+//
+// Each inner div has bg-white so it carries its own background when transformed.
+// During drag we set td backgrounds transparent so a shifted inner from the cell
+// above can show through without being covered by the td's own white background.
+
+function residentDragApplyPreview(srcEl, targetEl) {
+  const year = srcEl.dataset.resYear
+  const cells = residentDragYearCells(year)
+  const srcPos = cells.indexOf(srcEl)
+  const targetPos = cells.indexOf(targetEl)
+  const cellHeight = srcEl.offsetHeight
+  const hasError = srcEl.dataset.hasError === "true"
+  const ringColor = hasError ? "ring-red-400" : "ring-blue-400"
+  const bgColor   = hasError ? "bg-red-50"   : "bg-blue-50"
+
+  cells.forEach((cell, i) => {
+    const inner = cell.querySelector(".name-cell-inner")
+
+    let shift = ""
+    if (srcPos < targetPos && i > srcPos && i <= targetPos) {
+      shift = `translateY(-${cellHeight}px)`
+    } else if (srcPos > targetPos && i >= targetPos && i < srcPos) {
+      shift = `translateY(${cellHeight}px)`
+    }
+
+    if (inner && cell !== srcEl) {
+      inner.style.transition = "transform 140ms ease"
+      inner.style.transform = shift
+    }
+
+    // Target highlight: color reflects whether dragged cell has an error
+    const isTarget = cell === targetEl
+    cell.classList.toggle("ring-2", isTarget)
+    cell.classList.toggle(ringColor, isTarget)
+    cell.classList.toggle(bgColor, isTarget)
+  })
+}
+
+function residentDragClearPreview() {
+  const src = window._residentDragSrc
+  document.querySelectorAll("[data-res-year]").forEach(cell => {
+    const inner = cell.querySelector(".name-cell-inner")
+    if (inner && cell !== src) {
+      inner.style.transition = "none"
+      inner.style.transform = ""
+    }
+    cell.classList.remove("ring-2", "ring-blue-400", "ring-red-400", "bg-blue-50", "bg-red-50")
+    cell.removeAttribute("data-name-drag-over")
+  })
+}
+
+function residentDragSetYearTransparent(year) {
+  residentDragYearCells(year).forEach(cell => { cell.style.background = "transparent" })
+}
+
+function residentDragRestoreYearBackground(year) {
+  residentDragYearCells(year).forEach(cell => { cell.style.background = "" })
+}
+
+Hooks.ResidentDrag = {
+  mounted() {
+    const el = this.el
+    const input = el.querySelector("input")
+
+    if (input) {
+      input.addEventListener("mousedown", e => e.stopPropagation())
+      input.addEventListener("input", checkAllDuplicateNames)
+    }
+
+    el.addEventListener("dragstart", e => {
+      e.dataTransfer.effectAllowed = "move"
+      e.dataTransfer.setData("text/plain", el.dataset.resIdx + ":" + el.dataset.resYear)
+
+      const hasError = el.dataset.hasError === "true"
+      const ghost = document.createElement("div")
+      ghost.textContent = (input && input.value) || "—"
+      ghost.style.cssText = `position:fixed;top:-100px;padding:4px 10px;background:${hasError ? "#dc2626" : "#1d4ed8"};color:white;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3)`
+      document.body.appendChild(ghost)
+      e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, 14)
+      setTimeout(() => document.body.removeChild(ghost), 0)
+
+      // Hide source content so its slot appears empty; make all td backgrounds
+      // transparent so shifted inners from other cells can show through.
+      const srcInner = el.querySelector(".name-cell-inner")
+      if (srcInner) srcInner.style.opacity = "0"
+      residentDragSetYearTransparent(el.dataset.resYear)
+
+      window._residentDragSrc = el
+      window._residentDragOver = null
+    })
+
+    el.addEventListener("dragend", () => {
+      // Restore source inner and all td backgrounds before LiveView re-renders.
+      const srcInner = el.querySelector(".name-cell-inner")
+      if (srcInner) {
+        srcInner.style.opacity = ""
+        srcInner.style.transform = ""
+        srcInner.style.transition = "none"
+      }
+      residentDragRestoreYearBackground(el.dataset.resYear)
+      residentDragClearPreview()
+      window._residentDragSrc = null
+      window._residentDragOver = null
+    })
+
+    el.addEventListener("dragover", e => {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = "move"
+      const src = window._residentDragSrc
+      if (!src || src === el) return
+      if (src.dataset.resYear !== el.dataset.resYear) return
+      if (window._residentDragOver !== el) {
+        window._residentDragOver = el
+        residentDragApplyPreview(src, el)
+      }
+    })
+
+    el.addEventListener("dragleave", e => {
+      if (!el.contains(e.relatedTarget)) {
+        const nextYear = e.relatedTarget && e.relatedTarget.closest("[data-res-year]")?.dataset.resYear
+        if (nextYear !== el.dataset.resYear) {
+          residentDragClearPreview()
+          window._residentDragOver = null
+        }
+      }
+    })
+
+    el.addEventListener("drop", e => {
+      e.preventDefault()
+
+      const raw = e.dataTransfer.getData("text/plain")
+      const [fromIdx, fromYear] = raw.split(":")
+      const toIdx = el.dataset.resIdx
+      const toYear = el.dataset.resYear
+
+      if (fromIdx === toIdx) return
+      if (fromYear !== toYear) return
+
+      this.pushEvent("swap_residents", { from_idx: fromIdx, to_idx: toIdx })
+    })
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,

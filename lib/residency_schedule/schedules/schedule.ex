@@ -6,7 +6,7 @@ defmodule ResidencySchedule.Schedules.Schedule do
     field :academic_year, :integer
     field :label, :string
 
-    has_many :residents, ResidencySchedule.Residents.Resident
+    has_many :schedule_residents, ResidencySchedule.Residents.ScheduleResident
 
     timestamps(type: :utc_datetime)
   end

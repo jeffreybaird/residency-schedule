@@ -43,7 +43,7 @@ defmodule ResidencySchedule.ShiftOverridesTest do
     test "creates a valid override", %{rotation_a: rot, rb: rb} do
       attrs = %{
         rotation_id: rot.id,
-        covering_resident_id: rb.id,
+        covering_schedule_resident_id: rb.id,
         override_start_date: ~D[2023-07-08],
         override_end_date: ~D[2023-07-14]
       }
@@ -56,7 +56,7 @@ defmodule ResidencySchedule.ShiftOverridesTest do
     test "returns error when end date is before start date", %{rotation_a: rot, rb: rb} do
       attrs = %{
         rotation_id: rot.id,
-        covering_resident_id: rb.id,
+        covering_schedule_resident_id: rb.id,
         override_start_date: ~D[2023-07-14],
         override_end_date: ~D[2023-07-08]
       }
@@ -68,7 +68,7 @@ defmodule ResidencySchedule.ShiftOverridesTest do
     test "returns error when required fields missing" do
       assert {:error, changeset} = ShiftOverrides.create_override(%{})
       assert changeset.errors[:rotation_id]
-      assert changeset.errors[:covering_resident_id]
+      assert changeset.errors[:covering_schedule_resident_id]
     end
   end
 
@@ -77,14 +77,14 @@ defmodule ResidencySchedule.ShiftOverridesTest do
       {:ok, _} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,
-          covering_resident_id: rb.id,
+          covering_schedule_resident_id: rb.id,
           override_start_date: ~D[2023-07-08],
           override_end_date: ~D[2023-07-14]
         })
 
       overrides = ShiftOverrides.list_overrides_for_resident_as_original(ra.id)
       assert length(overrides) == 1
-      assert hd(overrides).covering_resident.name == "Emily"
+      assert hd(overrides).covering_schedule_resident.name == "Emily"
     end
 
     test "returns empty for resident with no overrides", %{rb: rb} do
@@ -97,14 +97,14 @@ defmodule ResidencySchedule.ShiftOverridesTest do
       {:ok, _} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,
-          covering_resident_id: rb.id,
+          covering_schedule_resident_id: rb.id,
           override_start_date: ~D[2023-07-08],
           override_end_date: ~D[2023-07-14]
         })
 
       overrides = ShiftOverrides.list_overrides_for_resident_as_cover(rb.id)
       assert length(overrides) == 1
-      assert hd(overrides).rotation.resident.name == "Clare"
+      assert hd(overrides).rotation.schedule_resident.name == "Clare"
     end
 
     test "returns empty for resident who is not covering anyone", %{ra: ra} do
@@ -117,7 +117,7 @@ defmodule ResidencySchedule.ShiftOverridesTest do
       {:ok, _} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,
-          covering_resident_id: rb.id,
+          covering_schedule_resident_id: rb.id,
           override_start_date: ~D[2023-07-08],
           override_end_date: ~D[2023-07-14]
         })
@@ -134,7 +134,7 @@ defmodule ResidencySchedule.ShiftOverridesTest do
   describe "list_rotations_for_type_in_range/3" do
     test "returns rotations of a given type overlapping the date range", %{ra: ra} do
       rotations = ShiftOverrides.list_rotations_for_type_in_range("night_float", ~D[2023-07-05], ~D[2023-07-10])
-      assert Enum.any?(rotations, &(&1.resident_id == ra.id))
+      assert Enum.any?(rotations, &(&1.schedule_resident_id == ra.id))
     end
 
     test "returns empty for a type not present in the range" do
@@ -147,7 +147,7 @@ defmodule ResidencySchedule.ShiftOverridesTest do
       {:ok, override} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,
-          covering_resident_id: rb.id,
+          covering_schedule_resident_id: rb.id,
           override_start_date: ~D[2023-07-08],
           override_end_date: ~D[2023-07-14]
         })

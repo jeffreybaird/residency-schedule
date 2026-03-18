@@ -129,6 +129,13 @@ defmodule ResidencySchedule.Importer.CsvParserTest do
       assert length(backtick_warnings) > 0
     end
 
+    test "US cells parse as :ultrasound (introduced in 2025-2026 to replace USN)" do
+      csv = File.read!("test/fixtures/2025-2026.csv")
+      {:ok, residents, _warnings} = CsvParser.parse(csv)
+      all_rotations = Enum.flat_map(residents, & &1.rotations)
+      assert Enum.any?(all_rotations, fn r -> r.rotation_type == :ultrasound end)
+    end
+
     test "returns ok with empty residents for a CSV with no resident rows" do
       assert {:ok, [], []} = CsvParser.parse("not,valid\nCSV\nwithout dates")
     end

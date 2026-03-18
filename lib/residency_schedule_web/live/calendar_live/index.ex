@@ -243,23 +243,23 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     override_by_rotation = Map.new(overrides, fn o -> {o.rotation_id, o} end)
 
     # Set of covering resident IDs active today (they appear under the overridden rotation)
-    covering_today = MapSet.new(overrides, & &1.covering_resident_id)
+    covering_today = MapSet.new(overrides, & &1.covering_schedule_resident_id)
 
     effective =
       Enum.flat_map(rotations, fn rot ->
-        if MapSet.member?(covering_today, rot.resident_id) do
+        if MapSet.member?(covering_today, rot.schedule_resident_id) do
           # This resident is covering someone else today — suppress from their own rotation
           []
         else
           case Map.get(override_by_rotation, rot.id) do
             nil ->
-              [%{resident: rot.resident, rotation_type: rot.rotation_type, overridden: false, covered_by: nil, is_coverage: false}]
+              [%{resident: rot.schedule_resident, rotation_type: rot.rotation_type, overridden: false, covered_by: nil, is_coverage: false}]
 
             override ->
               # Original resident is being covered — show crossed out, then the covering resident
               [
-                %{resident: rot.resident, rotation_type: rot.rotation_type, overridden: true, covered_by: override.covering_resident, is_coverage: false},
-                %{resident: override.covering_resident, rotation_type: rot.rotation_type, overridden: false, covered_by: nil, is_coverage: true}
+                %{resident: rot.schedule_resident, rotation_type: rot.rotation_type, overridden: true, covered_by: override.covering_schedule_resident, is_coverage: false},
+                %{resident: override.covering_schedule_resident, rotation_type: rot.rotation_type, overridden: false, covered_by: nil, is_coverage: true}
               ]
           end
         end

@@ -60,6 +60,8 @@ defmodule ResidencyScheduleWeb.Router do
     pipe_through [:browser, :admin_authenticated]
     live "/", AdminLive.Index, :index
     live "/upload", UploadLive.Index, :index
+    live "/build", BuilderLive.Index, :index
+    live "/edit", EditLive.Index, :index
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

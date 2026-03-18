@@ -45,4 +45,13 @@ defmodule ResidencyScheduleWeb.ConnCase do
     conn = Plug.Test.init_test_session(conn, authenticated: true)
     %{conn: conn}
   end
+
+  @doc """
+  Sets :admin and :authenticated in the session so both RequireAuth and RequireAdmin plugs pass.
+  Use as `setup :admin_authenticate_session` in LiveView tests behind the admin pipeline.
+  """
+  def admin_authenticate_session(%{conn: conn}) do
+    conn = Plug.Test.init_test_session(conn, admin: true, authenticated: true)
+    %{conn: conn}
+  end
 end

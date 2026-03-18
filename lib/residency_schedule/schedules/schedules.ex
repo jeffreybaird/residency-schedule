@@ -2,6 +2,7 @@ defmodule ResidencySchedule.Schedules do
   import Ecto.Query
   alias ResidencySchedule.Repo
   alias ResidencySchedule.Schedules.Schedule
+  alias ResidencySchedule.Residents
 
   @doc """
   Returns all schedules ordered by academic_year descending.
@@ -22,6 +23,15 @@ defmodule ResidencySchedule.Schedules do
   """
   def get_by_year!(year) do
     Repo.get_by!(Schedule, academic_year: year)
+  end
+
+  @doc """
+  Gets a schedule by academic year start year. Returns nil if not found.
+
+  Exempt from doctest — hits the database.
+  """
+  def get_by_year(year) do
+    Repo.get_by(Schedule, academic_year: year)
   end
 
   @doc """
@@ -53,13 +63,20 @@ defmodule ResidencySchedule.Schedules do
   end
 
   @doc """
-  Deletes a schedule and all associated residents and rotations (via DB cascade).
+  Deletes a schedule and all associated schedule_residents and rotations (via DB cascade).
+  Resident (person) records that no longer appear in any schedule are also removed.
   Returns `{:ok, schedule}` or `{:error, :not_found}`.
+  Exempt from doctest — hits the database.
   """
   def delete_schedule(id) do
     case Repo.get(Schedule, id) do
-      nil -> {:error, :not_found}
-      schedule -> Repo.delete(schedule)
+      nil ->
+        {:error, :not_found}
+
+      schedule ->
+        result = Repo.delete(schedule)
+        Residents.delete_orphaned_residents()
+        result
     end
   end
 
@@ -71,5 +88,20 @@ defmodule ResidencySchedule.Schedules do
     |> order_by(desc: :academic_year)
     |> limit(1)
     |> Repo.one()
+  end
+
+  @doc """
+  Returns schedules that contain at least one future slot — i.e. the academic year
+  has not yet ended (academic year ends June 30 of year+1).
+  These are the schedules available for editing on the edit page.
+
+      iex> ResidencySchedule.Schedules.list_editable_schedules() |> is_list()
+      true
+  """
+  def list_editable_schedules do
+    today = Date.utc_today()
+
+    list_schedules()
+    |> Enum.filter(fn s -> Date.compare(Date.new!(s.academic_year + 1, 6, 30), today) != :lt end)
   end
 end

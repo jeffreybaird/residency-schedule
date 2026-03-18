@@ -1,0 +1,463 @@
+Loaded 2023-2024: 100 slots, 31 residents
+Loaded 2024-2025: 100 slots, 32 residents
+Loaded 2025-2026: 107 slots, 32 residents
+
+================================================================================
+SLOT TYPE BREAKDOWN PER YEAR
+================================================================================
+2023-2024: 50 weekday slots, 48 weekend slots, 2 other/empty
+2024-2025: 52 weekday slots, 48 weekend slots, 0 other/empty
+2025-2026: 52 weekday slots, 48 weekend slots, 7 other/empty
+
+All rotation types seen: ['AMB', 'AWAY', 'ELEC', 'EMPTY', 'FLOAT', 'GYN', 'HGYN', 'HHOB', 'HNF', 'HWD', 'HWN', 'LOA', 'NF', 'OB', 'ONC', 'PROTECTED', 'REI', 'SWD', 'SWING', 'SWN', 'UG', 'US', 'USN', 'VAC', '`']
+
+================================================================================
+SECTION 1: PER-SLOT COVERAGE STATISTICS BY YEAR LEVEL AND ROTATION
+(Across all 3 academic years, counts = # residents on that rotation per slot)
+================================================================================
+
+--- Year Level R1 ---
+
+Rotation         SlotType    Median   Min   Max    Mean  Slots    %>0
+----------------------------------------------------------------------
+AMB              weekday        1.0     1     1    1.00    144 100.0%
+FLOAT            weekday        8.0     8     8    8.00     10 100.0%
+GYN              weekday        1.0     1     1    1.00    144 100.0%
+HGYN             weekday        1.0     1     2    1.31    129 100.0%
+HNF              weekday        1.0     1     1    1.00     51 100.0%
+HWD              weekend        1.0     1     1    1.00     92 100.0%
+HWN              weekend        1.0     1     1    1.00     67 100.0%
+NF               weekday        1.0     1     1    1.00    144 100.0%
+OB               weekday        1.0     1     1    1.00    144 100.0%
+ONC              weekday        1.0     1     1    1.00    144 100.0%
+PROTECTED        weekend        1.0     1     3    1.57    110 100.0%
+SWD              weekend        1.0     1     1    1.00    144 100.0%
+SWING            weekday        1.0     1     2    1.05     42 100.0%
+SWN              weekend        1.0     1     1    1.00    144 100.0%
+US               weekday        1.0     1     1    1.00     24 100.0%
+VAC              weekday        1.0     1     2    1.13     85 100.0%
+
+--- Year Level R2 ---
+
+Rotation         SlotType    Median   Min   Max    Mean  Slots    %>0
+----------------------------------------------------------------------
+AMB              weekday        1.0     1     1    1.00    144 100.0%
+FLOAT            weekday        8.0     8     8    8.00     10 100.0%
+GYN              weekday        1.0     1     1    1.00    144 100.0%
+HGYN             weekday        1.0     1     2    1.02     47 100.0%
+HHOB             weekday        1.0     1     1    1.00    144 100.0%
+HNF              weekday        1.0     1     1    1.00     48 100.0%
+HWD              weekend        1.0     1     1    1.00    108 100.0%
+HWN              weekend        1.0     1     1    1.00     66 100.0%
+NF               weekday        1.0     1     1    1.00    144 100.0%
+OB               weekday        1.0     1     1    1.00    144 100.0%
+ONC              weekday        1.0     1     1    1.00    144 100.0%
+PROTECTED        weekend        1.0     1     3    1.50    108 100.0%
+REI              weekday        1.0     1     1    1.00     96 100.0%
+SWD              weekend        1.0     1     2    1.01    144 100.0%
+SWN              weekend        1.0     1     2    1.01    144 100.0%
+VAC              weekday        1.0     1     2    1.10     87 100.0%
+`                weekend        1.0     1     1    1.00      1 100.0%
+
+--- Year Level R3 ---
+
+Rotation         SlotType    Median   Min   Max    Mean  Slots    %>0
+----------------------------------------------------------------------
+AMB              weekday        1.0     1     1    1.00    143 100.0%
+AWAY             weekend        1.0     1     1    1.00      4 100.0%
+ELEC             weekday        1.0     1     2    1.01     95 100.0%
+FLOAT            weekday        8.0     8     8    8.00     10 100.0%
+GYN              weekday        1.0     1     2    1.01    136 100.0%
+HGYN             weekday        1.0     1     2    1.04     71 100.0%
+HNF              weekday        1.0     1     1    1.00     76 100.0%
+HWD              weekend        1.0     1     1    1.00     72 100.0%
+HWN              weekend        1.0     1     1    1.00     76 100.0%
+NF               weekday        1.0     1     1    1.00    144 100.0%
+OB               weekday        1.0     1     1    1.00    144 100.0%
+ONC              weekday        1.0     1     1    1.00    144 100.0%
+PROTECTED        weekend        2.0     1     3    1.70    129 100.0%
+SWD              weekend        1.0     1     2    1.04    143 100.0%
+SWING            weekday        1.0     1     1    1.00      1 100.0%
+SWN              weekend        1.0     1     2    1.01    144 100.0%
+UG               weekday        1.0     1     1    1.00     96 100.0%
+VAC              weekday        1.0     1     3    1.19     81 100.0%
+
+--- Year Level R4 ---
+
+Rotation         SlotType    Median   Min   Max    Mean  Slots    %>0
+----------------------------------------------------------------------
+AMB              weekday        1.0     1     1    1.00    144 100.0%
+ELEC             weekday        1.0     1     2    1.01     89 100.0%
+FLOAT            weekday        8.0     7     8    7.80     10 100.0%
+GYN              weekday        1.0     1     1    1.00    135 100.0%
+HGYN             weekday        1.0     1     2    1.13    109 100.0%
+HNF              weekday        1.0     1     1    1.00     68 100.0%
+HWD              weekend        1.0     1     1    1.00     74 100.0%
+HWN              weekend        1.0     1     1    1.00     68 100.0%
+LOA              weekday        1.0     1     1    1.00      5 100.0%
+NF               weekday        1.0     1     1    1.00    144 100.0%
+OB               weekday        1.0     1     1    1.00    144 100.0%
+ONC              weekday        1.0     1     1    1.00    144 100.0%
+PROTECTED        weekend        2.0     1     3    1.67    126 100.0%
+SWD              weekend        1.0     1     2    1.01    140 100.0%
+SWING            weekday        1.0     1     1    1.00     16 100.0%
+SWN              weekend        1.0     1     2    1.01    142 100.0%
+VAC              weekday        1.0     1     2    1.18     77 100.0%
+
+================================================================================
+SECTION 2: PER-RESIDENT ANNUAL SLOT COUNTS BY YEAR LEVEL
+(Each entry = how many valid slots a resident spent on this rotation in a year)
+================================================================================
+
+--- Year Level R1 (total: 24 resident-years) ---
+
+Rotation          Median   Min   Max    Mean   Res-yrs w/ rot  % w/ rot
+---------------------------------------------------------------------------
+AMB                  6.0     6     6    6.00    24/24           100.0%
+FLOAT                4.0     2     4    3.33    24/24           100.0%
+GYN                  6.0     6     6    6.00    24/24           100.0%
+HGYN                 7.0     7     8    7.04    24/24           100.0%
+HNF                  2.0     2     3    2.12    24/24           100.0%
+HWD                  4.0     3     5    3.83    24/24           100.0%
+HWN                  3.0     2     4    2.79    24/24           100.0%
+NF                   6.0     6     6    6.00    24/24           100.0%
+OB                   6.0     6     6    6.00    24/24           100.0%
+ONC                  6.0     6     6    6.00    24/24           100.0%
+PROTECTED            7.0     7     9    7.21    24/24           100.0%
+SWD                  6.0     6     6    6.00    24/24           100.0%
+SWING                2.0     1     2    1.83    24/24           100.0%
+SWN                  6.0     6     6    6.00    24/24           100.0%
+US                   3.0     3     3    3.00     8/24            33.3%
+VAC                  4.0     4     4    4.00    24/24           100.0%
+
+--- Year Level R2 (total: 24 resident-years) ---
+
+Rotation          Median   Min   Max    Mean   Res-yrs w/ rot  % w/ rot
+---------------------------------------------------------------------------
+AMB                  6.0     6     6    6.00    24/24           100.0%
+FLOAT                4.0     2     4    3.33    24/24           100.0%
+GYN                  6.0     6     6    6.00    24/24           100.0%
+HGYN                 2.0     2     2    2.00    24/24           100.0%
+HHOB                 6.0     6     6    6.00    24/24           100.0%
+HNF                  2.0     2     2    2.00    24/24           100.0%
+HWD                  5.0     3     5    4.50    24/24           100.0%
+HWN                  3.0     2     3    2.75    24/24           100.0%
+NF                   6.0     6     6    6.00    24/24           100.0%
+OB                   6.0     6     6    6.00    24/24           100.0%
+ONC                  6.0     6     6    6.00    24/24           100.0%
+PROTECTED            7.0     6     7    6.75    24/24           100.0%
+REI                  4.0     4     4    4.00    24/24           100.0%
+SWD                  6.0     5     7    6.04    24/24           100.0%
+SWN                  6.0     6     7    6.04    24/24           100.0%
+VAC                  4.0     4     4    4.00    24/24           100.0%
+`                    1.0     1     1    1.00     1/24             4.2%
+
+--- Year Level R3 (total: 24 resident-years) ---
+
+Rotation          Median   Min   Max    Mean   Res-yrs w/ rot  % w/ rot
+---------------------------------------------------------------------------
+AMB                  6.0     5     6    5.96    24/24           100.0%
+AWAY                 4.0     4     4    4.00     1/24             4.2%
+ELEC                 4.0     4     4    4.00    24/24           100.0%
+FLOAT                4.0     2     4    3.33    24/24           100.0%
+GYN                  6.0     5     6    5.75    24/24           100.0%
+HGYN                 3.0     3     4    3.08    24/24           100.0%
+HNF                  3.0     3     4    3.17    24/24           100.0%
+HWD                  3.0     2     4    3.00    24/24           100.0%
+HWN                  3.0     3     4    3.17    24/24           100.0%
+NF                   6.0     6     6    6.00    24/24           100.0%
+OB                   6.0     6     6    6.00    24/24           100.0%
+ONC                  6.0     6     6    6.00    24/24           100.0%
+PROTECTED            9.0     8    11    9.12    24/24           100.0%
+SWD                  6.0     5     7    6.21    24/24           100.0%
+SWING                1.0     1     1    1.00     1/24             4.2%
+SWN                  6.0     5     7    6.08    24/24           100.0%
+UG                   4.0     4     4    4.00    24/24           100.0%
+VAC                  4.0     4     4    4.00    24/24           100.0%
+
+--- Year Level R4 (total: 23 resident-years) ---
+
+Rotation          Median   Min   Max    Mean   Res-yrs w/ rot  % w/ rot
+---------------------------------------------------------------------------
+AMB                  6.0     6     8    6.26    23/23           100.0%
+ELEC                 4.0     2     4    3.91    23/23           100.0%
+FLOAT                4.0     2     4    3.39    23/23           100.0%
+GYN                  6.0     5     7    5.87    23/23           100.0%
+HGYN                 6.0     3     6    5.35    23/23           100.0%
+HNF                  3.0     2     4    2.96    23/23           100.0%
+HWD                  3.0     2     4    3.22    23/23           100.0%
+HWN                  3.0     2     3    2.96    23/23           100.0%
+LOA                  5.0     5     5    5.00     1/23             4.3%
+NF                   6.0     6     8    6.26    23/23           100.0%
+OB                   6.0     6     8    6.26    23/23           100.0%
+ONC                  6.0     6     8    6.26    23/23           100.0%
+PROTECTED            9.0     8    12    9.17    23/23           100.0%
+SWD                  6.0     5     7    6.17    23/23           100.0%
+SWING                1.0     1     1    1.00    16/23            69.6%
+SWN                  6.0     5     8    6.22    23/23           100.0%
+VAC                  4.0     3     4    3.96    23/23           100.0%
+
+================================================================================
+SECTION 3: ROTATION CLASSIFICATION — OPTIONAL vs REQUIRED
+Based on % of slots where count > 0 (across all years, weekday slots)
+================================================================================
+
+--- Year Level R1 (total: 24 resident-years) ---
+  REQUIRED (>=85% of residents have this rotation):
+    AMB              100.0% of res-years  avg 6.0 slots/year
+    FLOAT            100.0% of res-years  avg 3.3 slots/year
+    GYN              100.0% of res-years  avg 6.0 slots/year
+    HGYN             100.0% of res-years  avg 7.0 slots/year
+    HNF              100.0% of res-years  avg 2.1 slots/year
+    HWD              100.0% of res-years  avg 3.8 slots/year
+    HWN              100.0% of res-years  avg 2.8 slots/year
+    NF               100.0% of res-years  avg 6.0 slots/year
+    OB               100.0% of res-years  avg 6.0 slots/year
+    ONC              100.0% of res-years  avg 6.0 slots/year
+    PROTECTED        100.0% of res-years  avg 7.2 slots/year
+    SWD              100.0% of res-years  avg 6.0 slots/year
+    SWING            100.0% of res-years  avg 1.8 slots/year
+    SWN              100.0% of res-years  avg 6.0 slots/year
+    VAC              100.0% of res-years  avg 4.0 slots/year
+  OPTIONAL (20-84% of residents have this rotation):
+    US                33.3% of res-years  avg 3.0 slots/year
+  RARE (<20% of residents have this rotation):
+
+--- Year Level R2 (total: 24 resident-years) ---
+  REQUIRED (>=85% of residents have this rotation):
+    AMB              100.0% of res-years  avg 6.0 slots/year
+    FLOAT            100.0% of res-years  avg 3.3 slots/year
+    GYN              100.0% of res-years  avg 6.0 slots/year
+    HGYN             100.0% of res-years  avg 2.0 slots/year
+    HHOB             100.0% of res-years  avg 6.0 slots/year
+    HNF              100.0% of res-years  avg 2.0 slots/year
+    HWD              100.0% of res-years  avg 4.5 slots/year
+    HWN              100.0% of res-years  avg 2.8 slots/year
+    NF               100.0% of res-years  avg 6.0 slots/year
+    OB               100.0% of res-years  avg 6.0 slots/year
+    ONC              100.0% of res-years  avg 6.0 slots/year
+    PROTECTED        100.0% of res-years  avg 6.8 slots/year
+    REI              100.0% of res-years  avg 4.0 slots/year
+    SWD              100.0% of res-years  avg 6.0 slots/year
+    SWN              100.0% of res-years  avg 6.0 slots/year
+    VAC              100.0% of res-years  avg 4.0 slots/year
+  OPTIONAL (20-84% of residents have this rotation):
+  RARE (<20% of residents have this rotation):
+    `                  4.2% of res-years  avg 1.0 slots/year
+
+--- Year Level R3 (total: 24 resident-years) ---
+  REQUIRED (>=85% of residents have this rotation):
+    AMB              100.0% of res-years  avg 6.0 slots/year
+    ELEC             100.0% of res-years  avg 4.0 slots/year
+    FLOAT            100.0% of res-years  avg 3.3 slots/year
+    GYN              100.0% of res-years  avg 5.8 slots/year
+    HGYN             100.0% of res-years  avg 3.1 slots/year
+    HNF              100.0% of res-years  avg 3.2 slots/year
+    HWD              100.0% of res-years  avg 3.0 slots/year
+    HWN              100.0% of res-years  avg 3.2 slots/year
+    NF               100.0% of res-years  avg 6.0 slots/year
+    OB               100.0% of res-years  avg 6.0 slots/year
+    ONC              100.0% of res-years  avg 6.0 slots/year
+    PROTECTED        100.0% of res-years  avg 9.1 slots/year
+    SWD              100.0% of res-years  avg 6.2 slots/year
+    SWN              100.0% of res-years  avg 6.1 slots/year
+    UG               100.0% of res-years  avg 4.0 slots/year
+    VAC              100.0% of res-years  avg 4.0 slots/year
+  OPTIONAL (20-84% of residents have this rotation):
+  RARE (<20% of residents have this rotation):
+    AWAY               4.2% of res-years  avg 4.0 slots/year
+    SWING              4.2% of res-years  avg 1.0 slots/year
+
+--- Year Level R4 (total: 23 resident-years) ---
+  REQUIRED (>=85% of residents have this rotation):
+    AMB              100.0% of res-years  avg 6.3 slots/year
+    ELEC             100.0% of res-years  avg 3.9 slots/year
+    FLOAT            100.0% of res-years  avg 3.4 slots/year
+    GYN              100.0% of res-years  avg 5.9 slots/year
+    HGYN             100.0% of res-years  avg 5.3 slots/year
+    HNF              100.0% of res-years  avg 3.0 slots/year
+    HWD              100.0% of res-years  avg 3.2 slots/year
+    HWN              100.0% of res-years  avg 3.0 slots/year
+    NF               100.0% of res-years  avg 6.3 slots/year
+    OB               100.0% of res-years  avg 6.3 slots/year
+    ONC              100.0% of res-years  avg 6.3 slots/year
+    PROTECTED        100.0% of res-years  avg 9.2 slots/year
+    SWD              100.0% of res-years  avg 6.2 slots/year
+    SWN              100.0% of res-years  avg 6.2 slots/year
+    VAC              100.0% of res-years  avg 4.0 slots/year
+  OPTIONAL (20-84% of residents have this rotation):
+    SWING             69.6% of res-years  avg 1.0 slots/year
+  RARE (<20% of residents have this rotation):
+    LOA                4.3% of res-years  avg 5.0 slots/year
+
+================================================================================
+SECTION 4: LOA ANALYSIS FOR 2025-2026
+For each LOA slot, shows coverage impact and historical peer activity
+================================================================================
+
+Resident: R4-4 (Allie G, R4)
+  Total LOA slots: 5
+  LOA date range: 2025-06-30 to 2025-07-28
+  LOA slots: 5 weekday, 0 weekend
+  Coverage during LOA slots (what same-year peers were doing):
+    Peer rotation distribution (total across all LOA slots):
+      ONC             :   5 slot-residents
+      HGYN            :   5 slot-residents
+      NF              :   5 slot-residents
+      GYN             :   5 slot-residents
+      OB              :   5 slot-residents
+      AMB             :   5 slot-residents
+      HNF             :   2 slot-residents
+      ELEC            :   2 slot-residents
+      VAC             :   1 slot-residents
+    Historical peer activity (other years, same slots):
+      ONC             :  10 (13.3%)
+      NF              :  10 (13.3%)
+      HGYN            :  10 (13.3%)
+      OB              :  10 (13.3%)
+      GYN             :  10 (13.3%)
+      AMB             :  10 (13.3%)
+      VAC             :   6 (8.0%)
+      ELEC            :   5 (6.7%)
+      SWING           :   2 (2.7%)
+      HNF             :   2 (2.7%)
+
+================================================================================
+SECTION 5: KEY CLINICAL COVERAGE — OB, GYN, NF DETAILED BREAKDOWN
+Showing per-year-level per-slot-type counts for critical rotations
+================================================================================
+
+  OB:
+  YrLvl    SlotType    Median   Min   Max    %>0  Total slots
+  R1       weekday        1.0     1     1 100.0%          144
+  R2       weekday        1.0     1     1 100.0%          144
+  R3       weekday        1.0     1     1 100.0%          144
+  R4       weekday        1.0     1     1 100.0%          144
+
+  GYN:
+  YrLvl    SlotType    Median   Min   Max    %>0  Total slots
+  R1       weekday        1.0     1     1 100.0%          144
+  R2       weekday        1.0     1     1 100.0%          144
+  R3       weekday        1.0     1     2 100.0%          136
+  R4       weekday        1.0     1     1 100.0%          135
+
+  NF:
+  YrLvl    SlotType    Median   Min   Max    %>0  Total slots
+  R1       weekday        1.0     1     1 100.0%          144
+  R2       weekday        1.0     1     1 100.0%          144
+  R3       weekday        1.0     1     1 100.0%          144
+  R4       weekday        1.0     1     1 100.0%          144
+
+  HGYN:
+  YrLvl    SlotType    Median   Min   Max    %>0  Total slots
+  R1       weekday        1.0     1     2 100.0%          129
+  R2       weekday        1.0     1     2 100.0%           47
+  R3       weekday        1.0     1     2 100.0%           71
+  R4       weekday        1.0     1     2 100.0%          109
+
+  HHOB:
+  YrLvl    SlotType    Median   Min   Max    %>0  Total slots
+  R2       weekday        1.0     1     1 100.0%          144
+
+  AMB:
+  YrLvl    SlotType    Median   Min   Max    %>0  Total slots
+  R1       weekday        1.0     1     1 100.0%          144
+  R2       weekday        1.0     1     1 100.0%          144
+  R3       weekday        1.0     1     1 100.0%          143
+  R4       weekday        1.0     1     1 100.0%          144
+
+  ONC:
+  YrLvl    SlotType    Median   Min   Max    %>0  Total slots
+  R1       weekday        1.0     1     1 100.0%          144
+  R2       weekday        1.0     1     1 100.0%          144
+  R3       weekday        1.0     1     1 100.0%          144
+  R4       weekday        1.0     1     1 100.0%          144
+
+================================================================================
+SECTION 6: YEAR-OVER-YEAR COVERAGE COMPARISON
+Median per-slot counts for key rotations, broken down by academic year
+================================================================================
+
+--- R1 Year Level ---
+Rotation         SlotType      2023-2024    2024-2025    2025-2026
+-----------------------------------------------------------------
+AMB              weekday             1.0          1.0          1.0
+FLOAT            weekday             8.0          8.0          8.0
+GYN              weekday             1.0          1.0          1.0
+HGYN             weekday             1.0          1.0          1.0
+HNF              weekday             1.0          1.0          1.0
+HWD              weekend             1.0          1.0          1.0
+HWN              weekend             1.0          1.0          1.0
+NF               weekday             1.0          1.0          1.0
+OB               weekday             1.0          1.0          1.0
+ONC              weekday             1.0          1.0          1.0
+PROTECTED        weekend             2.0          1.0          2.0
+SWD              weekend             1.0          1.0          1.0
+SWING            weekday             1.0          1.0          1.0
+SWN              weekend             1.0          1.0          1.0
+US               weekday             ---          ---          1.0
+VAC              weekday             1.0          1.0          1.0
+
+--- R2 Year Level ---
+Rotation         SlotType      2023-2024    2024-2025    2025-2026
+-----------------------------------------------------------------
+AMB              weekday             1.0          1.0          1.0
+FLOAT            weekday             8.0          8.0          8.0
+GYN              weekday             1.0          1.0          1.0
+HGYN             weekday             1.0          1.0          1.0
+HHOB             weekday             1.0          1.0          1.0
+HNF              weekday             1.0          1.0          1.0
+HWD              weekend             1.0          1.0          1.0
+HWN              weekend             1.0          1.0          1.0
+NF               weekday             1.0          1.0          1.0
+OB               weekday             1.0          1.0          1.0
+ONC              weekday             1.0          1.0          1.0
+PROTECTED        weekend             1.0          1.0          1.0
+REI              weekday             1.0          1.0          1.0
+SWD              weekend             1.0          1.0          1.0
+SWN              weekend             1.0          1.0          1.0
+VAC              weekday             1.0          1.0          1.0
+`                weekend             1.0          ---          ---
+
+--- R3 Year Level ---
+Rotation         SlotType      2023-2024    2024-2025    2025-2026
+-----------------------------------------------------------------
+AMB              weekday             1.0          1.0          1.0
+AWAY             weekend             1.0          ---          ---
+ELEC             weekday             1.0          1.0          1.0
+FLOAT            weekday             8.0          8.0          8.0
+GYN              weekday             1.0          1.0          1.0
+HGYN             weekday             1.0          1.0          1.0
+HNF              weekday             1.0          1.0          1.0
+HWD              weekend             1.0          1.0          1.0
+HWN              weekend             1.0          1.0          1.0
+NF               weekday             1.0          1.0          1.0
+OB               weekday             1.0          1.0          1.0
+ONC              weekday             1.0          1.0          1.0
+PROTECTED        weekend             2.0          2.0          2.0
+SWD              weekend             1.0          1.0          1.0
+SWING            weekday             1.0          ---          ---
+SWN              weekend             1.0          1.0          1.0
+UG               weekday             1.0          1.0          1.0
+VAC              weekday             1.0          1.0          1.0
+
+--- R4 Year Level ---
+Rotation         SlotType      2023-2024    2024-2025    2025-2026
+-----------------------------------------------------------------
+AMB              weekday             1.0          1.0          1.0
+ELEC             weekday             1.0          1.0          1.0
+FLOAT            weekday             7.0          8.0          8.0
+GYN              weekday             1.0          1.0          1.0
+HGYN             weekday             1.0          1.0          1.0
+HNF              weekday             1.0          1.0          1.0
+HWD              weekend             1.0          1.0          1.0
+HWN              weekend             1.0          1.0          1.0
+LOA              weekday             ---          ---          1.0
+NF               weekday             1.0          1.0          1.0
+OB               weekday             1.0          1.0          1.0
+ONC              weekday             1.0          1.0          1.0
+PROTECTED        weekend             2.0          2.0          2.0
+SWD              weekend             1.0          1.0          1.0
+SWING            weekday             ---          1.0          1.0
+SWN              weekend             1.0          1.0          1.0
+VAC              weekday             1.0          1.0          1.0
