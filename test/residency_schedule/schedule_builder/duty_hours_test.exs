@@ -92,7 +92,7 @@ defmodule ResidencySchedule.ScheduleBuilder.DutyHoursTest do
   end
 
   describe "violations/3" do
-    defp build_window(res_idx, rotation_type, slot_count \\ 4) do
+    defp build_window(res_idx, rotation_type, slot_count) do
       slots =
         for i <- 0..(slot_count - 1) do
           %{slot_index: i * 2, is_weekend: false}
