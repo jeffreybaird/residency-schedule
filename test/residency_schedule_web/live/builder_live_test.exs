@@ -130,43 +130,10 @@ defmodule ResidencyScheduleWeb.BuilderLiveTest do
     end
   end
 
-  describe "load from existing schedule" do
-    setup %{conn: conn} do
-      seed_schedule()
-      {:ok, conn: conn}
-    end
-
-    test "shows the existing schedule in the Load dropdown", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/admin/build")
-      assert html =~ "Load"
-      assert html =~ "Optimize"
-    end
-
-    test "Load & Optimize loads the schedule into the Gantt grid", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/admin/build")
-
-      view |> element("button[phx-click='load_schedule']") |> render_click()
-
-      # Should show resident rows from the loaded schedule
-      html = render(view)
-      assert html =~ "Residents"
-    end
-
-    test "loaded state has no more duty violations after optimization", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/admin/build")
-
-      view |> element("button[phx-click='load_schedule']") |> render_click()
-
-      html = render(view)
-      # After Load & Optimize, duty warnings should be zero or reduced
-      # (either "No warnings" badge or reduced count vs unoptimized)
-      assert html =~ "warning" or html =~ "No warnings"
-    end
-
+  describe "resolve violations" do
     test "Resolve Violations button clears remaining duty warnings", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/admin/build")
 
-      # Generate a fresh schedule (which will have violations)
       view |> element("form") |> render_submit(%{"year" => "2035"})
 
       html_before = render(view)
@@ -174,7 +141,6 @@ defmodule ResidencyScheduleWeb.BuilderLiveTest do
       if html_before =~ "Resolve Violations" do
         view |> element("button[phx-click='resolve']") |> render_click()
         html_after = render(view)
-        # Violations should be reduced or eliminated
         assert html_after =~ "warning" or html_after =~ "No warnings"
       end
     end

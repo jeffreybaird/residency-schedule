@@ -39,19 +39,6 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderState do
   end
 
   @doc """
-  Returns a new state with a single assignment updated and warnings recomputed.
-
-      iex> state = ResidencySchedule.ScheduleBuilder.BuilderState.new(
-      ...>   2026,
-      ...>   [%{position_code: "R1-1", residency_year: 1, schedule_number: 1, name: "R1-1"}],
-      ...>   [%{slot_index: 0, start_date: ~D[2026-06-29], end_date: ~D[2026-07-03], is_weekend: false}],
-      ...>   %{}
-      ...> )
-      iex> updated = ResidencySchedule.ScheduleBuilder.BuilderState.update_assignments(state, 0, 0, :oncology)
-      iex> Map.get(updated.assignments, {0, 0})
-      :oncology
-  """
-  @doc """
   Returns a new state with the named resident's display name updated.
 
       iex> state = ResidencySchedule.ScheduleBuilder.BuilderState.new(
@@ -139,7 +126,19 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderState do
     %{state | assignments: updated_assignments}
     |> recompute_warnings()
   end
+@doc """
+  Returns a new state with a single assignment updated and warnings recomputed.
 
+      iex> state = ResidencySchedule.ScheduleBuilder.BuilderState.new(
+      ...>   2026,
+      ...>   [%{position_code: "R1-1", residency_year: 1, schedule_number: 1, name: "R1-1"}],
+      ...>   [%{slot_index: 0, start_date: ~D[2026-06-29], end_date: ~D[2026-07-03], is_weekend: false}],
+      ...>   %{}
+      ...> )
+      iex> updated = ResidencySchedule.ScheduleBuilder.BuilderState.update_assignments(state, 0, 0, :oncology)
+      iex> Map.get(updated.assignments, {0, 0})
+      :oncology
+  """
   def update_assignments(state, resident_index, slot_index, rotation_type) do
     updated_assignments = Map.put(state.assignments, {resident_index, slot_index}, rotation_type)
     %{state | assignments: updated_assignments}
