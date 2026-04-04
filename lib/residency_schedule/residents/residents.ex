@@ -89,17 +89,26 @@ defmodule ResidencySchedule.Residents do
   end
 
   @doc """
-  Finds the most recent schedule resident whose canonical name matches the given password
-  (case-insensitive). Returns `nil` if no match is found.
-  Exempt from doctest — hits the database.
+  Finds the most recent schedule resident whose canonical name matches the given password.
+  Matching is case-insensitive (via PostgreSQL `lower` on both the stored name and the
+  password). Accepts a spaced initial the same as a run-on form (e.g. `"paige r"` and
+  `"paiger"` both match `"Paige R"`).
+
+  Exempt from doctest — hits the database. See `ResidentsTest`.
   """
   def find_by_password(password) do
-    normalized = String.downcase(String.trim(password))
+    trimmed = String.trim(password)
 
     from(sr in ScheduleResident,
       join: r in assoc(sr, :resident),
       join: s in assoc(sr, :schedule),
-      where: fragment("lower(trim(?))", r.name) == ^normalized,
+      where:
+        fragment("lower(trim(?)) = lower(trim(?))", r.name, ^trimmed) or
+          fragment(
+            "regexp_replace(lower(trim(?)), '^(.+) ([a-z])$', '\\1\\2') = lower(trim(?))",
+            r.name,
+            ^trimmed
+          ),
       order_by: [desc: s.academic_year],
       limit: 1,
       select: %{sr | name: r.name}
