@@ -254,6 +254,49 @@ defmodule ResidencySchedule.RotationsTest do
     end
   end
 
+  describe "list_off_coworker_rows_for_slot_in_range/4" do
+    test "lists residents with no rotation for that slot and range", %{
+      schedule: sched,
+      ra: ra,
+      rb: rb
+    } do
+      {:ok, on_service} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R4-9",
+          residency_year: 4,
+          schedule_number: 9,
+          name: "OnCall"
+        })
+
+      {:ok, _} =
+        Rotations.insert_rotations(on_service.id, [
+          %{
+            slot_index: 2,
+            start_date: ~D[2023-07-03],
+            end_date: ~D[2023-07-07],
+            rotation_type: :oncology
+          }
+        ])
+
+      rows =
+        Rotations.list_off_coworker_rows_for_slot_in_range(
+          sched.id,
+          2,
+          ~D[2023-07-03],
+          ~D[2023-07-07]
+        )
+
+      ids = Enum.map(rows, & &1.resident.id)
+
+      assert ra.id in ids
+      assert rb.id in ids
+      refute on_service.id in ids
+
+      row_ra = Enum.find(rows, &(&1.resident.id == ra.id))
+      assert MapSet.size(row_ra.active_dates) == 5
+    end
+  end
+
   describe "format_date_set_within_block/3" do
     test "formats a single day without a range dash" do
       dates = MapSet.new([~D[2023-07-03]])

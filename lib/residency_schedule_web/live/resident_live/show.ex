@@ -110,12 +110,35 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     type = params["rotation-type"] || params["rotation_type"]
     sd = params["start-date"] || params["start_date"]
     ed = params["end-date"] || params["end_date"]
+    slot_raw = params["slot-index"] || params["slot_index"]
 
     cond do
-      type == "off" ->
-        {:noreply, socket}
+      type == "off" and is_binary(sd) and is_binary(ed) and is_binary(slot_raw) ->
+        with {:ok, start_d} <- Date.from_iso8601(sd),
+             {:ok, end_d} <- Date.from_iso8601(ed),
+             {slot_idx, ""} <- Integer.parse(slot_raw) do
+          coworker_rows =
+            Rotations.list_off_coworker_rows_for_slot_in_range(
+              socket.assigns.resident.schedule_id,
+              slot_idx,
+              start_d,
+              end_d
+            )
 
-      is_binary(type) and is_binary(sd) and is_binary(ed) ->
+          {:noreply,
+           assign(socket,
+             shift_coworkers_modal: %{
+               rotation_type: "off",
+               start_date: start_d,
+               end_date: end_d,
+               coworker_rows: coworker_rows
+             }
+           )}
+        else
+          _ -> {:noreply, socket}
+        end
+
+      is_binary(type) and type != "off" and is_binary(sd) and is_binary(ed) ->
         with {:ok, start_d} <- Date.from_iso8601(sd),
              {:ok, end_d} <- Date.from_iso8601(ed) do
           coworker_rows =
@@ -478,12 +501,13 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                       data-today-anchor={if entry.slot_index == @today_anchor_slot_index, do: "true"}
                       phx-click="open_shift_coworkers"
                       phx-value-rotation-type={entry.rotation_type}
+                      phx-value-slot-index={entry.slot_index}
                       phx-value-start-date={Date.to_iso8601(entry.start_date)}
                       phx-value-end-date={Date.to_iso8601(entry.end_date)}
                       class={[
                         entry_row_class(entry.rotation_type, past),
                         if(covered, do: "opacity-60", else: ""),
-                        if(entry.rotation_type != "off", do: "cursor-pointer")
+                        "cursor-pointer"
                       ]}
                     >
                       <td class="px-4 py-2 align-top">
@@ -618,7 +642,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
         <%= if @shift_coworkers_modal do %>
           <% modal = @shift_coworkers_modal %>
-          <% type_label = Rotations.rotation_type_label(modal.rotation_type) %>
+          <% type_label = entry_label(modal.rotation_type) %>
           <% color = entry_color(modal.rotation_type) %>
           <div
             id="shift-coworkers-modal"
@@ -692,6 +716,13 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                           <span class="text-xs text-blue-500 italic">(covering)</span>
                         <% end %>
                       </div>
+                      <p class="text-xs text-gray-500 pl-12">
+                        {Rotations.format_date_set_within_block(
+                          row.active_dates,
+                          modal.start_date,
+                          modal.end_date
+                        )}
+                      </p>
                     </li>
                   <% end %>
                 </ul>
