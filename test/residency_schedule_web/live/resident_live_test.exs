@@ -33,11 +33,11 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       refute html =~ "Rotation Table"
     end
 
-    test "shows Set as My Resident button when no home resident set", %{html: html} do
-      assert html =~ "Set as My Resident"
+    test "shows Set as Home button when no home resident set", %{html: html} do
+      assert html =~ "Set as Home"
     end
 
-    test "shows My Resident badge when resident is home resident", %{conn: conn} do
+    test "shows Home badge when resident is home resident", %{conn: conn} do
       resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
 
       conn =
@@ -45,7 +45,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
         |> Plug.Test.init_test_session(authenticated: true, resident_id: resident.id)
 
       {:ok, _view, html} = live(conn, "/residents/#{resident.id}")
-      assert html =~ "My Resident"
+      assert html =~ "✓ Home"
     end
 
     test "filters the rotation table to a selected service", %{view: view, resident: resident} do
