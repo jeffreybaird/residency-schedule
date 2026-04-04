@@ -145,6 +145,209 @@ defmodule ResidencySchedule.RotationsTest do
     end
   end
 
+  describe "list_rotations_for_schedule_type_in_range/4" do
+    test "returns all residents on the schedule with that type overlapping the range", %{
+      schedule: sched,
+      ra: ra
+    } do
+      {:ok, rc} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R4-9",
+          residency_year: 4,
+          schedule_number: 9,
+          name: "CoOnc"
+        })
+
+      {:ok, _} =
+        Rotations.insert_rotations(rc.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-04],
+            end_date: ~D[2023-07-06],
+            rotation_type: :oncology
+          }
+        ])
+
+      rots =
+        Rotations.list_rotations_for_schedule_type_in_range(
+          sched.id,
+          "oncology",
+          ~D[2023-07-03],
+          ~D[2023-07-07]
+        )
+
+      ids = rots |> Enum.map(& &1.schedule_resident_id) |> Enum.sort()
+      assert ra.id in ids
+      assert rc.id in ids
+      assert Enum.all?(rots, &(&1.rotation_type == "oncology"))
+    end
+
+    test "returns empty when no rotation of that type overlaps", %{schedule: sched} do
+      assert Rotations.list_rotations_for_schedule_type_in_range(
+               sched.id,
+               "oncology",
+               ~D[2020-01-01],
+               ~D[2020-01-07]
+             ) == []
+    end
+  end
+
+  describe "effective_day_assignments/2" do
+    alias ResidencySchedule.Residents.ScheduleResident
+    alias ResidencySchedule.Rotations.Rotation
+    alias ResidencySchedule.ShiftOverrides.ShiftOverride
+
+    test "returns one row per rotation when there are no overrides" do
+      a = %ScheduleResident{
+        id: 1,
+        residency_year: 4,
+        schedule_number: 1,
+        position_code: "R4-1",
+        name: "Ann"
+      }
+
+      rot = %Rotation{
+        id: 5,
+        rotation_type: "oncology",
+        schedule_resident_id: 1,
+        schedule_resident: a
+      }
+
+      [row] = Rotations.effective_day_assignments([rot], [])
+      assert row.resident == a
+      refute row.overridden
+      refute row.is_coverage
+    end
+
+    test "suppresses the covering resident's own rotation but keeps coverage rows" do
+      a = %ScheduleResident{id: 1, residency_year: 4, schedule_number: 1, name: "Ann"}
+      b = %ScheduleResident{id: 2, residency_year: 2, schedule_number: 1, name: "Bea"}
+
+      rot_a = %Rotation{
+        id: 10,
+        rotation_type: "oncology",
+        schedule_resident_id: 1,
+        schedule_resident: a
+      }
+
+      rot_b = %Rotation{
+        id: 11,
+        rotation_type: "elective",
+        schedule_resident_id: 2,
+        schedule_resident: b
+      }
+
+      ov = %ShiftOverride{
+        rotation_id: 10,
+        covering_schedule_resident_id: 2,
+        covering_schedule_resident: b,
+        override_start_date: ~D[2023-07-01],
+        override_end_date: ~D[2023-07-07]
+      }
+
+      rows = Rotations.effective_day_assignments([rot_a, rot_b], [ov])
+
+      assert length(rows) == 2
+      refute Enum.any?(rows, fn r -> r.rotation_type == "elective" end)
+      assert Enum.count(rows, & &1.is_coverage) == 1
+      assert Enum.any?(rows, fn r -> r.overridden and r.resident.id == a.id end)
+    end
+  end
+
+  describe "format_date_set_within_block/3" do
+    test "formats a single day without a range dash" do
+      dates = MapSet.new([~D[2023-07-03]])
+
+      assert Rotations.format_date_set_within_block(dates, ~D[2023-07-01], ~D[2023-07-31]) ==
+               "Jul 3, 2023"
+    end
+  end
+
+  describe "list_effective_coworker_rows_for_type_in_range/4" do
+    alias ResidencySchedule.ShiftOverrides
+
+    setup do
+      {:ok, sched} = Schedules.upsert_schedule(2023, "2023–2024")
+
+      {:ok, clare} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R4-8",
+          residency_year: 4,
+          schedule_number: 8,
+          name: "Clare"
+        })
+
+      {:ok, emily} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R2-8",
+          residency_year: 2,
+          schedule_number: 8,
+          name: "EmilyCov"
+        })
+
+      {:ok, _} =
+        Rotations.insert_rotations(clare.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-01],
+            end_date: ~D[2023-07-14],
+            rotation_type: :night_float
+          }
+        ])
+
+      {:ok, _} =
+        Rotations.insert_rotations(emily.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-01],
+            end_date: ~D[2023-07-14],
+            rotation_type: :elective
+          }
+        ])
+
+      clares_rotation = Rotations.list_rotations_for_resident(clare.id) |> hd()
+
+      %{
+        sched: sched,
+        clare: clare,
+        emily: emily,
+        clares_rotation: clares_rotation
+      }
+    end
+
+    test "lists coverage row when override overlaps the range", %{
+      sched: sched,
+      clare: clare,
+      emily: emily,
+      clares_rotation: rot
+    } do
+      {:ok, _} =
+        ShiftOverrides.create_override(%{
+          rotation_id: rot.id,
+          covering_schedule_resident_id: emily.id,
+          override_start_date: ~D[2023-07-08],
+          override_end_date: ~D[2023-07-14]
+        })
+
+      rows =
+        Rotations.list_effective_coworker_rows_for_type_in_range(
+          sched.id,
+          "night_float",
+          ~D[2023-07-08],
+          ~D[2023-07-10]
+        )
+
+      coverage = Enum.find(rows, & &1.is_coverage)
+      assert coverage.resident.id == emily.id
+      assert MapSet.size(coverage.active_dates) == 3
+
+      clare_overridden = Enum.find(rows, fn r -> r.resident.id == clare.id && r.overridden end)
+
+      assert clare_overridden
+      assert clare_overridden.covered_by.id == emily.id
+    end
+  end
+
   describe "list_rotations_for_date/2" do
     test "returns rotations covering the given date", %{schedule: sched} do
       rotations = Rotations.list_rotations_for_date(~D[2023-07-05], sched.id)

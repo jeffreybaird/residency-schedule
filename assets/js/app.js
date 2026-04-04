@@ -28,10 +28,80 @@ import topbar from "../vendor/topbar"
 // visible data column in the Gantt scroll container as the user scrolls.
 const Hooks = {}
 
+// Positions #service-filter-panel with fixed coordinates under #service-filter-toggle so the
+// menu is not clipped by #rotation-table-scroll (overflow-auto).
+Hooks.ServiceFilterAnchored = {
+  mounted() {
+    this._position = () => this.positionPanel()
+    this.scheduleAlignPanel = () => {
+      queueMicrotask(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => this.positionPanel())
+        })
+      })
+    }
+    this._docClick = e => {
+      const panel = document.getElementById("service-filter-panel")
+      const toggle = document.getElementById("service-filter-toggle")
+      if (!panel) return
+      if ((toggle && toggle.contains(e.target)) || panel.contains(e.target)) return
+      this.pushEvent("close_service_filter_menu", {})
+    }
+    document.addEventListener("click", this._docClick, true)
+    // After LiveView patches DOM, hook updated() runs *after* phx:update; defer past ScrollToToday et al.
+    this._phxUpdate = () => this.scheduleAlignPanel()
+    document.addEventListener("phx:update", this._phxUpdate)
+    this._position()
+    window.addEventListener("resize", this._position)
+    // Panel is position:fixed to the toggle’s viewport rect — main-page scroll must recompute it
+    // (scroll inside #rotation-table-scroll does not bubble to window).
+    window.addEventListener("scroll", this._position, {passive: true})
+    this._scrollEl = this.el.querySelector("#rotation-table-scroll")
+    if (this._scrollEl) {
+      this._scrollEl.addEventListener("scroll", this._position, {passive: true})
+      this._scrollRo = new ResizeObserver(() => this._position())
+      this._scrollRo.observe(this._scrollEl)
+    }
+    this._statsEl = document.getElementById("sticky-stats")
+    if (this._statsEl) {
+      this._statsRo = new ResizeObserver(() => this._position())
+      this._statsRo.observe(this._statsEl)
+    }
+  },
+  updated() {
+    this.scheduleAlignPanel()
+  },
+  destroyed() {
+    document.removeEventListener("click", this._docClick, true)
+    document.removeEventListener("phx:update", this._phxUpdate)
+    window.removeEventListener("resize", this._position)
+    window.removeEventListener("scroll", this._position, {passive: true})
+    if (this._scrollEl) {
+      this._scrollEl.removeEventListener("scroll", this._position)
+    }
+    if (this._scrollRo) this._scrollRo.disconnect()
+    if (this._statsRo) this._statsRo.disconnect()
+  },
+  positionPanel() {
+    const toggle = document.getElementById("service-filter-toggle")
+    const panel = document.getElementById("service-filter-panel")
+    if (!toggle || !panel) return
+    const btn = toggle.getBoundingClientRect()
+    const margin = 6
+    panel.style.position = "fixed"
+    panel.style.top = `${btn.bottom + margin}px`
+    panel.style.right = `${Math.max(8, window.innerWidth - btn.right)}px`
+    panel.style.left = "auto"
+    panel.style.bottom = "auto"
+    panel.style.zIndex = "60"
+  }
+}
+
 Hooks.ScrollToToday = {
   mounted() {
     this.updateTableHeight()
     this.scrollToToday()
+    this.updateHeaderSticky()
     const stickyEl = document.getElementById("sticky-stats")
     if (stickyEl) {
       this._statsObserver = new ResizeObserver(() => this.updateTableHeight())
@@ -45,6 +115,7 @@ Hooks.ScrollToToday = {
   updated() {
     this.updateTableHeight()
     this.scrollToToday()
+    this.updateHeaderSticky()
   },
   destroyed() {
     if (this._statsObserver) this._statsObserver.disconnect()
@@ -61,6 +132,9 @@ Hooks.ScrollToToday = {
     this.el.style.maxHeight = (window.innerHeight - offset - 40) + "px"
   },
   updateHeaderSticky() {
+    // Toggling thead between sticky and relative reflows the table and can jump scroll
+    // (including the main window with scroll anchoring). Skip while the service filter is open.
+    if (document.getElementById("service-filter-panel")) return
     const thead = this.el.querySelector("thead")
     if (!thead) return
     const firstRow = this.el.querySelector("tbody tr")
@@ -76,6 +150,7 @@ Hooks.ScrollToToday = {
     }
   },
   scrollToToday() {
+    if (document.getElementById("service-filter-panel")) return
     const anchor = this.el.querySelector("[data-today-anchor]")
     if (!anchor) return
     const thead = this.el.querySelector("thead")
