@@ -117,6 +117,38 @@ defmodule ResidencySchedule.ResidentsTest do
     end
   end
 
+  describe "find_by_password/1" do
+    setup %{schedule: sched} do
+      {:ok, paige} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R3-5",
+          residency_year: 3,
+          schedule_number: 5,
+          name: "Paige R"
+        })
+
+      %{paige: paige}
+    end
+
+    test "matches spaced and run-on forms for trailing initial", %{paige: paige} do
+      assert Residents.find_by_password("paige r").id == paige.id
+      assert Residents.find_by_password("Paiger").id == paige.id
+      assert Residents.find_by_password("  paiger  ").id == paige.id
+      assert Residents.find_by_password("PAIGE R").id == paige.id
+      assert Residents.find_by_password("pAiGeR").id == paige.id
+    end
+
+    test "still matches names without an initial (any letter case)", %{r4: r4} do
+      assert Residents.find_by_password("alexis").id == r4.id
+      assert Residents.find_by_password("ALEXIS").id == r4.id
+      assert Residents.find_by_password("Alexis").id == r4.id
+    end
+
+    test "returns nil when no resident matches" do
+      assert Residents.find_by_password("nobody_here_xyz") == nil
+    end
+  end
+
   describe "insert_resident/2" do
     test "inserts a valid resident", %{schedule: sched} do
       {:ok, resident} =
