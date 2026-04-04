@@ -2,6 +2,7 @@ defmodule ResidencySchedule.Rotations do
   import Ecto.Query
   alias ResidencySchedule.Repo
   alias ResidencySchedule.Rotations.Rotation
+  alias ResidencySchedule.Residents
   alias ResidencySchedule.Residents.ScheduleResident
   alias ResidencySchedule.ShiftOverrides
 
@@ -245,6 +246,64 @@ defmodule ResidencySchedule.Rotations do
     |> Map.values()
     |> Enum.map(fn %{template: t, dates: dates} -> Map.put(t, :active_dates, dates) end)
     |> Enum.sort_by(&coworker_modal_row_sort_key/1)
+  end
+
+  @doc """
+  Lists schedule residents who have no rotation for the given `slot_index` on each day in the
+  inclusive date range (same notion of “off” as the resident schedule table: unassigned for
+  that slot in that block). Each row matches the coworker modal shape with `:active_dates`.
+
+  Exempt from doctest — hits the database. See `RotationsTest`.
+  """
+  def list_off_coworker_rows_for_slot_in_range(
+        schedule_id,
+        slot_index,
+        range_start,
+        range_end
+      ) do
+    srs = Residents.list_residents_for_schedule(schedule_id)
+
+    busy_intervals =
+      from(r in Rotation,
+        join: sr in assoc(r, :schedule_resident),
+        where: sr.schedule_id == ^schedule_id,
+        where: r.slot_index == ^slot_index,
+        where: r.start_date <= ^range_end and r.end_date >= ^range_start,
+        select: {sr.id, r.start_date, r.end_date}
+      )
+      |> Repo.all()
+      |> Enum.group_by(&elem(&1, 0), fn {_, s, e} -> {s, e} end)
+
+    range_start
+    |> Date.range(range_end)
+    |> Enum.reduce(%{}, fn date, acc ->
+      Enum.reduce(srs, acc, fn sr, acc2 ->
+        intervals = Map.get(busy_intervals, sr.id, [])
+
+        busy? =
+          Enum.any?(intervals, fn {s, e} ->
+            Date.compare(date, s) != :lt and Date.compare(date, e) != :gt
+          end)
+
+        if busy? do
+          acc2
+        else
+          Map.update(acc2, sr.id, MapSet.new([date]), &MapSet.put(&1, date))
+        end
+      end)
+    end)
+    |> Enum.map(fn {sr_id, dates} ->
+      sr = Enum.find(srs, &(&1.id == sr_id))
+
+      %{
+        resident: sr,
+        active_dates: dates,
+        overridden: false,
+        covered_by: nil,
+        is_coverage: false
+      }
+    end)
+    |> Enum.sort_by(&{&1.resident.residency_year, &1.resident.schedule_number})
   end
 
   @doc """

@@ -125,7 +125,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       assert has_element?(view, "#shift-coworkers-list")
     end
 
-    test "does not open coworkers modal when clicking an OFF row", %{view: view} do
+    test "opens off coworkers modal when clicking an OFF row", %{view: view} do
       html = render(view)
 
       case Regex.run(~r/id="(rotation-entry-off-[^"]+)"/, html) do
@@ -134,7 +134,8 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
           |> element("##{row_id}")
           |> render_click()
 
-          refute has_element?(view, "#shift-coworkers-modal")
+          assert has_element?(view, "#shift-coworkers-modal")
+          assert has_element?(view, "#shift-coworkers-modal-title")
 
         nil ->
           :ok
