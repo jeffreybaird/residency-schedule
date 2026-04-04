@@ -23,8 +23,18 @@ defmodule ResidencySchedule.ShiftOverrides.ShiftOverride do
   """
   def changeset(override, attrs) do
     override
-    |> cast(attrs, [:rotation_id, :covering_schedule_resident_id, :override_start_date, :override_end_date])
-    |> validate_required([:rotation_id, :covering_schedule_resident_id, :override_start_date, :override_end_date])
+    |> cast(attrs, [
+      :rotation_id,
+      :covering_schedule_resident_id,
+      :override_start_date,
+      :override_end_date
+    ])
+    |> validate_required([
+      :rotation_id,
+      :covering_schedule_resident_id,
+      :override_start_date,
+      :override_end_date
+    ])
     |> validate_date_order()
   end
 

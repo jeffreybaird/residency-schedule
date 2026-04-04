@@ -18,6 +18,7 @@ defmodule ResidencySchedule.ScheduleBuilder do
     Coverage,
     TemplateLoader
   }
+
   alias ResidencySchedule.Importer.{CsvParser, ScheduleImporter}
   alias ResidencySchedule.{Schedules, Residents, Rotations}
 
@@ -66,7 +67,14 @@ defmodule ResidencySchedule.ScheduleBuilder do
       end)
       |> Map.new()
 
-    state = BuilderState.new(academic_year, residents, slots, Map.merge(template_assignments, float_assignments))
+    state =
+      BuilderState.new(
+        academic_year,
+        residents,
+        slots,
+        Map.merge(template_assignments, float_assignments)
+      )
+
     {:ok, state}
   end
 
@@ -299,7 +307,7 @@ defmodule ResidencySchedule.ScheduleBuilder do
       prior_schedule ->
         prior_schedule.id
         |> Residents.list_residents_for_schedule()
-        |> Enum.filter(& &1.residency_year == residency_year - 1)
+        |> Enum.filter(&(&1.residency_year == residency_year - 1))
         |> Enum.map(& &1.name)
         |> Enum.reject(&(&1 == "" or &1 == nil))
     end
@@ -317,6 +325,7 @@ defmodule ResidencySchedule.ScheduleBuilder do
 
       prior_schedule ->
         name_map = build_name_map(prior_schedule.id)
+
         Enum.map(residents, fn r ->
           bumped_name = Map.get(name_map, {r.residency_year, r.schedule_number})
           if bumped_name, do: %{r | name: bumped_name}, else: r
@@ -330,6 +339,7 @@ defmodule ResidencySchedule.ScheduleBuilder do
     |> Residents.list_residents_for_schedule()
     |> Enum.reduce(%{}, fn r, acc ->
       next_year = r.residency_year + 1
+
       if next_year <= 4 do
         Map.put(acc, {next_year, r.schedule_number}, r.name)
       else
@@ -363,7 +373,7 @@ defmodule ResidencySchedule.ScheduleBuilder do
   # --- Private: save helpers ---
 
   defp build_parsed_residents(%{residents: residents, slots: slots, assignments: assignments}) do
-    slot_map = Map.new(slots, & {&1.slot_index, &1})
+    slot_map = Map.new(slots, &{&1.slot_index, &1})
 
     residents
     |> Enum.with_index()
@@ -385,13 +395,18 @@ defmodule ResidencySchedule.ScheduleBuilder do
     |> Enum.filter(fn {{ri, _slot_idx}, _type} -> ri == res_idx end)
     |> Enum.flat_map(fn {{_ri, slot_idx}, rotation_type} ->
       case Map.get(slot_map, slot_idx) do
-        nil -> []
-        slot -> [%{
-          slot_index: slot_idx,
-          start_date: slot.start_date,
-          end_date: slot.end_date,
-          rotation_type: rotation_type
-        }]
+        nil ->
+          []
+
+        slot ->
+          [
+            %{
+              slot_index: slot_idx,
+              start_date: slot.start_date,
+              end_date: slot.end_date,
+              rotation_type: rotation_type
+            }
+          ]
       end
     end)
     |> Enum.sort_by(& &1.slot_index)

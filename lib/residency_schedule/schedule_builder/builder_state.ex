@@ -53,7 +53,7 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderState do
   """
   def rename_resident(state, resident_index, name) do
     updated_residents =
-      List.update_at(state.residents, resident_index, & %{&1 | name: name})
+      List.update_at(state.residents, resident_index, &%{&1 | name: name})
 
     %{state | residents: updated_residents}
   end
@@ -123,10 +123,12 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderState do
 
   def update_assignments(state, resident_index, slot_index, nil) do
     updated_assignments = Map.delete(state.assignments, {resident_index, slot_index})
+
     %{state | assignments: updated_assignments}
     |> recompute_warnings()
   end
-@doc """
+
+  @doc """
   Returns a new state with a single assignment updated and warnings recomputed.
 
       iex> state = ResidencySchedule.ScheduleBuilder.BuilderState.new(
@@ -141,6 +143,7 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderState do
   """
   def update_assignments(state, resident_index, slot_index, rotation_type) do
     updated_assignments = Map.put(state.assignments, {resident_index, slot_index}, rotation_type)
+
     %{state | assignments: updated_assignments}
     |> recompute_warnings()
   end
@@ -171,6 +174,11 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderState do
     placement_warnings =
       Coverage.placement_warnings(state.assignments, state.slots)
 
-    %{state | duty_warnings: duty_warnings, coverage_warnings: coverage_warnings, placement_warnings: placement_warnings}
+    %{
+      state
+      | duty_warnings: duty_warnings,
+        coverage_warnings: coverage_warnings,
+        placement_warnings: placement_warnings
+    }
   end
 end

@@ -82,7 +82,8 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
   @impl true
   def handle_event("save_override", _params, socket) do
     with rotation_id when rotation_id not in [nil, ""] <- socket.assigns.override_rotation_id,
-         covering_id when covering_id not in [nil, ""] <- socket.assigns.override_covering_resident_id,
+         covering_id when covering_id not in [nil, ""] <-
+           socket.assigns.override_covering_resident_id,
          start_date when not is_nil(start_date) <- socket.assigns.override_start_date,
          end_date when not is_nil(end_date) <- socket.assigns.override_end_date do
       attrs = %{
@@ -114,7 +115,8 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
       end
     else
       _ ->
-        {:noreply, assign(socket, override_error: "Please fill in all fields.", override_success: nil)}
+        {:noreply,
+         assign(socket, override_error: "Please fill in all fields.", override_success: nil)}
     end
   end
 
@@ -149,13 +151,17 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
         <%!-- Schedules card --%>
         <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
           <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">Schedules</span>
+            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
+              Schedules
+            </span>
           </div>
           <div class="divide-y divide-gray-100">
             <div class="px-4 py-4 flex items-center justify-between">
               <div>
                 <p class="text-sm font-medium text-gray-800">Upload a New Schedule</p>
-                <p class="text-xs text-gray-500 mt-0.5">Import a CSV to create a new academic year schedule.</p>
+                <p class="text-xs text-gray-500 mt-0.5">
+                  Import a CSV to create a new academic year schedule.
+                </p>
               </div>
               <.link
                 navigate="/admin/upload"
@@ -175,16 +181,16 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                     </p>
                   </div>
                   <span class="text-xs text-gray-400 ml-4 shrink-0">
-                    <%= length(@schedules) %> schedule<%= if length(@schedules) != 1, do: "s" %>
+                    {length(@schedules)} schedule{if length(@schedules) != 1, do: "s"}
                   </span>
                 </div>
                 <ul class="space-y-2">
                   <%= for s <- @schedules do %>
                     <li class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 bg-white">
-                      <span class="text-sm font-medium text-gray-700"><%= s.label %></span>
+                      <span class="text-sm font-medium text-gray-700">{s.label}</span>
                       <%= if @delete_confirm_id == s.id do %>
                         <div class="flex items-center gap-2">
-                          <span class="text-xs text-red-700 font-medium">Delete <%= s.label %>?</span>
+                          <span class="text-xs text-red-700 font-medium">Delete {s.label}?</span>
                           <button
                             phx-click="confirm_delete"
                             phx-value-id={s.id}
@@ -219,7 +225,9 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
         <%!-- Override card --%>
         <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
           <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">Schedule Overrides</span>
+            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
+              Schedule Overrides
+            </span>
           </div>
 
           <div class="px-4 py-4 space-y-4">
@@ -242,7 +250,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                     <option value="">— select —</option>
                     <%= for type <- Rotations.all_rotation_types() |> Enum.sort() do %>
                       <option value={type} selected={@override_rotation_type == type}>
-                        <%= Rotations.rotation_type_label(type) %>
+                        {Rotations.rotation_type_label(type)}
                       </option>
                     <% end %>
                   </select>
@@ -270,7 +278,9 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
               </div>
 
               <%!-- Step 2: select which rotation to override --%>
-              <div class={if @available_rotations == [], do: "opacity-40 pointer-events-none", else: ""}>
+              <div class={
+                if @available_rotations == [], do: "opacity-40 pointer-events-none", else: ""
+              }>
                 <label class="block text-xs font-medium text-gray-600 mb-1">
                   Resident to cover for
                   <%= if @available_rotations == [] do %>
@@ -283,19 +293,29 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                 >
                   <option value="">— select resident —</option>
                   <%= for rot <- @available_rotations do %>
-                    <option value={rot.id} selected={to_string(rot.id) == to_string(@override_rotation_id)}>
-                      <%= rot.schedule_resident.name %> (<%= rot.schedule_resident.position_code %>) — <%= Calendar.strftime(rot.start_date, "%b %-d") %> – <%= Calendar.strftime(rot.end_date, "%b %-d, %Y") %>
+                    <option
+                      value={rot.id}
+                      selected={to_string(rot.id) == to_string(@override_rotation_id)}
+                    >
+                      {rot.schedule_resident.name} ({rot.schedule_resident.position_code}) — {Calendar.strftime(
+                        rot.start_date,
+                        "%b %-d"
+                      )} – {Calendar.strftime(rot.end_date, "%b %-d, %Y")}
                     </option>
                   <% end %>
                 </select>
               </div>
 
               <%!-- Step 3: select covering resident --%>
-              <div class={if @override_rotation_id in [nil, ""], do: "opacity-40 pointer-events-none", else: ""}>
+              <div class={
+                if @override_rotation_id in [nil, ""], do: "opacity-40 pointer-events-none", else: ""
+              }>
                 <label class="block text-xs font-medium text-gray-600 mb-1">
                   Covering resident
                   <%= if @override_rotation_id in [nil, ""] do %>
-                    <span class="text-gray-400 font-normal">(select resident to cover for first)</span>
+                    <span class="text-gray-400 font-normal">
+                      (select resident to cover for first)
+                    </span>
                   <% end %>
                 </label>
                 <select
@@ -308,17 +328,17 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                       value={res.id}
                       selected={to_string(res.id) == to_string(@override_covering_resident_id)}
                     >
-                      <%= res.name %> (<%= res.position_code %>)
+                      {res.name} ({res.position_code})
                     </option>
                   <% end %>
                 </select>
               </div>
 
               <%= if @override_error do %>
-                <p class="text-sm text-red-600"><%= @override_error %></p>
+                <p class="text-sm text-red-600">{@override_error}</p>
               <% end %>
               <%= if @override_success do %>
-                <p class="text-sm text-green-600"><%= @override_success %></p>
+                <p class="text-sm text-green-600">{@override_success}</p>
               <% end %>
 
               <button
@@ -335,7 +355,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
             <div class="border-t border-gray-200">
               <div class="px-4 py-3 bg-gray-50 border-b border-gray-100">
                 <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
-                  Active Overrides (<%= length(@existing_overrides) %>)
+                  Active Overrides ({length(@existing_overrides)})
                 </span>
               </div>
               <ul class="divide-y divide-gray-100">
@@ -343,13 +363,16 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                   <li class="px-4 py-3 flex items-start justify-between gap-3">
                     <div class="text-sm text-gray-700 leading-snug">
                       <span class={"inline-block rounded px-1.5 py-0.5 text-xs font-medium mr-1 #{Rotations.rotation_type_color(o.rotation.rotation_type)}"}>
-                        <%= Rotations.rotation_type_label(o.rotation.rotation_type) %>
+                        {Rotations.rotation_type_label(o.rotation.rotation_type)}
                       </span>
-                      <span class="font-medium"><%= o.rotation.schedule_resident.name %></span>
+                      <span class="font-medium">{o.rotation.schedule_resident.name}</span>
                       <span class="text-gray-400 mx-1">covered by</span>
-                      <span class="font-medium"><%= o.covering_schedule_resident.name %></span>
+                      <span class="font-medium">{o.covering_schedule_resident.name}</span>
                       <span class="text-gray-400 text-xs ml-1">
-                        <%= Calendar.strftime(o.override_start_date, "%b %-d") %>–<%= Calendar.strftime(o.override_end_date, "%b %-d, %Y") %>
+                        {Calendar.strftime(o.override_start_date, "%b %-d")}–{Calendar.strftime(
+                          o.override_end_date,
+                          "%b %-d, %Y"
+                        )}
                       </span>
                     </div>
                     <button

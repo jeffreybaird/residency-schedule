@@ -92,7 +92,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
             ← Prev
           </button>
           <h2 class="text-lg font-semibold text-gray-700">
-            <%= Calendar.strftime(@current_month, "%B %Y") %>
+            {Calendar.strftime(@current_month, "%B %Y")}
           </h2>
           <button
             phx-click="next_month"
@@ -105,8 +105,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         <div class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <%= for {short, long} <- [{"Su","Sun"},{"Mo","Mon"},{"Tu","Tue"},{"We","Wed"},{"Th","Thu"},{"Fr","Fri"},{"Sa","Sat"}] do %>
             <div class="bg-gray-50 px-1 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              <span class="sm:hidden"><%= short %></span>
-              <span class="hidden sm:inline"><%= long %></span>
+              <span class="sm:hidden">{short}</span>
+              <span class="hidden sm:inline">{long}</span>
             </div>
           <% end %>
 
@@ -125,7 +125,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                 "text-sm font-medium",
                 if(day == Date.utc_today(), do: "text-blue-600 font-bold", else: "text-gray-700")
               ]}>
-                <%= day.day %>
+                {day.day}
               </span>
               <div class="flex flex-wrap gap-0.5 mt-1">
                 <%= for {type, _rots} <- Enum.take(group_by_type(rotations), 6) do %>
@@ -147,7 +147,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
             <div class="relative bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 z-10 max-h-[80vh] overflow-y-auto">
               <div class="flex items-start justify-between mb-4">
                 <h3 class="text-lg font-semibold text-gray-800">
-                  <%= Calendar.strftime(@selected_date, "%A, %B %-d, %Y") %>
+                  {Calendar.strftime(@selected_date, "%A, %B %-d, %Y")}
                 </h3>
                 <button
                   phx-click="close_modal"
@@ -166,30 +166,33 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                     <div>
                       <div class="flex items-center gap-2 mb-2">
                         <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
-                          <%= Rotations.rotation_type_label(type) %>
+                          {Rotations.rotation_type_label(type)}
                         </span>
                         <span class="text-xs text-gray-400">
-                          <%= length(entries) %> resident<%= if length(entries) != 1, do: "s" %>
+                          {length(entries)} resident{if length(entries) != 1, do: "s"}
                         </span>
                       </div>
                       <ul class="space-y-1 pl-1">
                         <%= for entry <- entries do %>
                           <li class="flex items-center gap-2 text-sm">
                             <span class="text-xs text-gray-400 font-mono w-10">
-                              <%= entry.resident.position_code %>
+                              {entry.resident.position_code}
                             </span>
                             <.link
                               navigate={"/residents/#{entry.resident.id}"}
                               class={[
                                 "hover:text-blue-600 hover:underline",
-                                if(entry.overridden, do: "line-through text-gray-400", else: "text-gray-700")
+                                if(entry.overridden,
+                                  do: "line-through text-gray-400",
+                                  else: "text-gray-700"
+                                )
                               ]}
                             >
-                              <%= entry.resident.name %>
+                              {entry.resident.name}
                             </.link>
                             <%= if entry.overridden do %>
                               <span class="text-xs text-gray-400 italic">
-                                → <%= entry.covered_by.name %>
+                                → {entry.covered_by.name}
                               </span>
                             <% end %>
                             <%= if entry.is_coverage do %>
@@ -216,7 +219,9 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
   # Builds both the rotation index (date → [rotation]) and the override index (date → [override]).
   defp build_indexes(current_month) do
-    rotations = Rotations.list_rotations_for_month_all_schedules(current_month.year, current_month.month)
+    rotations =
+      Rotations.list_rotations_for_month_all_schedules(current_month.year, current_month.month)
+
     overrides = ShiftOverrides.list_overrides_for_month(current_month.year, current_month.month)
 
     rotation_index =
@@ -253,20 +258,42 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         else
           case Map.get(override_by_rotation, rot.id) do
             nil ->
-              [%{resident: rot.schedule_resident, rotation_type: rot.rotation_type, overridden: false, covered_by: nil, is_coverage: false}]
+              [
+                %{
+                  resident: rot.schedule_resident,
+                  rotation_type: rot.rotation_type,
+                  overridden: false,
+                  covered_by: nil,
+                  is_coverage: false
+                }
+              ]
 
             override ->
               # Original resident is being covered — show crossed out, then the covering resident
               [
-                %{resident: rot.schedule_resident, rotation_type: rot.rotation_type, overridden: true, covered_by: override.covering_schedule_resident, is_coverage: false},
-                %{resident: override.covering_schedule_resident, rotation_type: rot.rotation_type, overridden: false, covered_by: nil, is_coverage: true}
+                %{
+                  resident: rot.schedule_resident,
+                  rotation_type: rot.rotation_type,
+                  overridden: true,
+                  covered_by: override.covering_schedule_resident,
+                  is_coverage: false
+                },
+                %{
+                  resident: override.covering_schedule_resident,
+                  rotation_type: rot.rotation_type,
+                  overridden: false,
+                  covered_by: nil,
+                  is_coverage: true
+                }
               ]
           end
         end
       end)
 
     effective
-    |> Enum.sort_by(fn e -> {e.rotation_type, e.resident.residency_year, e.resident.schedule_number} end)
+    |> Enum.sort_by(fn e ->
+      {e.rotation_type, e.resident.residency_year, e.resident.schedule_number}
+    end)
     |> Enum.group_by(& &1.rotation_type)
     |> Enum.sort_by(&elem(&1, 0))
   end

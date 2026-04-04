@@ -63,6 +63,7 @@ defmodule Mix.Tasks.NormalizeCsvNames do
       [position_code | [_name_raw | rest_cols]] when is_binary(position_code) ->
         if Regex.match?(@resident_row_pattern, position_code) do
           canonical = NameNormalizer.normalize(academic_year, position_code, hd(tl(cols)))
+
           ([position_code, canonical] ++ rest_cols)
           |> Enum.join(",")
           |> Kernel.<>(line_suffix)

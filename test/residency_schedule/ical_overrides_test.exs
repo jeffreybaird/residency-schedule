@@ -25,13 +25,23 @@ defmodule ResidencySchedule.IcalOverridesTest do
     # Clare: Night Float Jul 1–14
     {:ok, _} =
       Rotations.insert_rotations(clare.id, [
-        %{slot_index: 0, start_date: ~D[2023-07-01], end_date: ~D[2023-07-14], rotation_type: :night_float}
+        %{
+          slot_index: 0,
+          start_date: ~D[2023-07-01],
+          end_date: ~D[2023-07-14],
+          rotation_type: :night_float
+        }
       ])
 
     # Emily: Elective Jul 1–14
     {:ok, _} =
       Rotations.insert_rotations(emily.id, [
-        %{slot_index: 0, start_date: ~D[2023-07-01], end_date: ~D[2023-07-14], rotation_type: :elective}
+        %{
+          slot_index: 0,
+          start_date: ~D[2023-07-01],
+          end_date: ~D[2023-07-14],
+          rotation_type: :elective
+        }
       ])
 
     clares_rotation = Rotations.list_rotations_for_resident(clare.id) |> hd()
@@ -40,7 +50,11 @@ defmodule ResidencySchedule.IcalOverridesTest do
   end
 
   describe "build/1" do
-    test "covered period is excluded from original resident's iCal", %{clare: clare, emily: emily, rotation: rot} do
+    test "covered period is excluded from original resident's iCal", %{
+      clare: clare,
+      emily: emily,
+      rotation: rot
+    } do
       {:ok, _} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,
@@ -57,7 +71,11 @@ defmodule ResidencySchedule.IcalOverridesTest do
       refute result =~ "20230707T180000"
     end
 
-    test "covering resident's own shift is removed for covered dates", %{clare: _clare, emily: emily, rotation: rot} do
+    test "covering resident's own shift is removed for covered dates", %{
+      clare: _clare,
+      emily: emily,
+      rotation: rot
+    } do
       {:ok, _} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,

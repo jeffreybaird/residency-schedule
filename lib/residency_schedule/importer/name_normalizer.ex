@@ -122,9 +122,50 @@ defmodule ResidencySchedule.Importer.NameNormalizer do
     {2025, "R1-5"} => "Paige K",
     {2025, "R1-6"} => "Elizabeth",
     {2025, "R1-7"} => "Erin",
-    {2025, "R1-8"} => "Lexi"
-  }
+    {2025, "R1-8"} => "Lexi",
 
+    # ── 2026-2027 ─────────────────────────────────────────────────────────────
+
+    # R4
+    {2026, "R4-1"} => "Paige R",
+    {2026, "R4-2"} => "Grace",
+    {2026, "R4-3"} => "Emily Y",
+    {2026, "R4-4"} => "Dana",
+    {2026, "R4-5"} => "Alex",
+    {2026, "R4-6"} => "Clare",
+    {2026, "R4-7"} => "Carson",
+    {2026, "R4-8"} => "Tiffany",
+
+    # R3
+    {2026, "R3-1"} => "Ellie",
+    {2026, "R3-2"} => "Anna",
+    {2026, "R3-3"} => "Sarah",
+    {2026, "R3-4"} => "Malayna",
+    {2026, "R3-5"} => "JD",
+    {2026, "R3-6"} => "Olivia",
+    {2026, "R3-7"} => "Kylie",
+    {2026, "R3-8"} => "Emily F",
+
+    # R2
+    {2026, "R2-1"} => "Lexi",
+    {2026, "R2-2"} => "Erin",
+    {2026, "R2-3"} => "Paige K",
+    {2026, "R2-4"} => "Mary",
+    {2026, "R2-5"} => "Gina",
+    {2026, "R2-6"} => "Liz",
+    {2026, "R2-7"} => "Zhenya",
+    {2026, "R2-8"} => "Manasa",
+
+    # R1
+    {2026, "R1-1"} => "Hannah",
+    {2026, "R1-2"} => "Morolayo",
+    {2026, "R1-3"} => "Hildegard",
+    {2026, "R1-4"} => "Ellen",
+    {2026, "R1-5"} => "Alexa",
+    {2026, "R1-6"} => "Anna B",
+    {2026, "R1-7"} => "Carolyn",
+    {2026, "R1-8"} => "Jake"
+  }
   @doc """
   Returns the canonical name for a resident given their academic year start and
   position code. Falls back to the trimmed raw name if no mapping is found.

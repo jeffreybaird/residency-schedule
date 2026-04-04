@@ -31,8 +31,21 @@ defmodule ResidencySchedule.Residents.ScheduleResident do
   """
   def changeset(sr, attrs) do
     sr
-    |> cast(attrs, [:resident_id, :schedule_id, :position_code, :residency_year, :schedule_number, :calendar_token])
-    |> validate_required([:resident_id, :schedule_id, :position_code, :residency_year, :schedule_number])
+    |> cast(attrs, [
+      :resident_id,
+      :schedule_id,
+      :position_code,
+      :residency_year,
+      :schedule_number,
+      :calendar_token
+    ])
+    |> validate_required([
+      :resident_id,
+      :schedule_id,
+      :position_code,
+      :residency_year,
+      :schedule_number
+    ])
     |> unique_constraint([:schedule_id, :position_code])
     |> unique_constraint([:schedule_id, :resident_id])
     |> unique_constraint(:calendar_token)

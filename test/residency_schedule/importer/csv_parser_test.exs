@@ -164,7 +164,9 @@ defmodule ResidencySchedule.Importer.CsvParserTest do
           r.start_date == ~D[2026-03-07] and r.end_date == ~D[2026-03-08]
         end)
 
-      assert swn != nil, "Expected SWN rotation for 2026-03-07..03-08, got: #{inspect(Enum.filter(clare.rotations, &(&1.start_date.month == 3)))}"
+      assert swn != nil,
+             "Expected SWN rotation for 2026-03-07..03-08, got: #{inspect(Enum.filter(clare.rotations, &(&1.start_date.month == 3)))}"
+
       assert swn.rotation_type == :strong_weekend_nights
     end
 

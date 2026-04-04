@@ -25,13 +25,23 @@ defmodule ResidencySchedule.ShiftOverridesTest do
     # Clare is on Night Float Jul 1–14
     {:ok, _} =
       Rotations.insert_rotations(ra.id, [
-        %{slot_index: 0, start_date: ~D[2023-07-01], end_date: ~D[2023-07-14], rotation_type: :night_float}
+        %{
+          slot_index: 0,
+          start_date: ~D[2023-07-01],
+          end_date: ~D[2023-07-14],
+          rotation_type: :night_float
+        }
       ])
 
     # Emily is on Elective Jul 1–14
     {:ok, _} =
       Rotations.insert_rotations(rb.id, [
-        %{slot_index: 0, start_date: ~D[2023-07-01], end_date: ~D[2023-07-14], rotation_type: :elective}
+        %{
+          slot_index: 0,
+          start_date: ~D[2023-07-01],
+          end_date: ~D[2023-07-14],
+          rotation_type: :elective
+        }
       ])
 
     rotation_a = Rotations.list_rotations_for_resident(ra.id) |> hd()
@@ -73,7 +83,11 @@ defmodule ResidencySchedule.ShiftOverridesTest do
   end
 
   describe "list_overrides_for_resident_as_original/1" do
-    test "returns overrides where resident's rotation is being covered", %{rotation_a: rot, ra: ra, rb: rb} do
+    test "returns overrides where resident's rotation is being covered", %{
+      rotation_a: rot,
+      ra: ra,
+      rb: rb
+    } do
       {:ok, _} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,
@@ -93,7 +107,11 @@ defmodule ResidencySchedule.ShiftOverridesTest do
   end
 
   describe "list_overrides_for_resident_as_cover/1" do
-    test "returns overrides where resident is the covering resident", %{rotation_a: rot, ra: _ra, rb: rb} do
+    test "returns overrides where resident is the covering resident", %{
+      rotation_a: rot,
+      ra: _ra,
+      rb: rb
+    } do
       {:ok, _} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,
@@ -133,12 +151,22 @@ defmodule ResidencySchedule.ShiftOverridesTest do
 
   describe "list_rotations_for_type_in_range/3" do
     test "returns rotations of a given type overlapping the date range", %{ra: ra} do
-      rotations = ShiftOverrides.list_rotations_for_type_in_range("night_float", ~D[2023-07-05], ~D[2023-07-10])
+      rotations =
+        ShiftOverrides.list_rotations_for_type_in_range(
+          "night_float",
+          ~D[2023-07-05],
+          ~D[2023-07-10]
+        )
+
       assert Enum.any?(rotations, &(&1.schedule_resident_id == ra.id))
     end
 
     test "returns empty for a type not present in the range" do
-      assert ShiftOverrides.list_rotations_for_type_in_range("oncology", ~D[2023-07-01], ~D[2023-07-14]) == []
+      assert ShiftOverrides.list_rotations_for_type_in_range(
+               "oncology",
+               ~D[2023-07-01],
+               ~D[2023-07-14]
+             ) == []
     end
   end
 

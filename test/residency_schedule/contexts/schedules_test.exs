@@ -72,7 +72,15 @@ defmodule ResidencySchedule.SchedulesTest do
 
     test "deletes the schedule and orphaned residents" do
       {:ok, sched} = Schedules.upsert_schedule(2026, "2026–2027")
-      {:ok, _} = Residents.insert_resident(sched.id, %{position_code: "R1-1", residency_year: 1, schedule_number: 1, name: "OnlyHere"})
+
+      {:ok, _} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R1-1",
+          residency_year: 1,
+          schedule_number: 1,
+          name: "OnlyHere"
+        })
+
       {:ok, _} = Schedules.delete_schedule(sched.id)
       assert Schedules.get_by_year(2026) == nil
       assert Residents.list_residents() |> Enum.any?(&(&1.name == "OnlyHere")) == false
@@ -81,8 +89,23 @@ defmodule ResidencySchedule.SchedulesTest do
     test "does not delete residents shared with another schedule" do
       {:ok, sched1} = Schedules.upsert_schedule(2026, "2026–2027")
       {:ok, sched2} = Schedules.upsert_schedule(2027, "2027–2028")
-      {:ok, _} = Residents.insert_resident(sched1.id, %{position_code: "R1-1", residency_year: 1, schedule_number: 1, name: "Shared"})
-      {:ok, _} = Residents.insert_resident(sched2.id, %{position_code: "R1-1", residency_year: 1, schedule_number: 1, name: "Shared"})
+
+      {:ok, _} =
+        Residents.insert_resident(sched1.id, %{
+          position_code: "R1-1",
+          residency_year: 1,
+          schedule_number: 1,
+          name: "Shared"
+        })
+
+      {:ok, _} =
+        Residents.insert_resident(sched2.id, %{
+          position_code: "R1-1",
+          residency_year: 1,
+          schedule_number: 1,
+          name: "Shared"
+        })
+
       {:ok, _} = Schedules.delete_schedule(sched1.id)
       assert Residents.list_residents() |> Enum.any?(&(&1.name == "Shared"))
     end

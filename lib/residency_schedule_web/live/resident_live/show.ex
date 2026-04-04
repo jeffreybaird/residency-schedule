@@ -18,7 +18,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     year_history =
       resident.name
       |> Residents.list_by_canonical_name()
-      |> Enum.map(&%{id: &1.id, label: &1.schedule.label, academic_year: &1.schedule.academic_year})
+      |> Enum.map(
+        &%{id: &1.id, label: &1.schedule.label, academic_year: &1.schedule.academic_year}
+      )
 
     schedule_start = schedule_start_date(resident.rotations)
     schedule_end = schedule_end_date(resident.rotations)
@@ -37,8 +39,12 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
     total_shifts = compute_total_shifts(resident.rotations)
     shifts_remaining = compute_shifts_remaining(resident.rotations, today)
-    night_shifts_remaining_strong = compute_night_shifts_remaining(resident.rotations, today, @strong_night_types)
-    night_shifts_remaining_highland = compute_night_shifts_remaining(resident.rotations, today, @highland_night_types)
+
+    night_shifts_remaining_strong =
+      compute_night_shifts_remaining(resident.rotations, today, @strong_night_types)
+
+    night_shifts_remaining_highland =
+      compute_night_shifts_remaining(resident.rotations, today, @highland_night_types)
 
     {:ok,
      assign(socket,
@@ -76,11 +82,13 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     <div class="max-w-4xl mx-auto py-10 px-4">
       <div class="mb-4">
         <h1 class="text-2xl font-bold text-gray-800">
-          <%= @resident.name %>
+          {@resident.name}
           <span
             class="text-base font-normal text-gray-500"
             title={"Year #{@resident.residency_year}, resident #{@resident.schedule_number}"}
-          >(<%= @resident.position_code %>)</span>
+          >
+            ({@resident.position_code})
+          </span>
         </h1>
         <div class="flex items-center justify-between gap-2 mt-2">
           <div class="flex gap-2 flex-wrap">
@@ -90,7 +98,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                   class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-600 text-white"
                   title="Currently viewing this year"
                 >
-                  <%= year.label %>
+                  {year.label}
                 </span>
               <% else %>
                 <.link
@@ -98,7 +106,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                   class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
                   title={"View #{@resident.name}'s #{year.label} schedule"}
                 >
-                  <%= year.label %>
+                  {year.label}
                 </.link>
               <% end %>
             <% end %>
@@ -137,9 +145,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
       <%= if @schedule_start && @schedule_end do %>
         <div class="mb-4 text-sm text-gray-500">
-          <%= Calendar.strftime(@schedule_start, "%B %-d, %Y") %> –
-          <%= Calendar.strftime(@schedule_end, "%B %-d, %Y") %>
-          &nbsp;·&nbsp;
+          {Calendar.strftime(@schedule_start, "%B %-d, %Y")} – {Calendar.strftime(
+            @schedule_end,
+            "%B %-d, %Y"
+          )} &nbsp;·&nbsp;
           <a
             href={"/residents/#{@resident.id}/calendar.ics"}
             class="text-blue-600 hover:text-blue-800"
@@ -171,7 +180,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             <%!-- Card header --%>
             <div class="flex items-center justify-between px-4 py-2 bg-gray-100 border-b-2 border-gray-300 rounded-t-xl">
               <span class="text-xs font-semibold text-gray-600">
-                <span class="text-gray-800"><%= @resident.name %></span>
+                <span class="text-gray-800">{@resident.name}</span>
                 <span class="text-gray-400 mx-1">·</span>
                 <span class="uppercase tracking-widest text-gray-500">Schedule Stats</span>
               </span>
@@ -186,7 +195,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                 ]}
               >
                 <svg
-                  class={["w-3 h-3 transition-transform", if(@stats_expanded, do: "rotate-90", else: "")]}
+                  class={[
+                    "w-3 h-3 transition-transform",
+                    if(@stats_expanded, do: "rotate-90", else: "")
+                  ]}
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -196,7 +208,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                     clip-rule="evenodd"
                   />
                 </svg>
-                <%= if @stats_expanded, do: "Collapse", else: "Expand" %>
+                {if @stats_expanded, do: "Collapse", else: "Expand"}
               </button>
             </div>
 
@@ -208,25 +220,31 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                     <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                       Total Shifts
                     </p>
-                    <p class="text-xl font-bold text-gray-800"><%= @total_shifts %></p>
+                    <p class="text-xl font-bold text-gray-800">{@total_shifts}</p>
                   </div>
                   <div class="px-4 py-3" title="Service blocks with a start date on or after today">
                     <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                       Shifts Remaining
                     </p>
-                    <p class="text-xl font-bold text-gray-800"><%= @shifts_remaining %></p>
+                    <p class="text-xl font-bold text-gray-800">{@shifts_remaining}</p>
                   </div>
-                  <div class="px-4 py-3" title="Night float and weekend night blocks at Strong Memorial remaining">
+                  <div
+                    class="px-4 py-3"
+                    title="Night float and weekend night blocks at Strong Memorial remaining"
+                  >
                     <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                       Night Shifts Remaining – Strong
                     </p>
-                    <p class="text-xl font-bold text-gray-800"><%= @night_shifts_remaining_strong %></p>
+                    <p class="text-xl font-bold text-gray-800">{@night_shifts_remaining_strong}</p>
                   </div>
-                  <div class="px-4 py-3" title="Night float and weekend night blocks at Highland remaining">
+                  <div
+                    class="px-4 py-3"
+                    title="Night float and weekend night blocks at Highland remaining"
+                  >
                     <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                       Night Shifts Remaining – Highland
                     </p>
-                    <p class="text-xl font-bold text-gray-800"><%= @night_shifts_remaining_highland %></p>
+                    <p class="text-xl font-bold text-gray-800">{@night_shifts_remaining_highland}</p>
                   </div>
                 </div>
               </div>
@@ -243,7 +261,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                   >
                     <span class="flex items-center gap-1.5">
                       <svg
-                        class={["w-2.5 h-2.5 text-gray-400 transition-transform", if(@night_shifts_expanded, do: "rotate-90", else: "")]}
+                        class={[
+                          "w-2.5 h-2.5 text-gray-400 transition-transform",
+                          if(@night_shifts_expanded, do: "rotate-90", else: "")
+                        ]}
                         fill="currentColor"
                         viewBox="0 0 20 20"
                       >
@@ -262,7 +283,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                         else: "bg-gray-100 text-gray-500"
                       )
                     ]}>
-                      <%= if @night_shifts_expanded, do: "Collapse", else: "Expand" %>
+                      {if @night_shifts_expanded, do: "Collapse", else: "Expand"}
                     </span>
                   </button>
                 </div>
@@ -278,17 +299,17 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                   <% color = Rotations.rotation_type_color(type) %>
                   <div class="flex items-center justify-between px-4 py-2 bg-white">
                     <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
-                      <%= Rotations.rotation_type_label(type) %>
+                      {Rotations.rotation_type_label(type)}
                     </span>
                     <span class="text-sm font-semibold text-gray-700">
-                      <%= days %> day<%= if days != 1, do: "s" %>
+                      {days} day{if days != 1, do: "s"}
                     </span>
                   </div>
                 <% end %>
                 <div class="flex items-center justify-between px-4 py-2 bg-gray-50">
                   <span class="text-sm font-medium text-gray-600">Total</span>
                   <span class="text-sm font-bold text-gray-800">
-                    <%= @night_shift_counts |> Enum.map(&elem(&1, 1)) |> Enum.sum() %> days
+                    {@night_shift_counts |> Enum.map(&elem(&1, 1)) |> Enum.sum()} days
                   </span>
                 </div>
               </div>
@@ -296,7 +317,11 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
           <% end %>
         </div>
 
-        <div id="rotation-table" phx-hook="ScrollToToday" class="border-2 border-gray-300 rounded-xl overflow-auto overscroll-contain">
+        <div
+          id="rotation-table"
+          phx-hook="ScrollToToday"
+          class="border-2 border-gray-300 rounded-xl overflow-auto overscroll-contain"
+        >
           <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="sticky top-0 z-10 bg-gray-100">
               <tr>
@@ -315,33 +340,45 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                 <% label = entry_label(entry.rotation_type) %>
                 <tr
                   data-today-anchor={if entry.slot_index == @today_anchor_slot_index, do: "true"}
-                  class={[entry_row_class(entry.rotation_type, past), if(covered, do: "opacity-60", else: "")]}
+                  class={[
+                    entry_row_class(entry.rotation_type, past),
+                    if(covered, do: "opacity-60", else: "")
+                  ]}
                 >
                   <td class="px-4 py-2">
                     <div class="flex flex-col gap-0.5">
                       <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color} #{if covered, do: "line-through opacity-70", else: ""}"}>
-                        <%= label %>
+                        {label}
                       </span>
                       <%= if covered do %>
                         <span class="text-xs text-gray-400 italic">
-                          covered by <%= covered.name %>
+                          covered by {covered.name}
                         </span>
                       <% end %>
                       <%= if is_coverage do %>
                         <span class="text-xs text-blue-500 italic">
-                          covering <%= entry.original_resident.name %>
+                          covering {entry.original_resident.name}
                         </span>
                       <% end %>
                     </div>
                   </td>
-                  <td class={["px-4 py-2", if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")]}>
-                    <%= Calendar.strftime(entry.start_date, "%b %-d, %Y") %>
+                  <td class={[
+                    "px-4 py-2",
+                    if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
+                  ]}>
+                    {Calendar.strftime(entry.start_date, "%b %-d, %Y")}
                   </td>
-                  <td class={["px-4 py-2", if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")]}>
-                    <%= Calendar.strftime(entry.end_date, "%b %-d, %Y") %>
+                  <td class={[
+                    "px-4 py-2",
+                    if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
+                  ]}>
+                    {Calendar.strftime(entry.end_date, "%b %-d, %Y")}
                   </td>
-                  <td class={["px-4 py-2 text-right", if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-500")]}>
-                    <%= Date.diff(entry.end_date, entry.start_date) + 1 %>
+                  <td class={[
+                    "px-4 py-2 text-right",
+                    if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-500")
+                  ]}>
+                    {Date.diff(entry.end_date, entry.start_date) + 1}
                   </td>
                 </tr>
               <% end %>
@@ -366,12 +403,25 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   defp entry_row_class("off", true), do: ["opacity-40", "bg-gray-50"]
 
   defp entry_row_class("off", false),
-    do: ["bg-gray-50", "hover:bg-gray-100", "hover:shadow-sm", "hover:relative", "hover:z-20", "transition-colors"]
+    do: [
+      "bg-gray-50",
+      "hover:bg-gray-100",
+      "hover:shadow-sm",
+      "hover:relative",
+      "hover:z-20",
+      "transition-colors"
+    ]
 
   defp entry_row_class(_type, true), do: "opacity-40"
 
   defp entry_row_class(_type, false),
-    do: ["hover:bg-gray-100", "hover:shadow-sm", "hover:relative", "hover:z-20", "transition-colors"]
+    do: [
+      "hover:bg-gray-100",
+      "hover:shadow-sm",
+      "hover:relative",
+      "hover:z-20",
+      "transition-colors"
+    ]
 
   defp compute_off_slots(rotations, schedule_slots) do
     resident_slot_indices = MapSet.new(rotations, & &1.slot_index)
@@ -420,7 +470,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   end
 
   defp schedule_start_date([]), do: nil
-  defp schedule_start_date(rotations), do: rotations |> Enum.map(& &1.start_date) |> Enum.min(Date)
+
+  defp schedule_start_date(rotations),
+    do: rotations |> Enum.map(& &1.start_date) |> Enum.min(Date)
 
   defp schedule_end_date([]), do: nil
   defp schedule_end_date(rotations), do: rotations |> Enum.map(& &1.end_date) |> Enum.max(Date)

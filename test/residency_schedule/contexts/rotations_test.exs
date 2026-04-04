@@ -5,16 +5,51 @@ defmodule ResidencySchedule.RotationsTest do
 
   setup do
     {:ok, sched} = Schedules.upsert_schedule(2023, "2023–2024")
-    {:ok, ra} = Residents.insert_resident(sched.id, %{position_code: "R4-1", residency_year: 4, schedule_number: 1, name: "Alexis"})
-    {:ok, rb} = Residents.insert_resident(sched.id, %{position_code: "R4-2", residency_year: 4, schedule_number: 2, name: "Emily"})
+
+    {:ok, ra} =
+      Residents.insert_resident(sched.id, %{
+        position_code: "R4-1",
+        residency_year: 4,
+        schedule_number: 1,
+        name: "Alexis"
+      })
+
+    {:ok, rb} =
+      Residents.insert_resident(sched.id, %{
+        position_code: "R4-2",
+        residency_year: 4,
+        schedule_number: 2,
+        name: "Emily"
+      })
 
     rots_a = [
-      %{slot_index: 0, start_date: ~D[2023-07-03], end_date: ~D[2023-07-07], rotation_type: :oncology},
-      %{slot_index: 1, start_date: ~D[2023-07-08], end_date: ~D[2023-07-09], rotation_type: :highland_weekend_days}
+      %{
+        slot_index: 0,
+        start_date: ~D[2023-07-03],
+        end_date: ~D[2023-07-07],
+        rotation_type: :oncology
+      },
+      %{
+        slot_index: 1,
+        start_date: ~D[2023-07-08],
+        end_date: ~D[2023-07-09],
+        rotation_type: :highland_weekend_days
+      }
     ]
+
     rots_b = [
-      %{slot_index: 0, start_date: ~D[2023-07-03], end_date: ~D[2023-07-07], rotation_type: :night_float},
-      %{slot_index: 1, start_date: ~D[2023-07-08], end_date: ~D[2023-07-09], rotation_type: :post_call}
+      %{
+        slot_index: 0,
+        start_date: ~D[2023-07-03],
+        end_date: ~D[2023-07-07],
+        rotation_type: :night_float
+      },
+      %{
+        slot_index: 1,
+        start_date: ~D[2023-07-08],
+        end_date: ~D[2023-07-09],
+        rotation_type: :post_call
+      }
     ]
 
     {:ok, _} = Rotations.insert_rotations(ra.id, rots_a)
@@ -61,29 +96,50 @@ defmodule ResidencySchedule.RotationsTest do
     end
 
     test "returns empty list for resident with no rotations", %{schedule: sched} do
-      {:ok, new_res} = Residents.insert_resident(sched.id, %{
-        position_code: "R1-1", residency_year: 1, schedule_number: 1, name: "New"
-      })
+      {:ok, new_res} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R1-1",
+          residency_year: 1,
+          schedule_number: 1,
+          name: "New"
+        })
+
       assert Rotations.list_rotations_for_resident(new_res.id) == []
     end
   end
 
   describe "insert_rotations/2" do
     test "inserts multiple rotations and returns count", %{schedule: sched} do
-      {:ok, new_res} = Residents.insert_resident(sched.id, %{
-        position_code: "R3-1", residency_year: 3, schedule_number: 1, name: "Sam"
-      })
+      {:ok, new_res} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R3-1",
+          residency_year: 3,
+          schedule_number: 1,
+          name: "Sam"
+        })
+
       rots = [
-        %{slot_index: 0, start_date: ~D[2023-07-03], end_date: ~D[2023-07-07], rotation_type: :ambulatory}
+        %{
+          slot_index: 0,
+          start_date: ~D[2023-07-03],
+          end_date: ~D[2023-07-07],
+          rotation_type: :ambulatory
+        }
       ]
+
       {:ok, count} = Rotations.insert_rotations(new_res.id, rots)
       assert count == 1
     end
 
     test "inserting zero rotations returns count of 0", %{schedule: sched} do
-      {:ok, new_res} = Residents.insert_resident(sched.id, %{
-        position_code: "R3-2", residency_year: 3, schedule_number: 2, name: "Robin"
-      })
+      {:ok, new_res} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R3-2",
+          residency_year: 3,
+          schedule_number: 2,
+          name: "Robin"
+        })
+
       {:ok, count} = Rotations.insert_rotations(new_res.id, [])
       assert count == 0
     end
@@ -114,10 +170,24 @@ defmodule ResidencySchedule.RotationsTest do
 
     test "returns rotations from a second schedule in the same month", %{} do
       {:ok, sched2} = Schedules.upsert_schedule(2024, "2024–2025")
-      {:ok, res2} = Residents.insert_resident(sched2.id, %{
-        position_code: "R1-1", residency_year: 1, schedule_number: 1, name: "Jordan"
-      })
-      rots = [%{slot_index: 0, start_date: ~D[2024-07-01], end_date: ~D[2024-07-14], rotation_type: :ambulatory}]
+
+      {:ok, res2} =
+        Residents.insert_resident(sched2.id, %{
+          position_code: "R1-1",
+          residency_year: 1,
+          schedule_number: 1,
+          name: "Jordan"
+        })
+
+      rots = [
+        %{
+          slot_index: 0,
+          start_date: ~D[2024-07-01],
+          end_date: ~D[2024-07-14],
+          rotation_type: :ambulatory
+        }
+      ]
+
       {:ok, _} = Rotations.insert_rotations(res2.id, rots)
 
       rotations = Rotations.list_rotations_for_month_all_schedules(2024, 7)
@@ -136,19 +206,37 @@ defmodule ResidencySchedule.RotationsTest do
 
   describe "list_co_service_days/2" do
     test "excludes float and post_call rotations", %{schedule: sched} do
-      {:ok, r3} = Residents.insert_resident(sched.id, %{
-        position_code: "R3-1", residency_year: 3, schedule_number: 1, name: "Pat"
-      })
+      {:ok, r3} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R3-1",
+          residency_year: 3,
+          schedule_number: 1,
+          name: "Pat"
+        })
+
       float_rots = [
-        %{slot_index: 10, start_date: ~D[2023-08-01], end_date: ~D[2023-08-07], rotation_type: :float}
+        %{
+          slot_index: 10,
+          start_date: ~D[2023-08-01],
+          end_date: ~D[2023-08-07],
+          rotation_type: :float
+        }
       ]
+
       {:ok, _} = Rotations.insert_rotations(r3.id, float_rots)
 
       # Add matching float rotation to ra — should be excluded
       more_a = [
-        %{slot_index: 10, start_date: ~D[2023-08-01], end_date: ~D[2023-08-07], rotation_type: :float}
+        %{
+          slot_index: 10,
+          start_date: ~D[2023-08-01],
+          end_date: ~D[2023-08-07],
+          rotation_type: :float
+        }
       ]
-      {:ok, _} = Rotations.insert_rotations((Residents.get_resident_by_position!("R4-1")).id, more_a)
+
+      {:ok, _} =
+        Rotations.insert_rotations(Residents.get_resident_by_position!("R4-1").id, more_a)
 
       # ra and r3 both have float on same dates — should NOT appear in co-service
       ra = Residents.get_resident_by_position!("R4-1")
@@ -158,17 +246,33 @@ defmodule ResidencySchedule.RotationsTest do
     end
 
     test "excludes elective rotations", %{schedule: sched} do
-      {:ok, rc} = Residents.insert_resident(sched.id, %{
-        position_code: "R2-1", residency_year: 2, schedule_number: 1, name: "Morgan"
-      })
+      {:ok, rc} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R2-1",
+          residency_year: 2,
+          schedule_number: 1,
+          name: "Morgan"
+        })
+
       elective_rots = [
-        %{slot_index: 11, start_date: ~D[2023-09-01], end_date: ~D[2023-09-07], rotation_type: :elective}
+        %{
+          slot_index: 11,
+          start_date: ~D[2023-09-01],
+          end_date: ~D[2023-09-07],
+          rotation_type: :elective
+        }
       ]
+
       {:ok, _} = Rotations.insert_rotations(rc.id, elective_rots)
 
-      {:ok, rd} = Residents.insert_resident(sched.id, %{
-        position_code: "R2-2", residency_year: 2, schedule_number: 2, name: "Quinn"
-      })
+      {:ok, rd} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R2-2",
+          residency_year: 2,
+          schedule_number: 2,
+          name: "Quinn"
+        })
+
       {:ok, _} = Rotations.insert_rotations(rd.id, elective_rots)
 
       days = Rotations.list_co_service_days(rc.id, rd.id)

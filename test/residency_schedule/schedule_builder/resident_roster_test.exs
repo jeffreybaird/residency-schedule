@@ -24,6 +24,7 @@ defmodule ResidencySchedule.ScheduleBuilder.ResidentRosterTest do
 
     test "names are set to position_code as placeholder" do
       residents = ResidentRoster.build_residents()
+
       Enum.each(residents, fn r ->
         assert r.name == r.position_code
       end)
@@ -43,12 +44,14 @@ defmodule ResidencySchedule.ScheduleBuilder.ResidentRosterTest do
 
     test "schedule_numbers go from 1 to count_per_year within each year" do
       residents = ResidentRoster.build_residents(8)
+
       for year <- 1..4 do
         nums =
           residents
-          |> Enum.filter(& &1.residency_year == year)
+          |> Enum.filter(&(&1.residency_year == year))
           |> Enum.map(& &1.schedule_number)
           |> Enum.sort()
+
         assert nums == Enum.to_list(1..8)
       end
     end
