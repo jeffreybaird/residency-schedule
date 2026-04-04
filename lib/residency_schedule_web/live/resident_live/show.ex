@@ -30,12 +30,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     off_slots = compute_off_slots(resident.rotations, schedule_slots)
     effective_segs = Rotations.effective_segments_for_resident(resident.id)
     all_entries = merge_effective_entries(effective_segs, off_slots)
+    available_services = build_service_options(all_entries)
+    filtered_entries = filter_entries(all_entries, [])
 
-    today_anchor_slot_index =
-      case Enum.find(all_entries, fn e -> Date.compare(e.end_date, today) != :lt end) do
-        nil -> nil
-        entry -> entry.slot_index
-      end
+    today_anchor_slot_index = today_anchor_slot_index(filtered_entries, today)
 
     total_shifts = compute_total_shifts(resident.rotations)
     shifts_remaining = compute_shifts_remaining(resident.rotations, today)
@@ -55,6 +53,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
        schedule_end: schedule_end,
        night_shift_counts: night_shift_counts,
        all_entries: all_entries,
+       filtered_entries: filtered_entries,
+       available_services: available_services,
+       service_filters: [],
+       service_filter_open: false,
        today: today,
        today_anchor_slot_index: today_anchor_slot_index,
        total_shifts: total_shifts,
@@ -62,7 +64,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
        night_shifts_remaining_strong: night_shifts_remaining_strong,
        night_shifts_remaining_highland: night_shifts_remaining_highland,
        stats_expanded: true,
-       night_shifts_expanded: false
+       night_shifts_expanded: false,
+       shift_coworkers_modal: nil
      )}
   end
 
@@ -74,6 +77,76 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   @impl true
   def handle_event("toggle_night_shifts", _params, socket) do
     {:noreply, assign(socket, night_shifts_expanded: !socket.assigns.night_shifts_expanded)}
+  end
+
+  @impl true
+  def handle_event("toggle_service_filter", %{"service" => service}, socket) do
+    service_filters =
+      socket.assigns.service_filters
+      |> toggle_service(service)
+      |> normalize_service_filters(socket.assigns.available_services)
+
+    {:noreply, assign_filtered_entries(socket, service_filters)}
+  end
+
+  @impl true
+  def handle_event("clear_service_filters", _params, socket) do
+    {:noreply, assign_filtered_entries(socket, [])}
+  end
+
+  @impl true
+  def handle_event("toggle_service_filter_menu", _params, socket) do
+    {:noreply, assign(socket, service_filter_open: !socket.assigns.service_filter_open)}
+  end
+
+  @impl true
+  def handle_event("close_service_filter_menu", _params, socket) do
+    {:noreply, assign(socket, service_filter_open: false)}
+  end
+
+  @impl true
+  def handle_event("open_shift_coworkers", params, socket) do
+    # phx-value-* keys are sent with hyphens (e.g. start-date), not underscores.
+    type = params["rotation-type"] || params["rotation_type"]
+    sd = params["start-date"] || params["start_date"]
+    ed = params["end-date"] || params["end_date"]
+
+    cond do
+      type == "off" ->
+        {:noreply, socket}
+
+      is_binary(type) and is_binary(sd) and is_binary(ed) ->
+        with {:ok, start_d} <- Date.from_iso8601(sd),
+             {:ok, end_d} <- Date.from_iso8601(ed) do
+          coworker_rows =
+            Rotations.list_effective_coworker_rows_for_type_in_range(
+              socket.assigns.resident.schedule_id,
+              type,
+              start_d,
+              end_d
+            )
+
+          {:noreply,
+           assign(socket,
+             shift_coworkers_modal: %{
+               rotation_type: type,
+               start_date: start_d,
+               end_date: end_d,
+               coworker_rows: coworker_rows
+             }
+           )}
+        else
+          _ -> {:noreply, socket}
+        end
+
+      true ->
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("close_shift_coworkers", _params, socket) do
+    {:noreply, assign(socket, shift_coworkers_modal: nil)}
   end
 
   @impl true
@@ -296,10 +369,17 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             <div class="border-2 border-t-0 border-gray-300 rounded-b-xl overflow-hidden">
               <div class="divide-y divide-gray-100">
                 <%= for {type, days} <- @night_shift_counts do %>
-                  <% color = Rotations.rotation_type_color(type) %>
+                  <% color = Rotations.rotation_type_color(type)
+                  pill_label = Rotations.rotation_type_label(type) %>
                   <div class="flex items-center justify-between px-4 py-2 bg-white">
-                    <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
-                      {Rotations.rotation_type_label(type)}
+                    <span
+                      title={pill_label}
+                      class={[
+                        "inline-flex h-8 w-44 max-w-full shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
+                        color
+                      ]}
+                    >
+                      {pill_label}
                     </span>
                     <span class="text-sm font-semibold text-gray-700">
                       {days} day{if days != 1, do: "s"}
@@ -319,72 +399,306 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
         <div
           id="rotation-table"
-          phx-hook="ScrollToToday"
-          class="border-2 border-gray-300 rounded-xl overflow-auto overscroll-contain"
+          class="relative rounded-xl border-2 border-gray-300"
+          phx-hook="ServiceFilterAnchored"
         >
-          <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="sticky top-0 z-10 bg-gray-100">
-              <tr>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Rotation</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Start</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">End</th>
-                <th class="px-4 py-3 text-right font-semibold text-gray-600">Days</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-              <%= for entry <- @all_entries do %>
-                <% past = Date.compare(entry.end_date, @today) == :lt %>
-                <% covered = Map.get(entry, :covered_by) %>
-                <% is_coverage = Map.get(entry, :is_coverage, false) %>
-                <% color = entry_color(entry.rotation_type) %>
-                <% label = entry_label(entry.rotation_type) %>
-                <tr
-                  data-today-anchor={if entry.slot_index == @today_anchor_slot_index, do: "true"}
-                  class={[
-                    entry_row_class(entry.rotation_type, past),
-                    if(covered, do: "opacity-60", else: "")
-                  ]}
-                >
-                  <td class="px-4 py-2">
-                    <div class="flex flex-col gap-0.5">
-                      <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color} #{if covered, do: "line-through opacity-70", else: ""}"}>
-                        {label}
-                      </span>
-                      <%= if covered do %>
-                        <span class="text-xs text-gray-400 italic">
-                          covered by {covered.name}
-                        </span>
-                      <% end %>
-                      <%= if is_coverage do %>
-                        <span class="text-xs text-blue-500 italic">
-                          covering {entry.original_resident.name}
-                        </span>
+          <div
+            id="rotation-table-scroll"
+            phx-hook="ScrollToToday"
+            class="overflow-auto overscroll-contain rounded-xl [overflow-anchor:none]"
+          >
+            <table class="table-fixed w-full min-w-0 divide-y divide-gray-200 text-sm">
+              <colgroup>
+                <col style="width: 14rem" />
+                <col />
+                <col />
+                <col style="width: 4.5rem" />
+              </colgroup>
+              <thead class="sticky top-0 z-10 bg-gray-100">
+                <tr>
+                  <th class="px-4 py-3 text-center font-semibold text-gray-600">
+                    <div class="inline-flex items-center justify-center gap-0.5">
+                      <span>Rotation</span>
+                      <%= if @available_services != [] do %>
+                        <button
+                          id="service-filter-toggle"
+                          type="button"
+                          phx-click="toggle_service_filter_menu"
+                          aria-haspopup="true"
+                          aria-expanded={@service_filter_open}
+                          aria-label={
+                            if @service_filter_open,
+                              do: "Close service filter menu",
+                              else: "Open service filter menu"
+                          }
+                          class={[
+                            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors duration-75 ease-out",
+                            if(@service_filter_open,
+                              do: "bg-gray-200 text-gray-800",
+                              else: "text-gray-500 hover:bg-gray-200 hover:text-gray-800"
+                            )
+                          ]}
+                        >
+                          <.icon
+                            name={
+                              if @service_filter_open,
+                                do: "hero-chevron-up",
+                                else: "hero-chevron-down"
+                            }
+                            class="h-4 w-4"
+                          />
+                        </button>
                       <% end %>
                     </div>
-                  </td>
-                  <td class={[
-                    "px-4 py-2",
-                    if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
-                  ]}>
-                    {Calendar.strftime(entry.start_date, "%b %-d, %Y")}
-                  </td>
-                  <td class={[
-                    "px-4 py-2",
-                    if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
-                  ]}>
-                    {Calendar.strftime(entry.end_date, "%b %-d, %Y")}
-                  </td>
-                  <td class={[
-                    "px-4 py-2 text-right",
-                    if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-500")
-                  ]}>
-                    {Date.diff(entry.end_date, entry.start_date) + 1}
-                  </td>
+                  </th>
+                  <th class="px-4 py-3 text-center font-semibold text-gray-600">Start</th>
+                  <th class="px-4 py-3 text-center font-semibold text-gray-600">End</th>
+                  <th class="px-4 py-3 text-right font-semibold text-gray-600">Days</th>
                 </tr>
-              <% end %>
-            </tbody>
-          </table>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <%= if @filtered_entries == [] do %>
+                  <tr id="rotation-table-empty-state">
+                    <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-400">
+                      No schedule entries match the selected service filters.
+                    </td>
+                  </tr>
+                <% else %>
+                  <%= for entry <- @filtered_entries do %>
+                    <% past = Date.compare(entry.end_date, @today) == :lt %>
+                    <% covered = Map.get(entry, :covered_by) %>
+                    <% is_coverage = Map.get(entry, :is_coverage, false) %>
+                    <% color = entry_color(entry.rotation_type) %>
+                    <% label = entry_label(entry.rotation_type) %>
+                    <tr
+                      id={
+                      "rotation-entry-#{entry.rotation_type}-#{entry.slot_index}-#{Date.to_iso8601(entry.start_date)}"
+                    }
+                      data-rotation-type={entry.rotation_type}
+                      data-today-anchor={if entry.slot_index == @today_anchor_slot_index, do: "true"}
+                      phx-click="open_shift_coworkers"
+                      phx-value-rotation-type={entry.rotation_type}
+                      phx-value-start-date={Date.to_iso8601(entry.start_date)}
+                      phx-value-end-date={Date.to_iso8601(entry.end_date)}
+                      class={[
+                        entry_row_class(entry.rotation_type, past),
+                        if(covered, do: "opacity-60", else: ""),
+                        if(entry.rotation_type != "off", do: "cursor-pointer")
+                      ]}
+                    >
+                      <td class="px-4 py-2 align-top">
+                        <div class="flex flex-col items-start gap-0.5 text-left">
+                          <span
+                            title={label}
+                            class={[
+                              "inline-flex h-8 w-full max-w-[11rem] shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
+                              color,
+                              if(covered, do: "line-through opacity-70", else: "")
+                            ]}
+                          >
+                            {label}
+                          </span>
+                          <%= if covered do %>
+                            <span class="max-w-full text-xs text-gray-400 italic break-words">
+                              covered by {covered.name}
+                            </span>
+                          <% end %>
+                          <%= if is_coverage do %>
+                            <span class="max-w-full text-xs text-blue-500 italic break-words">
+                              covering {entry.original_resident.name}
+                            </span>
+                          <% end %>
+                        </div>
+                      </td>
+                      <td class={[
+                        "px-4 py-2 text-center",
+                        if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
+                      ]}>
+                        {Calendar.strftime(entry.start_date, "%b %-d, %Y")}
+                      </td>
+                      <td class={[
+                        "px-4 py-2 text-center",
+                        if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
+                      ]}>
+                        {Calendar.strftime(entry.end_date, "%b %-d, %Y")}
+                      </td>
+                      <td class={[
+                        "px-4 py-2 text-right tabular-nums",
+                        if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-500")
+                      ]}>
+                        {Date.diff(entry.end_date, entry.start_date) + 1}
+                      </td>
+                    </tr>
+                  <% end %>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+
+          <%= if @available_services != [] && @service_filter_open do %>
+            <div
+              id="service-filter-panel"
+              class={[
+                "w-[min(22rem,calc(100vw-2rem))]",
+                "rounded-2xl border border-gray-200/80 bg-white py-2 shadow-lg shadow-gray-900/10",
+                "transition-[opacity,transform] duration-75 ease-out motion-reduce:transition-none",
+                "opacity-100 scale-100"
+              ]}
+              role="menu"
+              aria-label="Service filters"
+            >
+              <div class="flex items-start justify-between gap-3 border-b border-gray-100 px-3 pb-2">
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-gray-900">Visible services</p>
+                  <p class="text-xs text-gray-500">
+                    {service_filter_count_label(@service_filters, @available_services)}
+                  </p>
+                </div>
+
+                <button
+                  id="service-filter-clear"
+                  type="button"
+                  phx-click="clear_service_filters"
+                  role="menuitem"
+                  class={[
+                    "shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors duration-75",
+                    if(@service_filters == [],
+                      do: "bg-blue-600 text-white hover:bg-blue-700",
+                      else: "text-blue-600 hover:bg-blue-50"
+                    )
+                  ]}
+                >
+                  All
+                </button>
+              </div>
+
+              <div
+                id="service-filter-options"
+                class="max-h-72 overflow-y-auto px-1 py-1"
+                role="group"
+                aria-label="Service options"
+              >
+                <%= for service <- @available_services do %>
+                  <% selected = service.rotation_type in @service_filters %>
+                  <button
+                    id={"service-filter-option-#{service.rotation_type}"}
+                    type="button"
+                    phx-click="toggle_service_filter"
+                    phx-value-service={service.rotation_type}
+                    aria-pressed={selected}
+                    role="menuitemcheckbox"
+                    aria-checked={selected}
+                    class={[
+                      "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm",
+                      "transition-colors duration-75 ease-out motion-reduce:transition-none",
+                      if(selected,
+                        do: "bg-blue-50/80 text-gray-900",
+                        else: "text-gray-800 hover:bg-gray-50"
+                      )
+                    ]}
+                  >
+                    <span class="min-w-0 flex-1 font-medium">{service.label}</span>
+                    <span class={[
+                      "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors duration-75",
+                      if(selected,
+                        do: "border-blue-600 bg-blue-600 text-white",
+                        else: "border-gray-300 bg-white"
+                      )
+                    ]}>
+                      <%= if selected do %>
+                        <.icon name="hero-check" class="h-3.5 w-3.5" />
+                      <% end %>
+                    </span>
+                  </button>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
         </div>
+
+        <%= if @shift_coworkers_modal do %>
+          <% modal = @shift_coworkers_modal %>
+          <% type_label = Rotations.rotation_type_label(modal.rotation_type) %>
+          <% color = entry_color(modal.rotation_type) %>
+          <div
+            id="shift-coworkers-modal"
+            class="fixed inset-0 z-[70] flex items-center justify-center"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shift-coworkers-modal-title"
+          >
+            <div phx-click="close_shift_coworkers" class="absolute inset-0 bg-black/40"></div>
+            <div class="relative bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 z-10 max-h-[80vh] overflow-y-auto">
+              <div class="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <h3 id="shift-coworkers-modal-title" class="text-lg font-semibold text-gray-800">
+                    {type_label}
+                  </h3>
+                  <p class="text-sm text-gray-500 mt-1">
+                    {Calendar.strftime(modal.start_date, "%b %-d, %Y")} – {Calendar.strftime(
+                      modal.end_date,
+                      "%b %-d, %Y"
+                    )}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  phx-click="close_shift_coworkers"
+                  class="text-gray-400 hover:text-gray-600 text-xl leading-none shrink-0"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div class="mb-3">
+                <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
+                  {type_label}
+                </span>
+                <span class="text-xs text-gray-400 ml-2">
+                  {length(modal.coworker_rows)} resident{if length(modal.coworker_rows) != 1, do: "s"}
+                </span>
+              </div>
+
+              <%= if modal.coworker_rows == [] do %>
+                <p class="text-sm text-gray-400">No schedule rows match this block.</p>
+              <% else %>
+                <ul id="shift-coworkers-list" class="space-y-3 pl-0.5">
+                  <%= for row <- modal.coworker_rows do %>
+                    <% sr = row.resident %>
+                    <li class="flex flex-col gap-0.5 text-sm border-b border-gray-100 last:border-0 pb-3 last:pb-0">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-xs text-gray-400 font-mono w-10 shrink-0">
+                          {sr.position_code}
+                        </span>
+                        <.link
+                          navigate={"/residents/#{sr.id}"}
+                          class={[
+                            "hover:text-blue-600 hover:underline font-medium",
+                            if(row.overridden,
+                              do: "line-through text-gray-400",
+                              else: "text-gray-800"
+                            )
+                          ]}
+                        >
+                          {sr.name}
+                        </.link>
+                        <%= if row.overridden do %>
+                          <span class="text-xs text-gray-400 italic">
+                            → {row.covered_by.name}
+                          </span>
+                        <% end %>
+                        <%= if row.is_coverage do %>
+                          <span class="text-xs text-blue-500 italic">(covering)</span>
+                        <% end %>
+                      </div>
+                    </li>
+                  <% end %>
+                </ul>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
       <% else %>
         <p class="text-gray-500">No rotations recorded for this resident.</p>
       <% end %>
@@ -438,6 +752,65 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   defp merge_effective_entries(effective_segs, off_slots) do
     (effective_segs ++ off_slots)
     |> Enum.sort_by(& &1.start_date, Date)
+  end
+
+  defp build_service_options(entries) do
+    entries
+    |> Enum.reject(&(&1.rotation_type == "off"))
+    |> Enum.map(& &1.rotation_type)
+    |> Enum.uniq()
+    |> Enum.sort_by(&String.downcase(entry_label(&1)))
+    |> Enum.map(fn rotation_type ->
+      %{rotation_type: rotation_type, label: entry_label(rotation_type)}
+    end)
+  end
+
+  defp filter_entries(entries, []), do: entries
+
+  defp filter_entries(entries, service_filters) do
+    Enum.filter(entries, fn entry -> entry.rotation_type in service_filters end)
+  end
+
+  defp today_anchor_slot_index(entries, today) do
+    case Enum.find(entries, fn entry -> Date.compare(entry.end_date, today) != :lt end) do
+      nil -> nil
+      entry -> entry.slot_index
+    end
+  end
+
+  defp toggle_service(service_filters, service) do
+    if service in service_filters do
+      Enum.reject(service_filters, &(&1 == service))
+    else
+      service_filters ++ [service]
+    end
+  end
+
+  defp normalize_service_filters(service_filters, available_services) do
+    valid_services = MapSet.new(available_services, & &1.rotation_type)
+
+    service_filters
+    |> Enum.uniq()
+    |> Enum.filter(&MapSet.member?(valid_services, &1))
+  end
+
+  defp assign_filtered_entries(socket, service_filters) do
+    filtered_entries = filter_entries(socket.assigns.all_entries, service_filters)
+
+    assign(socket,
+      service_filters: service_filters,
+      filtered_entries: filtered_entries,
+      today_anchor_slot_index: today_anchor_slot_index(filtered_entries, socket.assigns.today),
+      shift_coworkers_modal: nil
+    )
+  end
+
+  defp service_filter_count_label([], available_services),
+    do: "Showing all #{length(available_services)} services"
+
+  defp service_filter_count_label(service_filters, _available_services) do
+    count = length(service_filters)
+    "Showing #{count} selected service#{if count == 1, do: "", else: "s"}"
   end
 
   defp compute_total_shifts(rotations) do

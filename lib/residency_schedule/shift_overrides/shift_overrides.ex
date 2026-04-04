@@ -86,6 +86,26 @@ defmodule ResidencySchedule.ShiftOverrides do
   end
 
   @doc """
+  Lists shift overrides for a schedule that overlap an inclusive date range.
+
+  Preloads `rotation` (with `schedule_resident`) and `covering_schedule_resident`.
+
+  Exempt from doctest — hits the database. See `ShiftOverridesTest`.
+  """
+  def list_overrides_for_schedule_in_range(schedule_id, range_start, range_end) do
+    sr_query = ScheduleResident.with_name_query()
+
+    from(o in ShiftOverride,
+      join: r in assoc(o, :rotation),
+      join: sr in assoc(r, :schedule_resident),
+      where: sr.schedule_id == ^schedule_id,
+      where: o.override_start_date <= ^range_end and o.override_end_date >= ^range_start,
+      preload: [rotation: [schedule_resident: ^sr_query], covering_schedule_resident: ^sr_query]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Lists rotations of a given type overlapping the specified date range, with schedule_resident preloaded.
   Used to populate the admin override form with available shifts to cover.
 

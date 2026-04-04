@@ -61,11 +61,10 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     date = Date.from_iso8601!(date_str)
 
     day_detail =
-      build_effective_day_detail(
-        date,
-        Map.get(socket.assigns.rotation_index, date, []),
-        Map.get(socket.assigns.override_index, date, [])
-      )
+      Map.get(socket.assigns.rotation_index, date, [])
+      |> Rotations.effective_day_assignments(Map.get(socket.assigns.override_index, date, []))
+      |> Enum.group_by(& &1.rotation_type)
+      |> Enum.sort_by(&elem(&1, 0))
 
     {:noreply, assign(socket, selected_date: date, day_detail: day_detail)}
   end
@@ -239,63 +238,6 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
 
     {rotation_index, override_index}
-  end
-
-  # Builds the effective day detail entries for the modal, reflecting overrides.
-  # Each entry is %{resident, rotation_type, overridden, covered_by, is_coverage}.
-  defp build_effective_day_detail(_date, rotations, overrides) do
-    # Map rotation_id → override for fast lookup
-    override_by_rotation = Map.new(overrides, fn o -> {o.rotation_id, o} end)
-
-    # Set of covering resident IDs active today (they appear under the overridden rotation)
-    covering_today = MapSet.new(overrides, & &1.covering_schedule_resident_id)
-
-    effective =
-      Enum.flat_map(rotations, fn rot ->
-        if MapSet.member?(covering_today, rot.schedule_resident_id) do
-          # This resident is covering someone else today — suppress from their own rotation
-          []
-        else
-          case Map.get(override_by_rotation, rot.id) do
-            nil ->
-              [
-                %{
-                  resident: rot.schedule_resident,
-                  rotation_type: rot.rotation_type,
-                  overridden: false,
-                  covered_by: nil,
-                  is_coverage: false
-                }
-              ]
-
-            override ->
-              # Original resident is being covered — show crossed out, then the covering resident
-              [
-                %{
-                  resident: rot.schedule_resident,
-                  rotation_type: rot.rotation_type,
-                  overridden: true,
-                  covered_by: override.covering_schedule_resident,
-                  is_coverage: false
-                },
-                %{
-                  resident: override.covering_schedule_resident,
-                  rotation_type: rot.rotation_type,
-                  overridden: false,
-                  covered_by: nil,
-                  is_coverage: true
-                }
-              ]
-          end
-        end
-      end)
-
-    effective
-    |> Enum.sort_by(fn e ->
-      {e.rotation_type, e.resident.residency_year, e.resident.schedule_number}
-    end)
-    |> Enum.group_by(& &1.rotation_type)
-    |> Enum.sort_by(&elem(&1, 0))
   end
 
   defp group_by_type(rotations) do

@@ -149,6 +149,41 @@ defmodule ResidencySchedule.ShiftOverridesTest do
     end
   end
 
+  describe "list_overrides_for_schedule_in_range/3" do
+    test "returns overrides for rotations on that schedule overlapping the range", %{
+      rotation_a: rot,
+      sched: sched,
+      rb: rb
+    } do
+      {:ok, _} =
+        ShiftOverrides.create_override(%{
+          rotation_id: rot.id,
+          covering_schedule_resident_id: rb.id,
+          override_start_date: ~D[2023-07-08],
+          override_end_date: ~D[2023-07-14]
+        })
+
+      overrides =
+        ShiftOverrides.list_overrides_for_schedule_in_range(
+          sched.id,
+          ~D[2023-07-10],
+          ~D[2023-07-11]
+        )
+
+      assert length(overrides) == 1
+      assert hd(overrides).rotation_id == rot.id
+      assert hd(overrides).covering_schedule_resident_id == rb.id
+    end
+
+    test "returns empty when the range does not overlap overrides", %{sched: sched} do
+      assert ShiftOverrides.list_overrides_for_schedule_in_range(
+               sched.id,
+               ~D[2020-01-01],
+               ~D[2020-01-07]
+             ) == []
+    end
+  end
+
   describe "list_rotations_for_type_in_range/3" do
     test "returns rotations of a given type overlapping the date range", %{ra: ra} do
       rotations =

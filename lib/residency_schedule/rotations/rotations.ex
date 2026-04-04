@@ -3,6 +3,7 @@ defmodule ResidencySchedule.Rotations do
   alias ResidencySchedule.Repo
   alias ResidencySchedule.Rotations.Rotation
   alias ResidencySchedule.Residents.ScheduleResident
+  alias ResidencySchedule.ShiftOverrides
 
   @rotation_labels %{
     "ambulatory" => "Ambulatory",
@@ -104,6 +105,226 @@ defmodule ResidencySchedule.Rotations do
       order_by: [rot.rotation_type, sr.residency_year, sr.schedule_number]
     )
     |> Repo.all()
+  end
+
+  @doc """
+  Lists rotations for one schedule that match a rotation type and overlap the given date range
+  (inclusive), with `schedule_resident` preloaded (virtual `name` from `Resident`).
+
+  Exempt from doctest — hits the database. See `RotationsTest` for coverage.
+  """
+  def list_rotations_for_schedule_type_in_range(
+        schedule_id,
+        rotation_type,
+        range_start,
+        range_end
+      ) do
+    sr_query = ScheduleResident.with_name_query()
+
+    from(rot in Rotation,
+      join: sr in assoc(rot, :schedule_resident),
+      where: sr.schedule_id == ^schedule_id,
+      where: rot.rotation_type == ^rotation_type,
+      where: rot.start_date <= ^range_end and rot.end_date >= ^range_start,
+      preload: [schedule_resident: ^sr_query],
+      order_by: [sr.residency_year, sr.schedule_number, rot.start_date]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Builds effective assignment rows for one calendar day, applying shift coverage rules
+  (same behavior as the calendar day modal).
+
+  `rotations` must have `schedule_resident` preloaded. Each override must have
+  `covering_schedule_resident` preloaded.
+
+      iex> alias ResidencySchedule.Residents.ScheduleResident
+      iex> alias ResidencySchedule.Rotations.Rotation
+      iex> alias ResidencySchedule.ShiftOverrides.ShiftOverride
+      iex> ann = %ScheduleResident{id: 1, residency_year: 4, schedule_number: 1, position_code: "R4-1", name: "Ann"}
+      iex> bea = %ScheduleResident{id: 2, residency_year: 2, schedule_number: 1, position_code: "R2-1", name: "Bea"}
+      iex> rot = %Rotation{id: 10, rotation_type: "oncology", schedule_resident_id: 1, schedule_resident: ann}
+      iex> ov = %ShiftOverride{
+      ...>   rotation_id: 10,
+      ...>   covering_schedule_resident_id: 2,
+      ...>   covering_schedule_resident: bea,
+      ...>   override_start_date: ~D[2023-07-01],
+      ...>   override_end_date: ~D[2023-07-31]
+      ...> }
+      iex> rows = ResidencySchedule.Rotations.effective_day_assignments([rot], [ov])
+      iex> length(rows)
+      2
+      iex> Enum.at(rows, 1).is_coverage
+      true
+  """
+  def effective_day_assignments(rotations, overrides)
+      when is_list(rotations) and is_list(overrides) do
+    override_by_rotation = Map.new(overrides, fn o -> {o.rotation_id, o} end)
+    covering_today = MapSet.new(overrides, & &1.covering_schedule_resident_id)
+
+    Enum.flat_map(rotations, fn rot ->
+      if MapSet.member?(covering_today, rot.schedule_resident_id) do
+        []
+      else
+        case Map.get(override_by_rotation, rot.id) do
+          nil ->
+            [
+              %{
+                resident: rot.schedule_resident,
+                rotation_type: rot.rotation_type,
+                overridden: false,
+                covered_by: nil,
+                is_coverage: false
+              }
+            ]
+
+          override ->
+            [
+              %{
+                resident: rot.schedule_resident,
+                rotation_type: rot.rotation_type,
+                overridden: true,
+                covered_by: override.covering_schedule_resident,
+                is_coverage: false
+              },
+              %{
+                resident: override.covering_schedule_resident,
+                rotation_type: rot.rotation_type,
+                overridden: false,
+                covered_by: nil,
+                is_coverage: true
+              }
+            ]
+        end
+      end
+    end)
+    |> Enum.sort_by(fn e ->
+      {e.rotation_type, e.resident.residency_year, e.resident.schedule_number}
+    end)
+  end
+
+  @doc """
+  Effective modal rows for one rotation type on a schedule over an inclusive date range,
+  reflecting shift overrides per day.
+
+  Each row is a map with `:resident`, `:overridden`, `:covered_by`, `:is_coverage`, and
+  `:active_dates` (`MapSet` of dates in the range when that row applies).
+
+  Exempt from doctest — hits the database. See `RotationsTest`.
+  """
+  def list_effective_coworker_rows_for_type_in_range(
+        schedule_id,
+        rotation_type,
+        range_start,
+        range_end
+      ) do
+    overrides =
+      ShiftOverrides.list_overrides_for_schedule_in_range(
+        schedule_id,
+        range_start,
+        range_end
+      )
+
+    range_start
+    |> Date.range(range_end)
+    |> Enum.reduce(%{}, fn date, acc ->
+      rotations = list_rotations_for_date(date, schedule_id)
+
+      day_overrides =
+        Enum.filter(overrides, fn o ->
+          Date.compare(date, o.override_start_date) != :lt and
+            Date.compare(date, o.override_end_date) != :gt
+        end)
+
+      rotations
+      |> effective_day_assignments(day_overrides)
+      |> Enum.filter(&(&1.rotation_type == rotation_type))
+      |> Enum.reduce(acc, fn entry, acc2 -> accumulate_coworker_row(acc2, date, entry) end)
+    end)
+    |> Map.values()
+    |> Enum.map(fn %{template: t, dates: dates} -> Map.put(t, :active_dates, dates) end)
+    |> Enum.sort_by(&coworker_modal_row_sort_key/1)
+  end
+
+  @doc """
+  Renders which days in `dates` fall inside `[block_start, block_end]` as comma-separated ranges.
+
+      iex> dates = MapSet.new([~D[2023-07-03], ~D[2023-07-04], ~D[2023-07-06]])
+      iex> ResidencySchedule.Rotations.format_date_set_within_block(dates, ~D[2023-07-03], ~D[2023-07-07])
+      "Jul 3–4, Jul 6"
+
+      iex> ResidencySchedule.Rotations.format_date_set_within_block(MapSet.new(), ~D[2023-07-01], ~D[2023-07-31])
+      "—"
+  """
+  def format_date_set_within_block(%MapSet{} = dates, block_start, block_end) do
+    dates
+    |> MapSet.to_list()
+    |> Enum.filter(fn d ->
+      Date.compare(d, block_start) != :lt and Date.compare(d, block_end) != :gt
+    end)
+    |> Enum.sort(Date)
+    |> chunk_consecutive_dates()
+    |> Enum.map(&interval_label_for_dates/1)
+    |> case do
+      [] -> "—"
+      parts -> Enum.join(parts, ", ")
+    end
+  end
+
+  defp accumulate_coworker_row(acc, date, entry) do
+    key = coworker_row_key(entry)
+
+    template = %{
+      resident: entry.resident,
+      overridden: entry.overridden,
+      covered_by: entry.covered_by,
+      is_coverage: entry.is_coverage
+    }
+
+    Map.update(acc, key, %{dates: MapSet.new([date]), template: template}, fn existing ->
+      %{existing | dates: MapSet.put(existing.dates, date)}
+    end)
+  end
+
+  defp coworker_row_key(entry) do
+    cover_id = if entry.covered_by, do: entry.covered_by.id, else: nil
+    {entry.resident.id, entry.overridden, entry.is_coverage, cover_id}
+  end
+
+  defp coworker_modal_row_sort_key(row) do
+    {
+      row.resident.residency_year,
+      row.resident.schedule_number,
+      row.is_coverage,
+      row.overridden
+    }
+  end
+
+  defp chunk_consecutive_dates([]), do: []
+
+  defp chunk_consecutive_dates([first | rest]) do
+    {chunk, remaining} = take_consecutive(rest, first, [first])
+    [chunk | chunk_consecutive_dates(remaining)]
+  end
+
+  defp take_consecutive([], _last, acc), do: {Enum.reverse(acc), []}
+
+  defp take_consecutive([y | ys], last, acc) do
+    if Date.diff(y, last) == 1 do
+      take_consecutive(ys, y, [y | acc])
+    else
+      {Enum.reverse(acc), [y | ys]}
+    end
+  end
+
+  defp interval_label_for_dates([d]),
+    do: Calendar.strftime(d, "%b %-d, %Y")
+
+  defp interval_label_for_dates(chunk) do
+    a = List.first(chunk)
+    b = List.last(chunk)
+    "#{Calendar.strftime(a, "%b %-d, %Y")}–#{Calendar.strftime(b, "%b %-d, %Y")}"
   end
 
   @doc """
