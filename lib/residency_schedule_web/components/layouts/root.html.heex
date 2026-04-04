@@ -65,14 +65,14 @@
           <%= if my_id = get_session(@conn, :resident_id) do %>
             <%= if @conn.request_path == "/residents/#{my_id}" do %>
               <span class="px-3 py-1.5 rounded-md text-sm text-green-700 bg-green-50 font-medium">
-                My Resident
+                Home
               </span>
             <% else %>
               <a
                 href={"/residents/#{my_id}"}
                 class="px-3 py-1.5 rounded-md text-sm text-green-700 hover:bg-green-50 transition-colors"
               >
-                My Resident
+                Home
               </a>
             <% end %>
           <% end %>
@@ -138,14 +138,14 @@
             <%= if my_id = get_session(@conn, :resident_id) do %>
               <%= if @conn.request_path == "/residents/#{my_id}" do %>
                 <span class="block px-4 py-2 text-sm text-green-700 font-medium bg-green-50">
-                  My Resident
+                  Home
                 </span>
               <% else %>
                 <a
                   href={"/residents/#{my_id}"}
                   class="block px-4 py-2 text-sm text-green-700 hover:bg-green-50"
                 >
-                  My Resident
+                  Home
                 </a>
               <% end %>
             <% end %>

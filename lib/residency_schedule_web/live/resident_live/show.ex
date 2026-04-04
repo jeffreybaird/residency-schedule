@@ -187,7 +187,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
           <%= if @is_home_resident do %>
             <div class="inline-flex items-center gap-1 shrink-0">
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                ✓ My Resident
+                ✓ Home
               </span>
               <form action="/unset-home" method="post" class="inline">
                 <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
@@ -195,7 +195,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                 <button
                   type="submit"
                   class="px-2 py-1 rounded-full text-xs text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                  title="Remove My Resident — the nav link will no longer point here"
+                  title="Remove Home — the nav link will no longer point here"
                 >
                   ✕
                 </button>
@@ -207,9 +207,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
               <button
                 type="submit"
                 class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700 transition-colors"
-                title="Pin this resident — adds a My Resident shortcut to the nav"
+                title="Pin this resident — adds a Home shortcut to the nav"
               >
-                Set as My Resident
+                Set as Home
               </button>
             </form>
           <% end %>
