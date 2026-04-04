@@ -81,7 +81,7 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
 
           <%= for entry <- @uploads.schedule_csv.entries do %>
             <div class="mt-4 flex items-center justify-between bg-gray-50 rounded-md px-4 py-2">
-              <span class="text-sm text-gray-700"><%= entry.client_name %></span>
+              <span class="text-sm text-gray-700">{entry.client_name}</span>
               <button
                 type="button"
                 phx-click="cancel-upload"
@@ -92,25 +92,25 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
               </button>
             </div>
             <%= for err <- upload_errors(@uploads.schedule_csv, entry) do %>
-              <p class="mt-1 text-sm text-red-600"><%= humanize_error(err) %></p>
+              <p class="mt-1 text-sm text-red-600">{humanize_error(err)}</p>
             <% end %>
           <% end %>
         </div>
 
         <%= if @error do %>
           <div class="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-            <%= @error %>
+            {@error}
           </div>
         <% end %>
 
         <%= if length(@warnings) > 0 do %>
           <div class="rounded-md bg-yellow-50 border border-yellow-200 px-4 py-3">
             <p class="text-sm font-medium text-yellow-800 mb-2">
-              <%= length(@warnings) %> unrecognized abbreviation(s) were skipped:
+              {length(@warnings)} unrecognized abbreviation(s) were skipped:
             </p>
             <ul class="text-sm text-yellow-700 list-disc list-inside space-y-0.5">
               <%= for {code, _idx, val} <- Enum.take(@warnings, 20) do %>
-                <li><%= code %>: "<%= val %>"</li>
+                <li>{code}: "{val}"</li>
               <% end %>
             </ul>
           </div>

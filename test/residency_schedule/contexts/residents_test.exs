@@ -5,8 +5,23 @@ defmodule ResidencySchedule.ResidentsTest do
 
   setup do
     {:ok, sched} = Schedules.upsert_schedule(2023, "2023–2024")
-    {:ok, r1} = Residents.insert_resident(sched.id, %{position_code: "R4-1", residency_year: 4, schedule_number: 1, name: "Alexis"})
-    {:ok, r2} = Residents.insert_resident(sched.id, %{position_code: "R1-1", residency_year: 1, schedule_number: 1, name: "Jamie"})
+
+    {:ok, r1} =
+      Residents.insert_resident(sched.id, %{
+        position_code: "R4-1",
+        residency_year: 4,
+        schedule_number: 1,
+        name: "Alexis"
+      })
+
+    {:ok, r2} =
+      Residents.insert_resident(sched.id, %{
+        position_code: "R1-1",
+        residency_year: 1,
+        schedule_number: 1,
+        name: "Jamie"
+      })
+
     %{schedule: sched, r4: r1, r1: r2}
   end
 
@@ -62,7 +77,14 @@ defmodule ResidencySchedule.ResidentsTest do
 
   describe "delete_orphaned_residents/0" do
     test "deletes residents not linked to any schedule", %{schedule: sched} do
-      {:ok, _} = Residents.insert_resident(sched.id, %{position_code: "R2-1", residency_year: 2, schedule_number: 1, name: "Morgan"})
+      {:ok, _} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R2-1",
+          residency_year: 2,
+          schedule_number: 1,
+          name: "Morgan"
+        })
+
       Schedules.delete_schedule(sched.id)
       {count, _} = Residents.delete_orphaned_residents()
       # All residents from that schedule were orphaned and already cleaned up by delete_schedule
@@ -72,7 +94,14 @@ defmodule ResidencySchedule.ResidentsTest do
     test "does not delete residents still linked to another schedule", %{schedule: sched} do
       {:ok, sched2} = Schedules.upsert_schedule(2024, "2024–2025")
       # Same person "Alexis" exists in both schedules
-      {:ok, _} = Residents.insert_resident(sched2.id, %{position_code: "R4-1", residency_year: 4, schedule_number: 1, name: "Alexis"})
+      {:ok, _} =
+        Residents.insert_resident(sched2.id, %{
+          position_code: "R4-1",
+          residency_year: 4,
+          schedule_number: 1,
+          name: "Alexis"
+        })
+
       Schedules.delete_schedule(sched.id)
       # Alexis is still in sched2, so should not be orphaned
       remaining = Residents.list_residents_for_schedule(sched2.id)
@@ -90,23 +119,27 @@ defmodule ResidencySchedule.ResidentsTest do
 
   describe "insert_resident/2" do
     test "inserts a valid resident", %{schedule: sched} do
-      {:ok, resident} = Residents.insert_resident(sched.id, %{
-        position_code: "R2-1",
-        residency_year: 2,
-        schedule_number: 1,
-        name: "Morgan"
-      })
+      {:ok, resident} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R2-1",
+          residency_year: 2,
+          schedule_number: 1,
+          name: "Morgan"
+        })
+
       assert resident.name == "Morgan"
       assert resident.schedule_id == sched.id
     end
 
     test "falls back to position_code when name is blank", %{schedule: sched} do
-      {:ok, resident} = Residents.insert_resident(sched.id, %{
-        position_code: "R2-2",
-        residency_year: 2,
-        schedule_number: 2,
-        name: "R2-2"
-      })
+      {:ok, resident} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R2-2",
+          residency_year: 2,
+          schedule_number: 2,
+          name: "R2-2"
+        })
+
       assert resident.name == "R2-2"
     end
 

@@ -28,7 +28,13 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
         )
       end
 
-    {:ok, assign(socket, delete_confirm_id: nil, delete_error: nil, is_admin: is_admin, today: Date.utc_today())}
+    {:ok,
+     assign(socket,
+       delete_confirm_id: nil,
+       delete_error: nil,
+       is_admin: is_admin,
+       today: Date.utc_today()
+     )}
   end
 
   @impl true
@@ -114,7 +120,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                   )
                 ]}
               >
-                <%= s.label %>
+                {s.label}
               </button>
               <%= if @is_admin do %>
                 <button
@@ -143,7 +149,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
             >
               <input type="hidden" name="schedule_id" value={@delete_confirm_id} />
               <span class="text-sm text-red-700 font-medium">
-                Delete <%= target && target.label %>?
+                Delete {target && target.label}?
               </span>
               <input
                 type="password"
@@ -153,7 +159,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 class="border border-gray-300 rounded px-2 py-0.5 text-sm w-32 focus:outline-none focus:ring-1 focus:ring-red-400"
               />
               <%= if @delete_error do %>
-                <span class="text-xs text-red-600"><%= @delete_error %></span>
+                <span class="text-xs text-red-600">{@delete_error}</span>
               <% end %>
               <button
                 type="submit"
@@ -190,7 +196,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 phx-value-year={y}
                 class={filter_tab_class(@filter_year, y)}
               >
-                R<%= y %>
+                R{y}
               </button>
             <% end %>
           </div>
@@ -231,7 +237,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                     data-slot-year={start_date.year}
                     data-today-slot={if slot_today, do: "true"}
                   >
-                    <%= slot_header_label(start_date, end_date) %>
+                    {slot_header_label(start_date, end_date)}
                   </th>
                 <% end %>
               </tr>
@@ -243,7 +249,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                     colspan={2 + length(@slots)}
                     class="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200"
                   >
-                    R<%= year %> Residents
+                    R{year} Residents
                   </td>
                 </tr>
                 <%= for resident <- residents do %>
@@ -254,15 +260,18 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                       style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
                     >
                       <.link navigate={"/residents/#{resident.id}"} class="hover:text-blue-600">
-                        <%= resident.position_code %>
+                        {resident.position_code}
                       </.link>
                     </td>
                     <td
                       class="sticky z-20 bg-white px-2 py-1 text-gray-700 font-medium border-r border-gray-200 overflow-hidden"
                       style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
                     >
-                      <.link navigate={"/residents/#{resident.id}"} class="hover:text-blue-600 truncate block">
-                        <%= resident.name %>
+                      <.link
+                        navigate={"/residents/#{resident.id}"}
+                        class="hover:text-blue-600 truncate block"
+                      >
+                        {resident.name}
                       </.link>
                     </td>
                     <%= for {colspan, rotation} <- cell_groups(@slots, resident.rotations) do %>
@@ -271,7 +280,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                         colspan={colspan}
                         class="px-0.5 py-0.5 text-center border-r border-gray-100"
                       >
-                        <%= render_rotation_cell(rotation, past) %>
+                        {render_rotation_cell(rotation, past)}
                       </td>
                     <% end %>
                   </tr>

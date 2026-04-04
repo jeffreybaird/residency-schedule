@@ -23,6 +23,12 @@ defmodule ResidencySchedule.Rotations.Rotation do
   def changeset(rotation, attrs) do
     rotation
     |> cast(attrs, [:schedule_resident_id, :rotation_type, :start_date, :end_date, :slot_index])
-    |> validate_required([:schedule_resident_id, :rotation_type, :start_date, :end_date, :slot_index])
+    |> validate_required([
+      :schedule_resident_id,
+      :rotation_type,
+      :start_date,
+      :end_date,
+      :slot_index
+    ])
   end
 end

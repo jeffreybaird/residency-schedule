@@ -159,7 +159,13 @@ defmodule ResidencySchedule.IcalTest do
 
     test "last day of day-shift block trimmed when immediately followed by night shift" do
       amb = %{rotation_type: "ambulatory", start_date: ~D[2026-02-23], end_date: ~D[2026-02-27]}
-      swn = %{rotation_type: "strong_weekend_nights", start_date: ~D[2026-02-28], end_date: ~D[2026-03-01]}
+
+      swn = %{
+        rotation_type: "strong_weekend_nights",
+        start_date: ~D[2026-02-28],
+        end_date: ~D[2026-03-01]
+      }
+
       result = Ical.build_from_segments([amb, swn], "Test")
       assert result =~ "DTSTART:20260226T060000"
       refute result =~ "DTSTART:20260227T060000"
@@ -191,8 +197,19 @@ defmodule ResidencySchedule.IcalTest do
     test "segments with covered_by set are excluded" do
       covering_resident = %{name: "Emily"}
 
-      seg_free = %{rotation_type: "ambulatory", start_date: ~D[2026-03-01], end_date: ~D[2026-03-07], covered_by: nil}
-      seg_covered = %{rotation_type: "ambulatory", start_date: ~D[2026-03-08], end_date: ~D[2026-03-14], covered_by: covering_resident}
+      seg_free = %{
+        rotation_type: "ambulatory",
+        start_date: ~D[2026-03-01],
+        end_date: ~D[2026-03-07],
+        covered_by: nil
+      }
+
+      seg_covered = %{
+        rotation_type: "ambulatory",
+        start_date: ~D[2026-03-08],
+        end_date: ~D[2026-03-14],
+        covered_by: covering_resident
+      }
 
       result = Ical.build_from_segments([seg_free, seg_covered], "Clare")
       # Free segment appears
@@ -204,8 +221,14 @@ defmodule ResidencySchedule.IcalTest do
     test "coverage segments (is_coverage: true) are included" do
       original_resident = %{name: "Clare"}
 
-      seg = %{rotation_type: "night_float", start_date: ~D[2026-03-08], end_date: ~D[2026-03-10],
-              covered_by: nil, is_coverage: true, original_resident: original_resident}
+      seg = %{
+        rotation_type: "night_float",
+        start_date: ~D[2026-03-08],
+        end_date: ~D[2026-03-10],
+        covered_by: nil,
+        is_coverage: true,
+        original_resident: original_resident
+      }
 
       result = Ical.build_from_segments([seg], "Emily")
       assert result =~ "DTSTART:20260307T180000"

@@ -28,7 +28,10 @@ defmodule ResidencyScheduleWeb.IcalFeedTest do
   end
 
   describe "GET /feed/:token/calendar.ics" do
-    test "returns iCal content for a valid token without authentication", %{conn: conn, resident: resident} do
+    test "returns iCal content for a valid token without authentication", %{
+      conn: conn,
+      resident: resident
+    } do
       conn = get(conn, "/feed/#{resident.calendar_token}/calendar.ics")
       assert response_content_type(conn, :ics) =~ "text/calendar"
       assert response(conn, 200) =~ "BEGIN:VCALENDAR"

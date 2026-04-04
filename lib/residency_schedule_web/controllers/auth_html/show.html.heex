@@ -4,14 +4,16 @@
 
     <%= if flash = @flash["error"] do %>
       <div class="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-        <%= flash %>
+        {flash}
       </div>
     <% end %>
 
     <form method="post" action="/login" class="space-y-4">
       <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
       <div>
-        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
+          Password
+        </label>
         <input
           type="password"
           id="password"

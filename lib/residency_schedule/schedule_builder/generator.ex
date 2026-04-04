@@ -60,7 +60,7 @@ defmodule ResidencySchedule.ScheduleBuilder.Generator do
       true
   """
   def assign_all(residents, slots) do
-    weekday_slots = Enum.filter(slots, & !&1.is_weekend)
+    weekday_slots = Enum.filter(slots, &(!&1.is_weekend))
     weekend_slots = Enum.filter(slots, & &1.is_weekend)
 
     queues = build_queues(residents)
@@ -168,7 +168,7 @@ defmodule ResidencySchedule.ScheduleBuilder.Generator do
     Enum.reduce(unassigned_slots, {assignments, needs}, fn slot, {asgn, nds} ->
       rotation_type = pick_elective(res_idx, residency_year, priority, nds)
       a2 = Map.put(asgn, {res_idx, slot.slot_index}, rotation_type)
-      n2 = Map.update(nds, {res_idx, rotation_type}, 0, & max(&1 - 1, 0))
+      n2 = Map.update(nds, {res_idx, rotation_type}, 0, &max(&1 - 1, 0))
       {a2, n2}
     end)
   end

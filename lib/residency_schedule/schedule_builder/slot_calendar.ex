@@ -70,12 +70,12 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendar do
   def slots_for_window(slots, start_slot_index, window_size \\ 4) do
     non_weekend_indices =
       slots
-      |> Enum.filter(& !&1.is_weekend)
+      |> Enum.filter(&(!&1.is_weekend))
       |> Enum.map(& &1.slot_index)
 
     window_non_weekend_indices =
       non_weekend_indices
-      |> Enum.drop_while(& &1 < start_slot_index)
+      |> Enum.drop_while(&(&1 < start_slot_index))
       |> Enum.take(window_size)
 
     case window_non_weekend_indices do

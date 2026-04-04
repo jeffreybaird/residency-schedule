@@ -29,7 +29,13 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderStateTest do
       residents =
         for i <- 0..3 do
           year = i + 1
-          %{position_code: "R#{year}-1", residency_year: year, schedule_number: 1, name: "R#{year}-1"}
+
+          %{
+            position_code: "R#{year}-1",
+            residency_year: year,
+            schedule_number: 1,
+            name: "R#{year}-1"
+          }
         end ++ [%{position_code: "R2-2", residency_year: 2, schedule_number: 2, name: "R2-2"}]
 
       slot = @slot
@@ -45,13 +51,21 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderStateTest do
               3 -> :ambulatory
               _ -> :night_float
             end
+
           Map.put(acc, {i, 0}, rotation)
         end)
-        |> Map.put({4, 0}, :highland_obstetrics)  # HHOB by the 5th resident (R2)
+        # HHOB by the 5th resident (R2)
+        |> Map.put({4, 0}, :highland_obstetrics)
 
       # Add NF for resident 3 (R4) which covers year 4's night_float
       state = BuilderState.new(2026, residents, [slot], assignments)
-      ob_warning = Enum.find(state.coverage_warnings, & &1.rotation_type == :strong_obstetrics and &1.slot_index == 0)
+
+      ob_warning =
+        Enum.find(
+          state.coverage_warnings,
+          &(&1.rotation_type == :strong_obstetrics and &1.slot_index == 0)
+        )
+
       # We have only 1 OB, needed 4 — so there will still be a warning
       assert ob_warning != nil
     end
@@ -146,7 +160,13 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderStateTest do
     end
 
     test "assignments stay with their positions after move" do
-      state = BuilderState.new(2026, [@resident, @r1_2, @r1_3], [@slot], %{{0, 0} => :oncology, {1, 0} => :ambulatory, {2, 0} => :vacation})
+      state =
+        BuilderState.new(2026, [@resident, @r1_2, @r1_3], [@slot], %{
+          {0, 0} => :oncology,
+          {1, 0} => :ambulatory,
+          {2, 0} => :vacation
+        })
+
       # Move position 0 to position 2 — assignments stay, only names shift
       updated = BuilderState.move_resident_name(state, 0, 2)
       assert Map.get(updated.assignments, {0, 0}) == :oncology
@@ -169,7 +189,13 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderStateTest do
     end
 
     test "only changes the resident at the specified index" do
-      second_resident = %{position_code: "R1-2", residency_year: 1, schedule_number: 2, name: "R1-2"}
+      second_resident = %{
+        position_code: "R1-2",
+        residency_year: 1,
+        schedule_number: 2,
+        name: "R1-2"
+      }
+
       state = BuilderState.new(2026, [@resident, second_resident], [@slot], %{})
       updated = BuilderState.rename_resident(state, 0, "Alice")
       assert Enum.at(updated.residents, 0).name == "Alice"
@@ -187,6 +213,7 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderStateTest do
         coverage_warnings: :stale,
         placement_warnings: :stale
       }
+
       result = BuilderState.recompute_warnings(state)
       assert is_list(result.duty_warnings)
       assert is_list(result.coverage_warnings)
@@ -194,13 +221,27 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderStateTest do
     end
 
     test "returns coverage warnings for uncovered slots" do
-      state = %{residents: [@resident], slots: [@slot], assignments: %{}, duty_warnings: [], coverage_warnings: [], placement_warnings: []}
+      state = %{
+        residents: [@resident],
+        slots: [@slot],
+        assignments: %{},
+        duty_warnings: [],
+        coverage_warnings: [],
+        placement_warnings: []
+      }
+
       result = BuilderState.recompute_warnings(state)
       assert length(result.coverage_warnings) > 0
     end
 
     test "returns placement warnings when a rotation is on the wrong slot type" do
-      weekend_slot = %{slot_index: 1, is_weekend: true, start_date: ~D[2026-07-04], end_date: ~D[2026-07-05]}
+      weekend_slot = %{
+        slot_index: 1,
+        is_weekend: true,
+        start_date: ~D[2026-07-04],
+        end_date: ~D[2026-07-05]
+      }
+
       state = %{
         residents: [@resident],
         slots: [@slot, weekend_slot],
@@ -209,6 +250,7 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderStateTest do
         coverage_warnings: [],
         placement_warnings: []
       }
+
       result = BuilderState.recompute_warnings(state)
       assert length(result.placement_warnings) == 1
       assert hd(result.placement_warnings).reason == :weekday_only

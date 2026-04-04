@@ -10,7 +10,8 @@ defmodule ResidencySchedule.Application do
     children = [
       ResidencyScheduleWeb.Telemetry,
       ResidencySchedule.Repo,
-      {DNSCluster, query: Application.get_env(:residency_schedule, :dns_cluster_query) || :ignore},
+      {DNSCluster,
+       query: Application.get_env(:residency_schedule, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: ResidencySchedule.PubSub},
       # Start a worker by calling: ResidencySchedule.Worker.start_link(arg)
       # {ResidencySchedule.Worker, arg},

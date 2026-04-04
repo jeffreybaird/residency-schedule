@@ -25,13 +25,23 @@ defmodule ResidencySchedule.EffectiveSegmentsTest do
     # Clare: Night Float Jul 1–14
     {:ok, _} =
       Rotations.insert_rotations(clare.id, [
-        %{slot_index: 0, start_date: ~D[2023-07-01], end_date: ~D[2023-07-14], rotation_type: :night_float}
+        %{
+          slot_index: 0,
+          start_date: ~D[2023-07-01],
+          end_date: ~D[2023-07-14],
+          rotation_type: :night_float
+        }
       ])
 
     # Emily: Elective Jul 1–14
     {:ok, _} =
       Rotations.insert_rotations(emily.id, [
-        %{slot_index: 0, start_date: ~D[2023-07-01], end_date: ~D[2023-07-14], rotation_type: :elective}
+        %{
+          slot_index: 0,
+          start_date: ~D[2023-07-01],
+          end_date: ~D[2023-07-14],
+          rotation_type: :elective
+        }
       ])
 
     clares_rotation = Rotations.list_rotations_for_resident(clare.id) |> hd()
@@ -175,11 +185,21 @@ defmodule ResidencySchedule.EffectiveSegmentsTest do
         })
 
       Rotations.insert_rotations(rc.id, [
-        %{slot_index: 5, start_date: ~D[2023-08-01], end_date: ~D[2023-08-07], rotation_type: :oncology}
+        %{
+          slot_index: 5,
+          start_date: ~D[2023-08-01],
+          end_date: ~D[2023-08-07],
+          rotation_type: :oncology
+        }
       ])
 
       Rotations.insert_rotations(rd.id, [
-        %{slot_index: 5, start_date: ~D[2023-08-01], end_date: ~D[2023-08-07], rotation_type: :oncology}
+        %{
+          slot_index: 5,
+          start_date: ~D[2023-08-01],
+          end_date: ~D[2023-08-07],
+          rotation_type: :oncology
+        }
       ])
 
       days = Rotations.list_effective_co_service_days(rc.id, rd.id)
@@ -196,7 +216,12 @@ defmodule ResidencySchedule.EffectiveSegmentsTest do
       # Give Emily a Night Float rotation too (same as Clare) for full overlap
       {:ok, _} =
         Rotations.insert_rotations(emily.id, [
-          %{slot_index: 5, start_date: ~D[2023-07-01], end_date: ~D[2023-07-14], rotation_type: :night_float}
+          %{
+            slot_index: 5,
+            start_date: ~D[2023-07-01],
+            end_date: ~D[2023-07-14],
+            rotation_type: :night_float
+          }
         ])
 
       # Override: Emily covers Clare Jul 8–14

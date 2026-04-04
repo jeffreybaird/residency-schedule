@@ -90,11 +90,19 @@ defmodule ResidencySchedule.ScheduleBuilder.IntegrationTest do
       state = %{
         academic_year: 2031,
         residents: [%{residency_year: 1, position_code: "R1-1", schedule_number: 1, name: "R1-1"}],
-        slots: [%{slot_index: 0, start_date: ~D[2031-06-30], end_date: ~D[2031-07-04], is_weekend: false}],
+        slots: [
+          %{
+            slot_index: 0,
+            start_date: ~D[2031-06-30],
+            end_date: ~D[2031-07-04],
+            is_weekend: false
+          }
+        ],
         assignments: %{{0, 0} => :vacation},
         duty_warnings: [],
         coverage_warnings: []
       }
+
       resolved = ScheduleBuilder.resolve_violations(state)
       assert resolved.assignments == state.assignments
     end
@@ -119,11 +127,12 @@ defmodule ResidencySchedule.ScheduleBuilder.IntegrationTest do
           label = "Person-#{resident.residency_year}-#{resident.schedule_number}"
           ScheduleBuilder.rename_resident(acc, idx, label)
         end)
+
       {:ok, _} = ScheduleBuilder.save(state_with_names)
 
       # Generate 2030 — R2s should have names from 2029's R1s, etc.
       {:ok, state_2030} = ScheduleBuilder.generate(2030)
-      r2s = Enum.filter(state_2030.residents, & &1.residency_year == 2)
+      r2s = Enum.filter(state_2030.residents, &(&1.residency_year == 2))
       # Each R2 in 2030 should have name of matching R1 from 2029
       Enum.each(r2s, fn r ->
         expected = "Person-1-#{r.schedule_number}"
@@ -144,10 +153,11 @@ defmodule ResidencySchedule.ScheduleBuilder.IntegrationTest do
             acc
           end
         end)
+
       {:ok, _} = ScheduleBuilder.save(state_with_r4_names)
 
       {:ok, state_2030} = ScheduleBuilder.generate(2030)
-      r1s = Enum.filter(state_2030.residents, & &1.residency_year == 1)
+      r1s = Enum.filter(state_2030.residents, &(&1.residency_year == 1))
       # R1 names should be placeholder codes, not graduate names
       Enum.each(r1s, fn r ->
         refute String.starts_with?(r.name, "Graduate-")
@@ -156,7 +166,7 @@ defmodule ResidencySchedule.ScheduleBuilder.IntegrationTest do
 
     test "generate with no prior year returns placeholder names" do
       {:ok, state} = ScheduleBuilder.generate(2099)
-      r1 = Enum.find(state.residents, & &1.residency_year == 1 and &1.schedule_number == 1)
+      r1 = Enum.find(state.residents, &(&1.residency_year == 1 and &1.schedule_number == 1))
       assert r1.name == "R1-1"
     end
   end
@@ -169,6 +179,7 @@ defmodule ResidencySchedule.ScheduleBuilder.IntegrationTest do
 
     test "returns R1 names from prior year's R1 residents (year level 0 doesn't exist, so empty)" do
       {:ok, state_2029} = ScheduleBuilder.generate(2029)
+
       state_named =
         state_2029.residents
         |> Enum.with_index()
@@ -179,6 +190,7 @@ defmodule ResidencySchedule.ScheduleBuilder.IntegrationTest do
             acc
           end
         end)
+
       {:ok, _} = ScheduleBuilder.save(state_named)
 
       # R1 names for year 2030 come from R1s of 2029 (residency_year - 1 == 0, none)
@@ -189,6 +201,7 @@ defmodule ResidencySchedule.ScheduleBuilder.IntegrationTest do
 
     test "returns R2 names from prior year when prior schedule has R2 residents" do
       {:ok, state_2029} = ScheduleBuilder.generate(2029)
+
       state_named =
         state_2029.residents
         |> Enum.with_index()
@@ -199,6 +212,7 @@ defmodule ResidencySchedule.ScheduleBuilder.IntegrationTest do
             acc
           end
         end)
+
       {:ok, _} = ScheduleBuilder.save(state_named)
 
       # R3 names for 2030 come from R2s of 2029

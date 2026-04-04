@@ -85,7 +85,7 @@ defmodule ResidencySchedule.ScheduleBuilder.DutyHours do
         acc + slot_hours(rotation_type || :float, slot)
       end)
 
-    weekday_count = Enum.count(slots, & !&1.is_weekend)
+    weekday_count = Enum.count(slots, &(!&1.is_weekend))
 
     if weekday_count == 0, do: 0.0, else: total_hours / weekday_count
   end
@@ -112,7 +112,7 @@ defmodule ResidencySchedule.ScheduleBuilder.DutyHours do
       []
   """
   def violations(assignments, slots, residents) do
-    weekday_slots = Enum.filter(slots, & !&1.is_weekend)
+    weekday_slots = Enum.filter(slots, &(!&1.is_weekend))
 
     residents
     |> Enum.with_index()
@@ -131,7 +131,7 @@ defmodule ResidencySchedule.ScheduleBuilder.DutyHours do
       # Include the weekend slot immediately following each weekday in the window,
       # as those weekend shifts count toward hours for that week.
       weekday_indices = MapSet.new(Enum.map(window_weekday, & &1.slot_index))
-      weekday_adjacent_weekends = MapSet.new(Enum.map(window_weekday, & &1.slot_index + 1))
+      weekday_adjacent_weekends = MapSet.new(Enum.map(window_weekday, &(&1.slot_index + 1)))
 
       window_all =
         Enum.filter(all_slots, fn s ->

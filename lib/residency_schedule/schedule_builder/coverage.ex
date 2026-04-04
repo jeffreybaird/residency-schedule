@@ -105,8 +105,17 @@ defmodule ResidencySchedule.ScheduleBuilder.Coverage do
   """
   def coverage_warnings(assignments, slots, _residents) do
     float_slots = float_slot_indices(assignments)
-    weekday_slots = slots |> Enum.filter(& !&1.is_weekend) |> Enum.reject(&MapSet.member?(float_slots, &1.slot_index))
-    weekend_slots = slots |> Enum.filter(& &1.is_weekend) |> Enum.reject(&MapSet.member?(float_slots, &1.slot_index))
+
+    weekday_slots =
+      slots
+      |> Enum.filter(&(!&1.is_weekend))
+      |> Enum.reject(&MapSet.member?(float_slots, &1.slot_index))
+
+    weekend_slots =
+      slots
+      |> Enum.filter(& &1.is_weekend)
+      |> Enum.reject(&MapSet.member?(float_slots, &1.slot_index))
+
     check_slots(assignments, weekday_slots, @required_weekday) ++
       check_slots(assignments, weekend_slots, @required_weekend)
   end
@@ -131,7 +140,7 @@ defmodule ResidencySchedule.ScheduleBuilder.Coverage do
       :weekday_only
   """
   def placement_warnings(assignments, slots) do
-    slot_map = Map.new(slots, & {&1.slot_index, &1})
+    slot_map = Map.new(slots, &{&1.slot_index, &1})
 
     assignments
     |> Enum.flat_map(fn {{res_idx, slot_idx}, rotation_type} ->
@@ -140,7 +149,7 @@ defmodule ResidencySchedule.ScheduleBuilder.Coverage do
         slot -> check_placement(res_idx, slot_idx, rotation_type, slot)
       end
     end)
-    |> Enum.sort_by(& {&1.slot_index, &1.resident_index})
+    |> Enum.sort_by(&{&1.slot_index, &1.resident_index})
   end
 
   # --- Private ---
@@ -148,13 +157,34 @@ defmodule ResidencySchedule.ScheduleBuilder.Coverage do
   defp check_placement(res_idx, slot_idx, rotation_type, slot) do
     cond do
       float_slot?(slot) and rotation_type != :float ->
-        [%{resident_index: res_idx, slot_index: slot_idx, rotation_type: rotation_type, reason: :float_slot_only}]
+        [
+          %{
+            resident_index: res_idx,
+            slot_index: slot_idx,
+            rotation_type: rotation_type,
+            reason: :float_slot_only
+          }
+        ]
 
       not slot.is_weekend and not float_slot?(slot) and rotation_type in @weekend_only_rotations ->
-        [%{resident_index: res_idx, slot_index: slot_idx, rotation_type: rotation_type, reason: :weekend_only}]
+        [
+          %{
+            resident_index: res_idx,
+            slot_index: slot_idx,
+            rotation_type: rotation_type,
+            reason: :weekend_only
+          }
+        ]
 
       slot.is_weekend and rotation_type in @weekday_only_rotations ->
-        [%{resident_index: res_idx, slot_index: slot_idx, rotation_type: rotation_type, reason: :weekday_only}]
+        [
+          %{
+            resident_index: res_idx,
+            slot_index: slot_idx,
+            rotation_type: rotation_type,
+            reason: :weekday_only
+          }
+        ]
 
       true ->
         []
@@ -175,13 +205,16 @@ defmodule ResidencySchedule.ScheduleBuilder.Coverage do
     Enum.flat_map(slots, fn slot ->
       Enum.flat_map(requirements, fn {rotation_type, required_count} ->
         actual = count_for_slot(assignments, slot.slot_index, rotation_type)
+
         if actual < required_count do
-          [%{
-            slot_index: slot.slot_index,
-            rotation_type: rotation_type,
-            actual: actual,
-            required: required_count
-          }]
+          [
+            %{
+              slot_index: slot.slot_index,
+              rotation_type: rotation_type,
+              actual: actual,
+              required: required_count
+            }
+          ]
         else
           []
         end

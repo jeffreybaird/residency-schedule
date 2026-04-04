@@ -157,7 +157,8 @@ defmodule ResidencySchedule.Rotations do
   def list_co_service_days(schedule_resident_a_id, schedule_resident_b_id) do
     from(a in Rotation,
       join: b in Rotation,
-      on: b.schedule_resident_id == ^schedule_resident_b_id and b.rotation_type == a.rotation_type,
+      on:
+        b.schedule_resident_id == ^schedule_resident_b_id and b.rotation_type == a.rotation_type,
       where: a.schedule_resident_id == ^schedule_resident_a_id,
       where: a.rotation_type not in ["float", "post_call", "vacation", "ambulatory", "elective"],
       where: a.start_date <= b.end_date and a.end_date >= b.start_date,
@@ -193,7 +194,10 @@ defmodule ResidencySchedule.Rotations do
     alias ResidencySchedule.ShiftOverrides
 
     rotations = list_rotations_for_resident(schedule_resident_id)
-    overrides_as_original = ShiftOverrides.list_overrides_for_resident_as_original(schedule_resident_id)
+
+    overrides_as_original =
+      ShiftOverrides.list_overrides_for_resident_as_original(schedule_resident_id)
+
     overrides_as_cover = ShiftOverrides.list_overrides_for_resident_as_cover(schedule_resident_id)
 
     covered_blocks =
@@ -329,7 +333,9 @@ defmodule ResidencySchedule.Rotations do
         Date.compare(a.end_date, b.start_date) != :lt do
       overlap_start = Enum.max([a.start_date, b.start_date], Date)
       overlap_end = Enum.min([a.end_date, b.end_date], Date)
-      Date.range(overlap_start, overlap_end) |> Enum.map(&%{date: &1, rotation_type: a.rotation_type})
+
+      Date.range(overlap_start, overlap_end)
+      |> Enum.map(&%{date: &1, rotation_type: a.rotation_type})
     end
     |> List.flatten()
     |> Enum.sort_by(& &1.date, Date)

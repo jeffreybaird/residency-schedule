@@ -117,7 +117,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                   )
                 ]}
               >
-                <%= s.label %>
+                {s.label}
               </button>
             <% end %>
           </div>
@@ -144,7 +144,10 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                 ]}
               >
                 <svg
-                  class={["w-3 h-3 transition-transform", if(@stats_expanded, do: "rotate-90", else: "")]}
+                  class={[
+                    "w-3 h-3 transition-transform",
+                    if(@stats_expanded, do: "rotate-90", else: "")
+                  ]}
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -154,7 +157,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                     clip-rule="evenodd"
                   />
                 </svg>
-                <%= if @stats_expanded, do: "Collapse", else: "Expand" %>
+                {if @stats_expanded, do: "Collapse", else: "Expand"}
               </button>
             </div>
 
@@ -162,7 +165,9 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
               <%!-- Dropdowns --%>
               <div class="grid grid-cols-2 divide-x divide-gray-200 bg-gray-50">
                 <div class="px-4 py-3">
-                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Resident A</p>
+                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                    Resident A
+                  </p>
                   <form phx-change="select_resident_a">
                     <select
                       name="resident_id"
@@ -171,14 +176,16 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                       <option value="">Select a resident…</option>
                       <%= for r <- @residents do %>
                         <option value={r.id} selected={@resident_a_id == r.id}>
-                          <%= r.name %> (<%= r.position_code %>)
+                          {r.name} ({r.position_code})
                         </option>
                       <% end %>
                     </select>
                   </form>
                 </div>
                 <div class="px-4 py-3">
-                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Resident B</p>
+                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                    Resident B
+                  </p>
                   <form phx-change="select_resident_b">
                     <select
                       name="resident_id"
@@ -187,7 +194,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                       <option value="">Select a resident…</option>
                       <%= for r <- @residents do %>
                         <option value={r.id} selected={@resident_b_id == r.id}>
-                          <%= r.name %> (<%= r.position_code %>)
+                          {r.name} ({r.position_code})
                         </option>
                       <% end %>
                     </select>
@@ -202,13 +209,13 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                     <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                       Shared Shifts
                     </p>
-                    <p class="text-xl font-bold text-gray-800"><%= @total_days %></p>
+                    <p class="text-xl font-bold text-gray-800">{@total_days}</p>
                   </div>
                   <div class="px-4 py-3">
                     <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                       Shared Shifts Remaining
                     </p>
-                    <p class="text-xl font-bold text-gray-800"><%= @shared_shifts_remaining %></p>
+                    <p class="text-xl font-bold text-gray-800">{@shared_shifts_remaining}</p>
                   </div>
                 </div>
 
@@ -221,7 +228,10 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                     >
                       <span class="flex items-center gap-1.5">
                         <svg
-                          class={["w-2.5 h-2.5 text-gray-400 transition-transform", if(@summary_expanded, do: "rotate-90", else: "")]}
+                          class={[
+                            "w-2.5 h-2.5 text-gray-400 transition-transform",
+                            if(@summary_expanded, do: "rotate-90", else: "")
+                          ]}
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
@@ -240,7 +250,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                           else: "bg-gray-100 text-gray-500"
                         )
                       ]}>
-                        <%= if @summary_expanded, do: "Collapse", else: "Expand" %>
+                        {if @summary_expanded, do: "Collapse", else: "Expand"}
                       </span>
                     </button>
                     <%= if @summary_expanded do %>
@@ -249,17 +259,17 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                           <% color = Rotations.rotation_type_color(type) %>
                           <div class="flex items-center justify-between px-4 py-2">
                             <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
-                              <%= Rotations.rotation_type_label(type) %>
+                              {Rotations.rotation_type_label(type)}
                             </span>
                             <span class="text-sm font-semibold text-gray-700">
-                              <%= days %> day<%= if days != 1, do: "s" %>
+                              {days} day{if days != 1, do: "s"}
                             </span>
                           </div>
                         <% end %>
                         <div class="flex items-center justify-between px-4 py-2 bg-gray-50">
                           <span class="text-sm font-medium text-gray-600">Total</span>
                           <span class="text-sm font-bold text-gray-800">
-                            <%= @total_days %> days
+                            {@total_days} days
                           </span>
                         </div>
                       </div>
@@ -274,7 +284,11 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
         <%!-- Co-service date range table (like rotation-table on resident show) --%>
         <%= if @resident_a_id && @resident_b_id do %>
           <%= if @co_service_ranges != [] do %>
-            <div id="co-service-table" phx-hook="ScrollToToday" class="border-2 border-gray-300 rounded-xl overflow-auto overscroll-contain">
+            <div
+              id="co-service-table"
+              phx-hook="ScrollToToday"
+              class="border-2 border-gray-300 rounded-xl overflow-auto overscroll-contain"
+            >
               <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="sticky top-0 z-10 bg-gray-100">
                   <tr>
@@ -293,20 +307,21 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                         if(past, do: "opacity-40"),
                         if(past,
                           do: nil,
-                          else: "hover:bg-gray-100 hover:shadow-sm hover:relative hover:z-20 transition-colors"
+                          else:
+                            "hover:bg-gray-100 hover:shadow-sm hover:relative hover:z-20 transition-colors"
                         )
                       ]}
                     >
                       <td class="px-4 py-2 text-gray-700">
-                        <%= date_range_label(range.date_start, range.date_end) %>
+                        {date_range_label(range.date_start, range.date_end)}
                       </td>
                       <td class="px-4 py-2">
                         <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
-                          <%= Rotations.rotation_type_label(range.rotation_type) %>
+                          {Rotations.rotation_type_label(range.rotation_type)}
                         </span>
                       </td>
                       <td class="px-4 py-2 text-right text-gray-500">
-                        <%= Date.diff(range.date_end, range.date_start) + 1 %>
+                        {Date.diff(range.date_end, range.date_start) + 1}
                       </td>
                     </tr>
                   <% end %>

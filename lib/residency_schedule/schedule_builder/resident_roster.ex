@@ -176,12 +176,12 @@ defmodule ResidencySchedule.ScheduleBuilder.ResidentRoster do
       slot.is_weekend ->
         residency_year
         |> valid_rotations_for_year()
-        |> Enum.reject(& &1 in @weekday_only_rotations)
+        |> Enum.reject(&(&1 in @weekday_only_rotations))
 
       true ->
         residency_year
         |> valid_rotations_for_year()
-        |> Enum.reject(& &1 in @weekend_only_rotations)
+        |> Enum.reject(&(&1 in @weekend_only_rotations))
     end
   end
 

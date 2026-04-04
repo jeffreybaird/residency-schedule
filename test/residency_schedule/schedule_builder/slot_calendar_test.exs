@@ -7,7 +7,7 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
     test "returns exactly 100 slots (52 non-weekend + 48 weekend)" do
       slots = SlotCalendar.build_slots(2026)
       assert length(slots) == 100
-      assert Enum.count(slots, & !&1.is_weekend) == 52
+      assert Enum.count(slots, &(!&1.is_weekend)) == 52
       assert Enum.count(slots, & &1.is_weekend) == 48
     end
 
@@ -55,7 +55,7 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
 
       regular_weekday =
         slots
-        |> Enum.filter(& !&1.is_weekend)
+        |> Enum.filter(&(!&1.is_weekend))
         |> Enum.reject(fn s -> Date.diff(s.end_date, s.start_date) == 6 end)
 
       assert length(regular_weekday) == 48
@@ -73,7 +73,9 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
       assert length(weekends) == 48
 
       Enum.each(weekends, fn s ->
-        assert Date.day_of_week(s.start_date) == 6, "start_date #{s.start_date} should be Saturday"
+        assert Date.day_of_week(s.start_date) == 6,
+               "start_date #{s.start_date} should be Saturday"
+
         assert Date.day_of_week(s.end_date) == 7, "end_date #{s.end_date} should be Sunday"
         assert Date.diff(s.end_date, s.start_date) == 1
       end)
@@ -96,7 +98,7 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
 
       regular_weekday =
         slots
-        |> Enum.filter(& !&1.is_weekend)
+        |> Enum.filter(&(!&1.is_weekend))
         |> Enum.reject(fn s -> Date.diff(s.end_date, s.start_date) == 6 end)
 
       weekends = Enum.filter(slots, & &1.is_weekend)
@@ -106,7 +108,7 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
       Enum.zip(regular_weekday, weekends)
       |> Enum.each(fn {wd, we} ->
         assert Date.diff(we.start_date, wd.end_date) == 1,
-          "weekend #{we.start_date} should be day after weekday end #{wd.end_date}"
+               "weekend #{we.start_date} should be day after weekday end #{wd.end_date}"
       end)
     end
   end
@@ -119,7 +121,7 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
 
     test "returns exactly window_size weekday slots", %{slots: slots} do
       window = SlotCalendar.slots_for_window(slots, 0, 4)
-      weekday_count = Enum.count(window, & !&1.is_weekend)
+      weekday_count = Enum.count(window, &(!&1.is_weekend))
       assert weekday_count == 4
     end
 
@@ -137,9 +139,12 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
 
     test "clamps at the end boundary (last slots)" do
       slots = SlotCalendar.build_slots(2026)
-      last_wd_index = slots |> Enum.filter(& !&1.is_weekend) |> List.last() |> Map.fetch!(:slot_index)
+
+      last_wd_index =
+        slots |> Enum.filter(&(!&1.is_weekend)) |> List.last() |> Map.fetch!(:slot_index)
+
       window = SlotCalendar.slots_for_window(slots, last_wd_index, 4)
-      wd_count = Enum.count(window, & !&1.is_weekend)
+      wd_count = Enum.count(window, &(!&1.is_weekend))
       assert wd_count == 1
     end
 
@@ -150,7 +155,7 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
 
     test "default window_size is 4", %{slots: slots} do
       window = SlotCalendar.slots_for_window(slots, 0)
-      weekday_count = Enum.count(window, & !&1.is_weekend)
+      weekday_count = Enum.count(window, &(!&1.is_weekend))
       assert weekday_count == 4
     end
   end
@@ -161,12 +166,14 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
       {:ok, slots: slots, float_slots: SlotCalendar.float_slot_indices(2025, slots)}
     end
 
-    test "returns exactly 4 float slot indices (2 holiday + 2 end-of-year)", %{float_slots: float_slots} do
+    test "returns exactly 4 float slot indices (2 holiday + 2 end-of-year)", %{
+      float_slots: float_slots
+    } do
       assert MapSet.size(float_slots) == 4
     end
 
     test "all returned indices are non-weekend slots", %{slots: slots, float_slots: float_slots} do
-      non_weekend_indices = slots |> Enum.filter(& !&1.is_weekend) |> MapSet.new(& &1.slot_index)
+      non_weekend_indices = slots |> Enum.filter(&(!&1.is_weekend)) |> MapSet.new(& &1.slot_index)
       assert MapSet.subset?(float_slots, non_weekend_indices)
     end
 
@@ -175,7 +182,7 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
 
       Enum.each(float_slot_list, fn s ->
         assert Date.diff(s.end_date, s.start_date) == 6,
-          "FLOAT slot #{s.slot_index} (#{s.start_date}–#{s.end_date}) should span 7 days"
+               "FLOAT slot #{s.slot_index} (#{s.start_date}–#{s.end_date}) should span 7 days"
       end)
     end
 
@@ -199,10 +206,20 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
     test "holiday FLOAT week ends on Jan 4 (Sun) for 2025-2026" do
       slots = SlotCalendar.build_slots(2025)
       float_slots = SlotCalendar.float_slot_indices(2025, slots)
-      dec_22_slot = Enum.find(slots, fn s -> s.slot_index in float_slots and s.start_date == ~D[2025-12-22] end)
+
+      dec_22_slot =
+        Enum.find(slots, fn s ->
+          s.slot_index in float_slots and s.start_date == ~D[2025-12-22]
+        end)
+
       assert dec_22_slot != nil
       assert dec_22_slot.end_date == ~D[2025-12-28]
-      dec_29_slot = Enum.find(slots, fn s -> s.slot_index in float_slots and s.start_date == ~D[2025-12-29] end)
+
+      dec_29_slot =
+        Enum.find(slots, fn s ->
+          s.slot_index in float_slots and s.start_date == ~D[2025-12-29]
+        end)
+
       assert dec_29_slot != nil
       assert dec_29_slot.end_date == ~D[2026-01-04]
     end
@@ -211,7 +228,10 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
       # 2026-2027 term starts June 29, so end-of-year FLOAT starts June 15
       slots = SlotCalendar.build_slots(2025)
       float_slots = SlotCalendar.float_slot_indices(2025, slots)
-      june_15_slot = Enum.find(slots, fn s -> !s.is_weekend and s.start_date == ~D[2026-06-15] end)
+
+      june_15_slot =
+        Enum.find(slots, fn s -> !s.is_weekend and s.start_date == ~D[2026-06-15] end)
+
       assert june_15_slot != nil
       assert june_15_slot.slot_index in float_slots
     end
@@ -220,7 +240,9 @@ defmodule ResidencySchedule.ScheduleBuilder.SlotCalendarTest do
       slots_2026 = SlotCalendar.build_slots(2026)
       float_2026 = SlotCalendar.float_slot_indices(2026, slots_2026)
       # 2026-2027 holiday FLOAT: first Monday of Jan 2027 is Jan 4; 14 days before = Dec 21
-      dec_21_slot = Enum.find(slots_2026, fn s -> !s.is_weekend and s.start_date == ~D[2026-12-21] end)
+      dec_21_slot =
+        Enum.find(slots_2026, fn s -> !s.is_weekend and s.start_date == ~D[2026-12-21] end)
+
       assert dec_21_slot != nil
       assert dec_21_slot.slot_index in float_2026
     end

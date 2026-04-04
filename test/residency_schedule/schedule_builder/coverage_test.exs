@@ -30,6 +30,7 @@ defmodule ResidencySchedule.ScheduleBuilder.CoverageTest do
         {3, 0} => :strong_obstetrics,
         {0, 2} => :strong_obstetrics
       }
+
       assert Coverage.count_for_slot(assignments, 0, :strong_obstetrics) == 3
       assert Coverage.count_for_slot(assignments, 0, :oncology) == 1
       assert Coverage.count_for_slot(assignments, 2, :strong_obstetrics) == 1
@@ -68,9 +69,10 @@ defmodule ResidencySchedule.ScheduleBuilder.CoverageTest do
     end
 
     test "returns warning when OB is undercovered in a weekday slot" do
-      assignments = %{{0, 0} => :strong_obstetrics}  # only 1 of needed 4
+      # only 1 of needed 4
+      assignments = %{{0, 0} => :strong_obstetrics}
       warnings = Coverage.coverage_warnings(assignments, [@weekday_slot], @residents)
-      ob_warning = Enum.find(warnings, & &1.rotation_type == :strong_obstetrics)
+      ob_warning = Enum.find(warnings, &(&1.rotation_type == :strong_obstetrics))
       assert ob_warning != nil
       assert ob_warning.actual == 1
       assert ob_warning.required == 4
@@ -81,19 +83,28 @@ defmodule ResidencySchedule.ScheduleBuilder.CoverageTest do
       # No HHOB assigned at all
       assignments = %{}
       warnings = Coverage.coverage_warnings(assignments, [@weekday_slot], @residents)
-      hhob_warning = Enum.find(warnings, & &1.rotation_type == :highland_obstetrics)
+      hhob_warning = Enum.find(warnings, &(&1.rotation_type == :highland_obstetrics))
       assert hhob_warning != nil
       assert hhob_warning.actual == 0
       assert hhob_warning.required == 1
     end
 
     test "does not check weekday constraints on weekend slots" do
-      assignments = %{}  # empty
+      # empty
+      assignments = %{}
       # Weekend slot only — should not have OB/ONC/GYN/AMB/NF warnings (those are weekday)
       warnings = Coverage.coverage_warnings(assignments, [@weekend_slot], @residents)
-      weekday_types = [:strong_obstetrics, :oncology, :strong_gynecology, :ambulatory, :night_float]
+
+      weekday_types = [
+        :strong_obstetrics,
+        :oncology,
+        :strong_gynecology,
+        :ambulatory,
+        :night_float
+      ]
+
       Enum.each(weekday_types, fn type ->
-        refute Enum.any?(warnings, & &1.rotation_type == type)
+        refute Enum.any?(warnings, &(&1.rotation_type == type))
       end)
     end
 
@@ -101,8 +112,9 @@ defmodule ResidencySchedule.ScheduleBuilder.CoverageTest do
       assignments = %{}
       warnings = Coverage.coverage_warnings(assignments, [@weekday_slot], @residents)
       weekend_types = [:strong_weekend_days, :strong_weekend_nights]
+
       Enum.each(weekend_types, fn type ->
-        refute Enum.any?(warnings, & &1.rotation_type == type)
+        refute Enum.any?(warnings, &(&1.rotation_type == type))
       end)
     end
 
@@ -122,11 +134,12 @@ defmodule ResidencySchedule.ScheduleBuilder.CoverageTest do
         %{slot_index: 0, is_weekend: false},
         %{slot_index: 2, is_weekend: false}
       ]
+
       assignments = %{}
       warnings = Coverage.coverage_warnings(assignments, slots, @residents)
       # Both slots should have warnings for all 6 weekday constraints
-      slot_0_warnings = Enum.filter(warnings, & &1.slot_index == 0)
-      slot_2_warnings = Enum.filter(warnings, & &1.slot_index == 2)
+      slot_0_warnings = Enum.filter(warnings, &(&1.slot_index == 0))
+      slot_2_warnings = Enum.filter(warnings, &(&1.slot_index == 2))
       assert length(slot_0_warnings) == 6
       assert length(slot_2_warnings) == 6
     end
@@ -158,6 +171,7 @@ defmodule ResidencySchedule.ScheduleBuilder.CoverageTest do
         {1, 1} => :strong_weekend_days,
         {2, 50} => :float
       }
+
       slots = [@weekday_slot_with_dates, @weekend_slot_with_dates, @float_slot]
       assert Coverage.placement_warnings(assignments, slots) == []
     end
@@ -202,22 +216,32 @@ defmodule ResidencySchedule.ScheduleBuilder.CoverageTest do
     end
 
     test "warns for all four weekend-only rotations on weekday slots" do
-      weekend_rotations = [:strong_weekend_days, :strong_weekend_nights, :highland_weekend_days, :highland_weekend_nights]
-      assignments = weekend_rotations |> Enum.with_index() |> Map.new(fn {r, i} -> {{i, 0}, r} end)
+      weekend_rotations = [
+        :strong_weekend_days,
+        :strong_weekend_nights,
+        :highland_weekend_days,
+        :highland_weekend_nights
+      ]
+
+      assignments =
+        weekend_rotations |> Enum.with_index() |> Map.new(fn {r, i} -> {{i, 0}, r} end)
+
       warnings = Coverage.placement_warnings(assignments, [@weekday_slot_with_dates])
       assert length(warnings) == 4
-      assert Enum.all?(warnings, & &1.reason == :weekend_only)
+      assert Enum.all?(warnings, &(&1.reason == :weekend_only))
     end
 
     test "returns warnings sorted by slot_index then resident_index" do
       slots = [@weekday_slot_with_dates, @weekend_slot_with_dates]
+
       assignments = %{
         {2, 0} => :strong_weekend_days,
         {0, 0} => :strong_weekend_days,
         {1, 1} => :strong_obstetrics
       }
+
       warnings = Coverage.placement_warnings(assignments, slots)
-      indices = Enum.map(warnings, & {&1.slot_index, &1.resident_index})
+      indices = Enum.map(warnings, &{&1.slot_index, &1.resident_index})
       assert indices == Enum.sort(indices)
     end
   end
