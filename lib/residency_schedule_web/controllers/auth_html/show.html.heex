@@ -38,10 +38,9 @@
             Continue
           </button>
         </form>
-
       <% :choose_method -> %>
         <p class="text-sm text-gray-500 text-center mb-4">
-          Signing in as <span class="font-medium text-gray-700"><%= @email %></span>
+          Signing in as <span class="font-medium text-gray-700">{@email}</span>
         </p>
 
         <div class="space-y-3">
@@ -94,19 +93,16 @@
             ← Use a different email
           </a>
         </div>
-
       <% :check_email -> %>
         <div class="text-center space-y-3">
           <div class="text-4xl">✉️</div>
           <p class="text-sm text-gray-700">
-            We sent a login link to
-            <span class="font-medium"><%= @email %></span>
+            We sent a login link to <span class="font-medium">{@email}</span>
           </p>
           <p class="text-xs text-gray-400">
             Check your inbox and click the link to sign in. It expires in 15 minutes.
           </p>
         </div>
-
       <% :set_password -> %>
         <p class="text-sm text-gray-500 text-center mb-4">
           You're in! Optionally set a password for faster logins next time.
@@ -145,7 +141,6 @@
             Skip for now →
           </button>
         </form>
-
       <% :pending_approval -> %>
         <div class="text-center space-y-3">
           <div class="text-4xl">⏳</div>

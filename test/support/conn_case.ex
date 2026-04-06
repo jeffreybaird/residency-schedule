@@ -43,7 +43,9 @@ defmodule ResidencyScheduleWeb.ConnCase do
   """
   def authenticate_session(%{conn: conn}) do
     {:ok, user} =
-      ResidencySchedule.Accounts.create_user(%{email: "test-#{System.unique_integer()}@urmc.rochester.edu"})
+      ResidencySchedule.Accounts.create_user(%{
+        email: "test-#{System.unique_integer()}@urmc.rochester.edu"
+      })
 
     conn = Plug.Test.init_test_session(conn, user_id: user.id, authenticated: true)
     %{conn: conn, user: user}
@@ -55,7 +57,9 @@ defmodule ResidencyScheduleWeb.ConnCase do
   """
   def admin_authenticate_session(%{conn: conn}) do
     {:ok, user} =
-      ResidencySchedule.Accounts.create_user(%{email: "admin-#{System.unique_integer()}@urmc.rochester.edu"})
+      ResidencySchedule.Accounts.create_user(%{
+        email: "admin-#{System.unique_integer()}@urmc.rochester.edu"
+      })
 
     conn = Plug.Test.init_test_session(conn, user_id: user.id, admin: true, authenticated: true)
     %{conn: conn, user: user}

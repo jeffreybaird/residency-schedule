@@ -216,10 +216,11 @@ defmodule ResidencyScheduleWeb.AuthController do
   # ── Private helpers ────────────────────────────────────────────────────────
 
   defp log_in_user(conn, user) do
-    conn = conn
-    |> configure_session(renew: true)
-    |> put_session(:user_id, user.id)
-    |> put_session(:authenticated, true)
+    conn =
+      conn
+      |> configure_session(renew: true)
+      |> put_session(:user_id, user.id)
+      |> put_session(:authenticated, true)
 
     if user.approved do
       home_path = if user.home_resident_id, do: "/residents/#{user.home_resident_id}", else: "/"
