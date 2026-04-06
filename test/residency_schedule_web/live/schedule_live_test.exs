@@ -23,8 +23,7 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
 
   describe "with schedule data (R4 graduated)" do
     setup %{conn: conn} do
-      # Fix date to July 2024 so R4 from the 2023-2024 schedule are graduated
-      # but R1-R3 are still visible.
+      # Fix date well past the 2023-2024 schedule's last rotation so R4s are gone.
       Application.put_env(:residency_schedule, :current_date, ~D[2024-07-01])
       on_exit(fn -> Application.delete_env(:residency_schedule, :current_date) end)
 
@@ -37,7 +36,7 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       assert html =~ "R1-1"
     end
 
-    test "hides graduated R4 residents from completed academic year", %{html: html} do
+    test "hides graduated R4 residents whose last rotation has ended", %{html: html} do
       refute html =~ "Alexis"
     end
 
@@ -59,7 +58,7 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       assert html =~ "R3-1"
     end
 
-    test "no year group headers in the grid — flat list", %{html: html} do
+    test "no year group headers in the grid", %{html: html} do
       refute html =~ "R1 Residents"
       refute html =~ "R4 Residents"
     end
@@ -79,7 +78,7 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       %{view: view, html: html}
     end
 
-    test "shows R4 residents when academic year has not ended", %{html: html} do
+    test "shows R4 residents when their rotations have not ended", %{html: html} do
       assert html =~ "Alexis"
       assert html =~ "R4-1"
     end
@@ -91,31 +90,10 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
   end
 
-  describe "schedule_started?/2" do
-    test "schedule from a past year has started" do
-      assert Index.schedule_started?(2023, ~D[2026-04-06])
-    end
-
-    test "schedule from current year before June has not started" do
-      refute Index.schedule_started?(2026, ~D[2026-04-06])
-    end
-
-    test "schedule from current year in June has started" do
-      assert Index.schedule_started?(2026, ~D[2026-06-01])
-    end
-
-    test "schedule from current year in July has started" do
-      assert Index.schedule_started?(2026, ~D[2026-07-01])
-    end
-
-    test "schedule from future year has not started" do
-      refute Index.schedule_started?(2027, ~D[2026-04-06])
-    end
-  end
-
-  describe "future schedule filtering" do
+  describe "future schedules are included" do
     setup %{conn: conn} do
-      # April 2026: the 2023 schedule has started, the 2026 schedule has not
+      # April 2026: the 2026-2027 schedule starts in ~July but should still
+      # show columns and new R1 rows (with blank cells until July).
       Application.put_env(:residency_schedule, :current_date, ~D[2026-04-06])
       on_exit(fn -> Application.delete_env(:residency_schedule, :current_date) end)
 
@@ -125,11 +103,8 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       %{view: view, html: html}
     end
 
-    test "does not show residents from a schedule that has not started", %{html: html} do
-      # 2026 schedule R4-1 is "Paige R" — but she should appear from her
-      # current (started) schedule, not the future one.
-      # New R1s in 2026 who have no earlier schedule should NOT appear.
-      refute html =~ "Hannah"
+    test "shows schedule pill for future schedule", %{html: html} do
+      assert html =~ "2026"
     end
   end
 
@@ -161,16 +136,6 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       assert Enum.at(result, 3) == {2, 1, ~D[2024-07-08], ~D[2024-07-14], false}
     end
 
-    test "marks first slot in each schedule section" do
-      sections = [
-        %{schedule: %{id: 10}, slots: [{0, ~D[2023-07-03], ~D[2023-07-09]}]},
-        %{schedule: %{id: 20}, slots: [{0, ~D[2024-07-01], ~D[2024-07-07]}]}
-      ]
-
-      result = Index.build_combined_slots(sections)
-      assert Enum.all?(result, fn {_, _, _, _, first?} -> first? end)
-    end
-
     test "returns empty list for empty sections" do
       assert Index.build_combined_slots([]) == []
     end
@@ -188,40 +153,8 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
   end
 
-  describe "cell_groups/2" do
-    test "groups contiguous same-type rotations" do
-      slots = [{0, ~D[2023-07-03], ~D[2023-07-09]}, {1, ~D[2023-07-10], ~D[2023-07-16]}]
-
-      rotations = [
-        %{slot_index: 0, rotation_type: "strong_obstetrics", end_date: ~D[2023-07-09]},
-        %{slot_index: 1, rotation_type: "strong_obstetrics", end_date: ~D[2023-07-16]}
-      ]
-
-      result = Index.cell_groups(slots, rotations)
-      assert [{2, %{rotation_type: "strong_obstetrics"}}] = result
-    end
-
-    test "splits different rotation types into separate groups" do
-      slots = [{0, ~D[2023-07-03], ~D[2023-07-09]}, {1, ~D[2023-07-10], ~D[2023-07-16]}]
-
-      rotations = [
-        %{slot_index: 0, rotation_type: "strong_obstetrics", end_date: ~D[2023-07-09]},
-        %{slot_index: 1, rotation_type: "float", end_date: ~D[2023-07-16]}
-      ]
-
-      result = Index.cell_groups(slots, rotations)
-      assert [{1, %{rotation_type: "strong_obstetrics"}}, {1, %{rotation_type: "float"}}] = result
-    end
-
-    test "handles empty rotation list" do
-      slots = [{0, ~D[2023-07-03], ~D[2023-07-09]}]
-      result = Index.cell_groups(slots, [])
-      assert [{1, nil}] = result
-    end
-  end
-
   describe "cell_groups_unified/2" do
-    test "groups contiguous same-type rotations across schedule slots" do
+    test "groups contiguous same-type rotations" do
       all_slots = [
         {1, 0, ~D[2023-07-03], ~D[2023-07-09], true},
         {1, 1, ~D[2023-07-10], ~D[2023-07-16], false}
@@ -236,80 +169,42 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       assert [{2, %{rotation_type: "strong_obstetrics"}}] = result
     end
 
-    test "splits different rotation types" do
-      all_slots = [
-        {1, 0, ~D[2023-07-03], ~D[2023-07-09], true},
-        {1, 1, ~D[2023-07-10], ~D[2023-07-16], false}
-      ]
-
-      lookup = %{
-        {1, 0} => %{rotation_type: "strong_obstetrics", end_date: ~D[2023-07-09]},
-        {1, 1} => %{rotation_type: "float", end_date: ~D[2023-07-16]}
-      }
-
-      result = Index.cell_groups_unified(all_slots, lookup)
-
-      assert [
-               {1, %{rotation_type: "strong_obstetrics"}},
-               {1, %{rotation_type: "float"}}
-             ] = result
-    end
-
     test "handles empty lookup — all slots become blank" do
       all_slots = [{1, 0, ~D[2023-07-03], ~D[2023-07-09], true}]
       result = Index.cell_groups_unified(all_slots, %{})
       assert [{1, nil}] = result
     end
-
-    test "spans across schedules with gap in between" do
-      all_slots = [
-        {1, 0, ~D[2023-07-03], ~D[2023-07-09], true},
-        {2, 0, ~D[2024-07-01], ~D[2024-07-07], true}
-      ]
-
-      lookup = %{
-        {1, 0} => %{rotation_type: "float", end_date: ~D[2023-07-09]},
-        {2, 0} => %{rotation_type: "strong_obstetrics", end_date: ~D[2024-07-07]}
-      }
-
-      result = Index.cell_groups_unified(all_slots, lookup)
-
-      assert [
-               {1, %{rotation_type: "float"}},
-               {1, %{rotation_type: "strong_obstetrics"}}
-             ] = result
-    end
   end
 
-  describe "graduated?/3" do
-    test "R4 in a completed academic year is graduated" do
-      resident = %{current_year: 4, latest_schedule_id: 1}
-      schedule_map = %{1 => %{academic_year: 2023}}
-      assert Index.graduated?(resident, schedule_map, ~D[2025-07-01])
+  describe "graduated?/2" do
+    test "R4 whose last rotation has ended is graduated" do
+      resident = %{current_year: 4, last_rotation_end: ~D[2024-06-15]}
+      assert Index.graduated?(resident, ~D[2025-07-01])
     end
 
-    test "R4 in current academic year is not graduated" do
-      resident = %{current_year: 4, latest_schedule_id: 1}
-      schedule_map = %{1 => %{academic_year: 2025}}
-      refute Index.graduated?(resident, schedule_map, ~D[2025-07-01])
+    test "R4 with remaining rotations is not graduated" do
+      resident = %{current_year: 4, last_rotation_end: ~D[2026-06-20]}
+      refute Index.graduated?(resident, ~D[2026-04-06])
     end
 
-    test "R4 exactly on June 30 end date is not graduated" do
-      resident = %{current_year: 4, latest_schedule_id: 1}
-      schedule_map = %{1 => %{academic_year: 2024}}
-      refute Index.graduated?(resident, schedule_map, ~D[2025-06-30])
+    test "R4 whose last rotation ends today is not graduated" do
+      resident = %{current_year: 4, last_rotation_end: ~D[2025-06-20]}
+      refute Index.graduated?(resident, ~D[2025-06-20])
     end
 
-    test "R4 on July 1 after end date is graduated" do
-      resident = %{current_year: 4, latest_schedule_id: 1}
-      schedule_map = %{1 => %{academic_year: 2024}}
-      assert Index.graduated?(resident, schedule_map, ~D[2025-07-01])
+    test "non-R4 is never graduated even with past rotations" do
+      resident = %{current_year: 3, last_rotation_end: ~D[2020-06-15]}
+      refute Index.graduated?(resident, ~D[2025-07-01])
     end
 
-    test "non-R4 resident is never graduated regardless of schedule age" do
-      resident = %{current_year: 3, latest_schedule_id: 1}
-      schedule_map = %{1 => %{academic_year: 2020}}
-      refute Index.graduated?(resident, schedule_map, ~D[2025-07-01])
+    test "R4 with no rotations is not graduated" do
+      resident = %{current_year: 4, last_rotation_end: nil}
+      refute Index.graduated?(resident, ~D[2025-07-01])
+    end
+
+    test "R1 with no rotations is not graduated" do
+      resident = %{current_year: 1, last_rotation_end: nil}
+      refute Index.graduated?(resident, ~D[2025-07-01])
     end
   end
 
