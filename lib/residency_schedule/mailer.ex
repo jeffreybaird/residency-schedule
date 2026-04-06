@@ -3,7 +3,7 @@ defmodule ResidencySchedule.Mailer do
 
   import Swoosh.Email
 
-  @from_address "schedule@urmc.rochester.edu"
+  @from_address "send@lennonbaird.com"
 
   @doc """
   Sends a magic link email to the given user.
@@ -39,7 +39,15 @@ defmodule ResidencySchedule.Mailer do
       </p>
       """)
 
-    deliver(email)
+    case deliver(email) do
+      {:ok, _metadata} = success ->
+        success
+
+      {:error, reason} = error ->
+        require Logger
+        Logger.error("Mailer.send_magic_link failed: #{inspect(reason)}")
+        error
+    end
   end
 
   defp from_name do

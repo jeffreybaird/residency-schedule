@@ -105,9 +105,15 @@ defmodule ResidencySchedule.Accounts do
     user = get_user_by_email(email)
 
     cond do
-      user && User.valid_password?(user, password) -> {:ok, user}
-      user -> {:error, :invalid_credentials}
-      true -> Bcrypt.no_user_verify(); {:error, :invalid_credentials}
+      user && User.valid_password?(user, password) ->
+        {:ok, user}
+
+      user ->
+        {:error, :invalid_credentials}
+
+      true ->
+        Bcrypt.no_user_verify()
+        {:error, :invalid_credentials}
     end
   end
 

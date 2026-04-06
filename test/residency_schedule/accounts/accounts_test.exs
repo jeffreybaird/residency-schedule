@@ -67,16 +67,21 @@ defmodule ResidencySchedule.AccountsTest do
 
     test "rejects wrong password", %{user: user} do
       Accounts.set_password(user, "mysecretpass")
-      assert {:error, :invalid_credentials} = Accounts.authenticate_by_password("pw@urmc.rochester.edu", "wrong")
+
+      assert {:error, :invalid_credentials} =
+               Accounts.authenticate_by_password("pw@urmc.rochester.edu", "wrong")
     end
 
     test "rejects when no password set", %{user: user} do
       assert Accounts.has_password?(user) == false
-      assert {:error, :invalid_credentials} = Accounts.authenticate_by_password("pw@urmc.rochester.edu", "anything")
+
+      assert {:error, :invalid_credentials} =
+               Accounts.authenticate_by_password("pw@urmc.rochester.edu", "anything")
     end
 
     test "rejects unknown email" do
-      assert {:error, :invalid_credentials} = Accounts.authenticate_by_password("unknown@test.com", "pass")
+      assert {:error, :invalid_credentials} =
+               Accounts.authenticate_by_password("unknown@test.com", "pass")
     end
   end
 
