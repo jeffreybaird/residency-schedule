@@ -201,12 +201,20 @@ defmodule ResidencySchedule.Importer.CsvParserTest do
 
   describe "adjust_highland_dates/3" do
     test "highland_night_float shifts start_date back one day (Sunday night start)" do
-      assert CsvParser.adjust_highland_dates(:highland_night_float, ~D[2025-07-07], ~D[2025-07-11]) ==
+      assert CsvParser.adjust_highland_dates(
+               :highland_night_float,
+               ~D[2025-07-07],
+               ~D[2025-07-11]
+             ) ==
                {~D[2025-07-06], ~D[2025-07-11]}
     end
 
     test "highland_weekend_nights sets end_date equal to start_date (Saturday only)" do
-      assert CsvParser.adjust_highland_dates(:highland_weekend_nights, ~D[2025-07-05], ~D[2025-07-06]) ==
+      assert CsvParser.adjust_highland_dates(
+               :highland_weekend_nights,
+               ~D[2025-07-05],
+               ~D[2025-07-06]
+             ) ==
                {~D[2025-07-05], ~D[2025-07-05]}
     end
 
@@ -226,7 +234,11 @@ defmodule ResidencySchedule.Importer.CsvParserTest do
     end
 
     test "highland_weekend_days dates are unchanged" do
-      assert CsvParser.adjust_highland_dates(:highland_weekend_days, ~D[2025-07-05], ~D[2025-07-06]) ==
+      assert CsvParser.adjust_highland_dates(
+               :highland_weekend_days,
+               ~D[2025-07-05],
+               ~D[2025-07-06]
+             ) ==
                {~D[2025-07-05], ~D[2025-07-06]}
     end
   end

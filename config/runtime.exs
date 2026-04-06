@@ -7,6 +7,15 @@ end
 config :residency_schedule, ResidencyScheduleWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+# Allow Resend in dev when RESEND_API_KEY is set
+if config_env() == :dev and System.get_env("RESEND_API_KEY") do
+  config :residency_schedule, ResidencySchedule.Mailer,
+    adapter: Swoosh.Adapters.Resend,
+    api_key: System.get_env("RESEND_API_KEY")
+
+  config :swoosh, :api_client, Swoosh.ApiClient.Req
+end
+
 if config_env() == :prod do
   database_url = System.fetch_env!("DATABASE_URL")
 
@@ -26,4 +35,13 @@ if config_env() == :prod do
   config :residency_schedule,
     access_password: System.fetch_env!("ACCESS_PASSWORD"),
     delete_password: System.get_env("DELETE_PASSWORD", "admin")
+
+  # Resend for transactional email (magic links)
+  resend_api_key = System.fetch_env!("RESEND_API_KEY")
+
+  config :residency_schedule, ResidencySchedule.Mailer,
+    adapter: Swoosh.Adapters.Resend,
+    api_key: resend_api_key
+
+  config :swoosh, :api_client, Swoosh.ApiClient.Req
 end

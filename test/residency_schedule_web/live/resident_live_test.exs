@@ -37,12 +37,10 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       assert html =~ "Set as Home"
     end
 
-    test "shows Home badge when resident is home resident", %{conn: conn} do
+    test "shows Home badge when resident is home resident", %{conn: conn, user: user} do
       resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
 
-      conn =
-        conn
-        |> Plug.Test.init_test_session(authenticated: true, resident_id: resident.id)
+      ResidencySchedule.Accounts.set_home_resident(user, resident.id)
 
       {:ok, _view, html} = live(conn, "/residents/#{resident.id}")
       assert html =~ "✓ Home"
@@ -111,8 +109,11 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
         |> Rotations.effective_segments_for_resident()
         |> Enum.find(fn s -> s.rotation_type == "oncology" end)
         |> case do
-          nil -> flunk("expected an oncology segment in fixture")
-          seg -> "rotation-entry-oncology-#{seg.slot_index}-#{Date.to_iso8601(seg.start_date)}-#{Date.to_iso8601(seg.end_date)}"
+          nil ->
+            flunk("expected an oncology segment in fixture")
+
+          seg ->
+            "rotation-entry-oncology-#{seg.slot_index}-#{Date.to_iso8601(seg.start_date)}-#{Date.to_iso8601(seg.end_date)}"
         end
 
       assert has_element?(view, "##{row_id}")
