@@ -24,7 +24,7 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
   describe "with schedule data (R4 graduated)" do
     setup %{conn: conn} do
       # Fix date to July 2024 so R4 from the 2023-2024 schedule are graduated
-      # but R1-R3 are still visible. This makes the test deterministic.
+      # but R1-R3 are still visible.
       Application.put_env(:residency_schedule, :current_date, ~D[2024-07-01])
       on_exit(fn -> Application.delete_env(:residency_schedule, :current_date) end)
 
@@ -33,13 +33,11 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       %{view: view, html: html}
     end
 
-    test "renders non-graduated residents in the Gantt grid", %{html: html} do
-      # R1 residents from 2023-2024 are not graduated — still shown
+    test "renders non-graduated residents in the grid", %{html: html} do
       assert html =~ "R1-1"
     end
 
     test "hides graduated R4 residents from completed academic year", %{html: html} do
-      # R4 from 2023-2024 graduated (June 30, 2024 is past) — hidden
       refute html =~ "Alexis"
     end
 
@@ -61,8 +59,9 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       assert html =~ "R3-1"
     end
 
-    test "year group headers show R-year labels", %{html: html} do
-      assert html =~ "R1 Residents"
+    test "no year group headers in the grid — flat list", %{html: html} do
+      refute html =~ "R1 Residents"
+      refute html =~ "R4 Residents"
     end
 
     test "pill buttons use scroll_to_schedule event", %{html: html} do
@@ -72,7 +71,6 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
 
   describe "with schedule data (R4 not yet graduated)" do
     setup %{conn: conn} do
-      # Fix date to mid-year so R4 residents are still active
       Application.put_env(:residency_schedule, :current_date, ~D[2024-01-15])
       on_exit(fn -> Application.delete_env(:residency_schedule, :current_date) end)
 
@@ -90,6 +88,48 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       html = view |> element("button[phx-value-year='4']") |> render_click()
       assert html =~ "R4-1"
       refute html =~ "R1-1"
+    end
+  end
+
+  describe "schedule_started?/2" do
+    test "schedule from a past year has started" do
+      assert Index.schedule_started?(2023, ~D[2026-04-06])
+    end
+
+    test "schedule from current year before June has not started" do
+      refute Index.schedule_started?(2026, ~D[2026-04-06])
+    end
+
+    test "schedule from current year in June has started" do
+      assert Index.schedule_started?(2026, ~D[2026-06-01])
+    end
+
+    test "schedule from current year in July has started" do
+      assert Index.schedule_started?(2026, ~D[2026-07-01])
+    end
+
+    test "schedule from future year has not started" do
+      refute Index.schedule_started?(2027, ~D[2026-04-06])
+    end
+  end
+
+  describe "future schedule filtering" do
+    setup %{conn: conn} do
+      # April 2026: the 2023 schedule has started, the 2026 schedule has not
+      Application.put_env(:residency_schedule, :current_date, ~D[2026-04-06])
+      on_exit(fn -> Application.delete_env(:residency_schedule, :current_date) end)
+
+      seed_schedule()
+      seed_schedule(2026)
+      {:ok, view, html} = live(conn, "/")
+      %{view: view, html: html}
+    end
+
+    test "does not show residents from a schedule that has not started", %{html: html} do
+      # 2026 schedule R4-1 is "Paige R" — but she should appear from her
+      # current (started) schedule, not the future one.
+      # New R1s in 2026 who have no earlier schedule should NOT appear.
+      refute html =~ "Hannah"
     end
   end
 
@@ -257,7 +297,6 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     test "R4 exactly on June 30 end date is not graduated" do
       resident = %{current_year: 4, latest_schedule_id: 1}
       schedule_map = %{1 => %{academic_year: 2024}}
-      # June 30, 2025 is the end date — on that date, not yet past
       refute Index.graduated?(resident, schedule_map, ~D[2025-06-30])
     end
 
@@ -269,12 +308,6 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
 
     test "non-R4 resident is never graduated regardless of schedule age" do
       resident = %{current_year: 3, latest_schedule_id: 1}
-      schedule_map = %{1 => %{academic_year: 2020}}
-      refute Index.graduated?(resident, schedule_map, ~D[2025-07-01])
-    end
-
-    test "R1 in old schedule is not graduated" do
-      resident = %{current_year: 1, latest_schedule_id: 1}
       schedule_map = %{1 => %{academic_year: 2020}}
       refute Index.graduated?(resident, schedule_map, ~D[2025-07-01])
     end
