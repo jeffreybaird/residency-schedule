@@ -495,7 +495,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                     <% label = entry_label(entry.rotation_type) %>
                     <tr
                       id={
-                      "rotation-entry-#{entry.rotation_type}-#{entry.slot_index}-#{Date.to_iso8601(entry.start_date)}"
+                      "rotation-entry-#{entry.rotation_type}-#{entry.slot_index}-#{Date.to_iso8601(entry.start_date)}-#{Date.to_iso8601(entry.end_date)}"
                     }
                       data-rotation-type={entry.rotation_type}
                       data-today-anchor={if entry.slot_index == @today_anchor_slot_index, do: "true"}
