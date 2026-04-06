@@ -112,7 +112,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
         |> Enum.find(fn s -> s.rotation_type == "oncology" end)
         |> case do
           nil -> flunk("expected an oncology segment in fixture")
-          seg -> "rotation-entry-oncology-#{seg.slot_index}-#{Date.to_iso8601(seg.start_date)}"
+          seg -> "rotation-entry-oncology-#{seg.slot_index}-#{Date.to_iso8601(seg.start_date)}-#{Date.to_iso8601(seg.end_date)}"
         end
 
       assert has_element?(view, "##{row_id}")
