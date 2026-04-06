@@ -26,4 +26,13 @@ if config_env() == :prod do
   config :residency_schedule,
     access_password: System.fetch_env!("ACCESS_PASSWORD"),
     delete_password: System.get_env("DELETE_PASSWORD", "admin")
+
+  # Resend for transactional email (magic links)
+  resend_api_key = System.fetch_env!("RESEND_API_KEY")
+
+  config :residency_schedule, ResidencySchedule.Mailer,
+    adapter: Swoosh.Adapters.Resend,
+    api_key: resend_api_key
+
+  config :swoosh, :api_client, Swoosh.ApiClient.Req
 end

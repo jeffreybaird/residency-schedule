@@ -62,14 +62,15 @@
           >
             Compare
           </a>
-          <%= if my_id = get_session(@conn, :resident_id) do %>
-            <%= if @conn.request_path == "/residents/#{my_id}" do %>
+          <%= if (user = @conn.assigns[:current_user]) && user.home_resident_id do %>
+            <% home_path = "/residents/#{user.home_resident_id}" %>
+            <%= if @conn.request_path == home_path do %>
               <span class="px-3 py-1.5 rounded-md text-sm text-green-700 bg-green-50 font-medium">
                 Home
               </span>
             <% else %>
               <a
-                href={"/residents/#{my_id}"}
+                href={home_path}
                 class="px-3 py-1.5 rounded-md text-sm text-green-700 hover:bg-green-50 transition-colors"
               >
                 Home
@@ -135,14 +136,15 @@
             <a href="/compare" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
               Compare
             </a>
-            <%= if my_id = get_session(@conn, :resident_id) do %>
-              <%= if @conn.request_path == "/residents/#{my_id}" do %>
+            <%= if (user = @conn.assigns[:current_user]) && user.home_resident_id do %>
+              <% home_path = "/residents/#{user.home_resident_id}" %>
+              <%= if @conn.request_path == home_path do %>
                 <span class="block px-4 py-2 text-sm text-green-700 font-medium bg-green-50">
                   Home
                 </span>
               <% else %>
                 <a
-                  href={"/residents/#{my_id}"}
+                  href={home_path}
                   class="block px-4 py-2 text-sm text-green-700 hover:bg-green-50"
                 >
                   Home
