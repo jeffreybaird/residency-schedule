@@ -21,8 +21,13 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
   end
 
-  describe "with schedule data" do
+  describe "with schedule data (R4 graduated)" do
     setup %{conn: conn} do
+      # Fix date to July 2024 so R4 from the 2023-2024 schedule are graduated
+      # but R1-R3 are still visible. This makes the test deterministic.
+      Application.put_env(:residency_schedule, :current_date, ~D[2024-07-01])
+      on_exit(fn -> Application.delete_env(:residency_schedule, :current_date) end)
+
       seed_schedule()
       {:ok, view, html} = live(conn, "/")
       %{view: view, html: html}
@@ -62,6 +67,29 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
 
     test "pill buttons use scroll_to_schedule event", %{html: html} do
       assert html =~ "scroll_to_schedule"
+    end
+  end
+
+  describe "with schedule data (R4 not yet graduated)" do
+    setup %{conn: conn} do
+      # Fix date to mid-year so R4 residents are still active
+      Application.put_env(:residency_schedule, :current_date, ~D[2024-01-15])
+      on_exit(fn -> Application.delete_env(:residency_schedule, :current_date) end)
+
+      seed_schedule()
+      {:ok, view, html} = live(conn, "/")
+      %{view: view, html: html}
+    end
+
+    test "shows R4 residents when academic year has not ended", %{html: html} do
+      assert html =~ "Alexis"
+      assert html =~ "R4-1"
+    end
+
+    test "R4 filter shows R4 residents", %{view: view} do
+      html = view |> element("button[phx-value-year='4']") |> render_click()
+      assert html =~ "R4-1"
+      refute html =~ "R1-1"
     end
   end
 
