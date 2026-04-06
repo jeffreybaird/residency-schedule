@@ -50,6 +50,36 @@ defmodule ResidencySchedule.ResidentsTest do
     end
   end
 
+  describe "list_residents_across_schedules/1" do
+    test "returns residents from multiple schedules", %{schedule: sched, r4: r4, r1: r1} do
+      {:ok, sched2} = Schedules.upsert_schedule(2024, "2024–2025")
+
+      {:ok, r4_next} =
+        Residents.insert_resident(sched2.id, %{
+          position_code: "R4-1",
+          residency_year: 4,
+          schedule_number: 1,
+          name: "Alexis"
+        })
+
+      results = Residents.list_residents_across_schedules([sched.id, sched2.id])
+      assert length(results) == 3
+      ids = Enum.map(results, & &1.id)
+      assert r1.id in ids
+      assert r4.id in ids
+      assert r4_next.id in ids
+    end
+
+    test "preloads rotations for each schedule resident", %{schedule: sched} do
+      results = Residents.list_residents_across_schedules([sched.id])
+      assert Enum.all?(results, fn r -> is_list(r.rotations) end)
+    end
+
+    test "returns empty list for empty schedule ids" do
+      assert Residents.list_residents_across_schedules([]) == []
+    end
+  end
+
   describe "get_resident!/1" do
     test "returns the resident with rotations preloaded", %{r4: r4} do
       found = Residents.get_resident!(r4.id)
