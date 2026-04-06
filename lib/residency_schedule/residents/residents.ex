@@ -42,6 +42,24 @@ defmodule ResidencySchedule.Residents do
   end
 
   @doc """
+  Returns all schedule residents across the given schedule ids, with rotations preloaded
+  and the virtual name field populated. Ordered by residency_year, schedule_number.
+  Exempt from doctest — hits the database.
+  """
+  def list_residents_across_schedules(schedule_ids) do
+    rotations_query = from(r in ResidencySchedule.Rotations.Rotation, order_by: r.start_date)
+
+    from(sr in ScheduleResident,
+      join: r in assoc(sr, :resident),
+      where: sr.schedule_id in ^schedule_ids,
+      order_by: [asc: sr.residency_year, asc: sr.schedule_number],
+      preload: [rotations: ^rotations_query],
+      select: %{sr | name: r.name}
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Gets a single schedule resident by id. Preloads rotations ordered by start_date and
   the schedule association. The virtual name field is populated from the associated Resident.
   Raises if not found. Exempt from doctest — hits the database.

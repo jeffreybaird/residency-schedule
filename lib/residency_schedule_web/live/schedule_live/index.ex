@@ -22,6 +22,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           schedules: [],
           schedule_sections: [],
           all_slots: [],
+          unified_residents: [],
           filter_year: nil
         )
       end
@@ -74,6 +75,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
               schedules: [],
               schedule_sections: [],
               all_slots: [],
+              unified_residents: [],
               filter_year: nil
             )
 
@@ -231,58 +233,46 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
               </tr>
             </thead>
             <tbody>
-              <%= for section <- @schedule_sections do %>
-                <%= for {year, residents} <- visible_residents(section.residents_by_year, @filter_year) do %>
-                  <tr class="bg-gray-50">
+              <%= for {year, residents} <- visible_residents(@unified_residents, @filter_year) do %>
+                <tr class="bg-gray-50">
+                  <td
+                    colspan={2 + length(@all_slots)}
+                    class="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200"
+                  >
+                    R{year} Residents
+                  </td>
+                </tr>
+                <%= for resident <- residents do %>
+                  <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
                     <td
-                      colspan={2 + length(@all_slots)}
-                      class="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200"
+                      class="sticky left-0 z-20 bg-white px-2 py-1 font-mono text-gray-500 border-r border-gray-200 overflow-hidden"
+                      style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
                     >
-                      {section.schedule.label} · R{year} Residents
+                      <.link navigate={"/residents/#{resident.id}"} class="hover:text-blue-600">
+                        {resident.position_code}
+                      </.link>
                     </td>
+                    <td
+                      class="sticky z-20 bg-white px-2 py-1 text-gray-700 font-medium border-r border-gray-200 overflow-hidden"
+                      style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
+                    >
+                      <.link
+                        navigate={"/residents/#{resident.id}"}
+                        class="hover:text-blue-600 truncate block"
+                      >
+                        {resident.name}
+                      </.link>
+                    </td>
+                    <%= for {colspan, rotation} <- cell_groups_unified(@all_slots, resident.rotation_lookup) do %>
+                      <% past = rotation != nil && Date.compare(rotation.end_date, @today) == :lt %>
+                      <td
+                        colspan={colspan}
+                        class="px-0.5 py-0.5 text-center border-r border-gray-100"
+                      >
+                        {render_rotation_cell(rotation, past)}
+                      </td>
+                    <% end %>
                   </tr>
-                  <%= for resident <- residents do %>
-                    <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
-                      <td
-                        class="sticky left-0 z-20 bg-white px-2 py-1 font-mono text-gray-500 border-r border-gray-200 overflow-hidden"
-                        style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
-                      >
-                        <.link navigate={"/residents/#{resident.id}"} class="hover:text-blue-600">
-                          {resident.position_code}
-                        </.link>
-                      </td>
-                      <td
-                        class="sticky z-20 bg-white px-2 py-1 text-gray-700 font-medium border-r border-gray-200 overflow-hidden"
-                        style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
-                      >
-                        <.link
-                          navigate={"/residents/#{resident.id}"}
-                          class="hover:text-blue-600 truncate block"
-                        >
-                          {resident.name}
-                        </.link>
-                      </td>
-                      <%!-- Empty cells for slots before this schedule --%>
-                      <%= if section.slot_offset > 0 do %>
-                        <td colspan={section.slot_offset} class="px-0.5 py-0.5"></td>
-                      <% end %>
-                      <%!-- Rotation cells for this schedule's slots --%>
-                      <%= for {colspan, rotation} <- cell_groups(section.slots, resident.rotations) do %>
-                        <% past = rotation != nil && Date.compare(rotation.end_date, @today) == :lt %>
-                        <td
-                          colspan={colspan}
-                          class="px-0.5 py-0.5 text-center border-r border-gray-100"
-                        >
-                          {render_rotation_cell(rotation, past)}
-                        </td>
-                      <% end %>
-                      <%!-- Empty cells for slots after this schedule --%>
-                      <% trailing = length(@all_slots) - section.slot_offset - length(section.slots) %>
-                      <%= if trailing > 0 do %>
-                        <td colspan={trailing} class="px-0.5 py-0.5"></td>
-                      <% end %>
-                    </tr>
-                  <% end %>
                 <% end %>
               <% end %>
             </tbody>
@@ -309,32 +299,123 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   @doc false
   def load_all_schedules(socket, schedules) do
-    {sections, _offset} =
-      schedules
-      |> Enum.map(&build_section/1)
-      |> Enum.map_reduce(0, fn section, offset ->
-        {%{section | slot_offset: offset}, offset + length(section.slots)}
-      end)
+    schedule_map = Map.new(schedules, &{&1.id, &1})
+    schedule_ids = Enum.map(schedules, & &1.id)
 
+    # Load all schedule residents once, then use for both slots and unified rows
+    all_schedule_residents = Residents.list_residents_across_schedules(schedule_ids)
+
+    residents_by_schedule = Enum.group_by(all_schedule_residents, & &1.schedule_id)
+    sections = build_slot_sections(schedules, residents_by_schedule)
     all_slots = build_combined_slots(sections)
+
+    unified_residents =
+      build_unified_residents(all_schedule_residents, schedule_map, Date.utc_today())
 
     assign(socket,
       schedules: schedules,
       schedule_sections: sections,
       all_slots: all_slots,
+      unified_residents: unified_residents,
       filter_year: nil
     )
   end
 
-  defp build_section(schedule) do
-    residents = fetch_residents_with_rotations(schedule.id)
+  defp build_slot_sections(schedules, residents_by_schedule) do
+    schedules
+    |> Enum.map(fn schedule ->
+      residents = Map.get(residents_by_schedule, schedule.id, [])
+
+      %{
+        schedule: schedule,
+        slots: build_slots(residents),
+        slot_offset: 0
+      }
+    end)
+    |> assign_slot_offsets()
+  end
+
+  defp assign_slot_offsets(sections) do
+    {sections_with_offsets, _} =
+      Enum.map_reduce(sections, 0, fn section, offset ->
+        {%{section | slot_offset: offset}, offset + length(section.slots)}
+      end)
+
+    sections_with_offsets
+  end
+
+  @doc """
+  Builds a list of unified resident rows from all schedules. Each person gets one
+  row spanning all schedules. Graduated residents (R4 in a completed academic year)
+  are excluded.
+
+      iex> schedule_map = %{1 => %{id: 1, academic_year: 2023}}
+      iex> residents = ResidencyScheduleWeb.ScheduleLive.Index.build_unified_residents([], schedule_map, ~D[2026-04-06])
+      iex> residents
+      []
+  """
+  def build_unified_residents(all_schedule_residents, schedule_map, today) do
+    all_schedule_residents
+    |> Enum.group_by(& &1.resident_id)
+    |> Enum.map(fn {_person_id, srs} -> build_person_row(srs, schedule_map) end)
+    |> Enum.reject(&graduated?(&1, schedule_map, today))
+    |> Enum.sort_by(&{&1.current_year, &1.sort_number})
+  end
+
+  defp build_person_row(schedule_residents, schedule_map) do
+    sorted =
+      Enum.sort_by(schedule_residents, fn sr ->
+        schedule_map[sr.schedule_id].academic_year
+      end)
+
+    latest = List.last(sorted)
+    earliest = hd(sorted)
+
+    rotation_lookup = build_rotation_lookup(sorted)
 
     %{
-      schedule: schedule,
-      residents_by_year: group_residents_by_year(residents),
-      slots: build_slots(residents),
-      slot_offset: 0
+      resident_id: latest.resident_id,
+      id: latest.id,
+      name: latest.name,
+      position_code: latest.position_code,
+      current_year: latest.residency_year,
+      sort_number: earliest.schedule_number,
+      latest_schedule_id: latest.schedule_id,
+      rotation_lookup: rotation_lookup
     }
+  end
+
+  defp build_rotation_lookup(schedule_residents) do
+    schedule_residents
+    |> Enum.flat_map(fn sr ->
+      Enum.map(sr.rotations, fn rot ->
+        {{sr.schedule_id, rot.slot_index}, rot}
+      end)
+    end)
+    |> Map.new()
+  end
+
+  @doc """
+  Returns true if a resident has graduated — i.e. they completed R4 in an
+  academic year that has ended (June 30 of year+1 is in the past).
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, latest_schedule_id: 1}, %{1 => %{academic_year: 2023}}, ~D[2025-07-01])
+      true
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, latest_schedule_id: 1}, %{1 => %{academic_year: 2025}}, ~D[2025-07-01])
+      false
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 3, latest_schedule_id: 1}, %{1 => %{academic_year: 2023}}, ~D[2025-07-01])
+      false
+  """
+  def graduated?(resident, schedule_map, today) do
+    resident.current_year == 4 and
+      academic_year_ended?(schedule_map[resident.latest_schedule_id].academic_year, today)
+  end
+
+  defp academic_year_ended?(academic_year, today) do
+    end_date = Date.new!(academic_year + 1, 6, 30)
+    Date.compare(end_date, today) == :lt
   end
 
   @doc """
@@ -358,21 +439,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     end)
   end
 
-  defp fetch_residents_with_rotations(schedule_id) do
-    schedule_id
-    |> Residents.list_residents_for_schedule()
-    |> Enum.map(&load_rotations/1)
-  end
-
-  defp group_residents_by_year(residents) do
-    Enum.group_by(residents, & &1.residency_year)
-  end
-
-  defp load_rotations(resident) do
-    rotations = Rotations.list_rotations_for_resident(resident.id)
-    Map.put(resident, :rotations, rotations)
-  end
-
   defp build_slots([]), do: []
 
   defp build_slots(residents) do
@@ -390,6 +456,32 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     else
       "#{Calendar.strftime(start_date, "%-d %b")}–#{Calendar.strftime(end_date, "%-d %b")}"
     end
+  end
+
+  @doc """
+  Groups consecutive slots into merged cells based on rotation type. Works with
+  the unified all_slots list and a rotation lookup keyed by {schedule_id, slot_index}.
+
+      iex> all_slots = [{1, 0, ~D[2023-07-03], ~D[2023-07-09], true}, {1, 1, ~D[2023-07-10], ~D[2023-07-16], false}]
+      iex> lookup = %{{1, 0} => %{rotation_type: "float", end_date: ~D[2023-07-09]}, {1, 1} => %{rotation_type: "float", end_date: ~D[2023-07-16]}}
+      iex> [{count, rot}] = ResidencyScheduleWeb.ScheduleLive.Index.cell_groups_unified(all_slots, lookup)
+      iex> {count, rot.rotation_type}
+      {2, "float"}
+  """
+  def cell_groups_unified(all_slots, rotation_lookup) do
+    all_slots
+    |> Enum.map(fn {schedule_id, idx, _start, _end, _first?} ->
+      Map.get(rotation_lookup, {schedule_id, idx})
+    end)
+    |> Enum.chunk_by(fn
+      nil -> :blank
+      r -> r.rotation_type
+    end)
+    |> Enum.map(fn group ->
+      colspan = length(group)
+      rotation = Enum.find(group, &(&1 != nil))
+      {colspan, rotation}
+    end)
   end
 
   @doc false
@@ -449,14 +541,15 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   defp abbrev(rotation_type), do: Map.get(@abbrev_map, rotation_type, rotation_type)
 
-  defp visible_residents(residents_by_year, nil),
-    do: Enum.sort_by(residents_by_year, &elem(&1, 0))
-
-  defp visible_residents(residents_by_year, year) do
-    residents_by_year
-    |> Enum.filter(fn {y, _} -> y == year end)
+  defp visible_residents(unified_residents, filter_year) do
+    unified_residents
+    |> filter_by_year(filter_year)
+    |> Enum.group_by(& &1.current_year)
     |> Enum.sort_by(&elem(&1, 0))
   end
+
+  defp filter_by_year(residents, nil), do: residents
+  defp filter_by_year(residents, year), do: Enum.filter(residents, &(&1.current_year == year))
 
   defp filter_tab_class(current, value) do
     base = "px-3 py-1 rounded-full text-sm font-medium transition-colors"
