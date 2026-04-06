@@ -1,4 +1,4 @@
-defmodule ResidencySchedule.Importer.NameNormalizer do
+my defmodule ResidencySchedule.Importer.NameNormalizer do
   @moduledoc """
   Maps raw resident names to canonical first-name forms.
 
@@ -163,7 +163,7 @@ defmodule ResidencySchedule.Importer.NameNormalizer do
     {2026, "R1-4"} => "Ellen",
     {2026, "R1-5"} => "Alexa",
     {2026, "R1-6"} => "Anna B",
-    {2026, "R1-7"} => "Carolyn",
+    {2026, "R1-7"} => "Carolyn R",
     {2026, "R1-8"} => "Jake"
   }
   @doc """
