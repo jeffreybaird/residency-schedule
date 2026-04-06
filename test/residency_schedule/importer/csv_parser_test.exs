@@ -198,4 +198,75 @@ defmodule ResidencySchedule.Importer.CsvParserTest do
       assert pc.rotation_type == :post_call
     end
   end
+
+  describe "adjust_highland_dates/3" do
+    test "highland_night_float shifts start_date back one day (Sunday night start)" do
+      assert CsvParser.adjust_highland_dates(:highland_night_float, ~D[2025-07-07], ~D[2025-07-11]) ==
+               {~D[2025-07-06], ~D[2025-07-11]}
+    end
+
+    test "highland_weekend_nights sets end_date equal to start_date (Saturday only)" do
+      assert CsvParser.adjust_highland_dates(:highland_weekend_nights, ~D[2025-07-05], ~D[2025-07-06]) ==
+               {~D[2025-07-05], ~D[2025-07-05]}
+    end
+
+    test "non-highland rotations are unchanged" do
+      assert CsvParser.adjust_highland_dates(:strong_obstetrics, ~D[2025-07-07], ~D[2025-07-11]) ==
+               {~D[2025-07-07], ~D[2025-07-11]}
+    end
+
+    test "highland_obstetrics dates are unchanged" do
+      assert CsvParser.adjust_highland_dates(:highland_obstetrics, ~D[2025-07-07], ~D[2025-07-11]) ==
+               {~D[2025-07-07], ~D[2025-07-11]}
+    end
+
+    test "highland_gynecology dates are unchanged" do
+      assert CsvParser.adjust_highland_dates(:highland_gynecology, ~D[2025-07-07], ~D[2025-07-11]) ==
+               {~D[2025-07-07], ~D[2025-07-11]}
+    end
+
+    test "highland_weekend_days dates are unchanged" do
+      assert CsvParser.adjust_highland_dates(:highland_weekend_days, ~D[2025-07-05], ~D[2025-07-06]) ==
+               {~D[2025-07-05], ~D[2025-07-06]}
+    end
+  end
+
+  describe "parse/1 — highland date adjustments" do
+    test "HNF rotations have start_date shifted back one day in 2025-2026 fixture" do
+      csv = File.read!("test/fixtures/2025-2026.csv")
+      {:ok, residents, _warnings} = CsvParser.parse(csv)
+
+      all_hnf =
+        residents
+        |> Enum.flat_map(& &1.rotations)
+        |> Enum.filter(&(&1.rotation_type == :highland_night_float))
+
+      assert length(all_hnf) > 0
+
+      Enum.each(all_hnf, fn rot ->
+        assert Date.day_of_week(rot.start_date) == 7,
+               "HNF start_date #{rot.start_date} should be Sunday (day 7), got day #{Date.day_of_week(rot.start_date)}"
+      end)
+    end
+
+    test "HWN rotations span a single day (Saturday) in 2025-2026 fixture" do
+      csv = File.read!("test/fixtures/2025-2026.csv")
+      {:ok, residents, _warnings} = CsvParser.parse(csv)
+
+      all_hwn =
+        residents
+        |> Enum.flat_map(& &1.rotations)
+        |> Enum.filter(&(&1.rotation_type == :highland_weekend_nights))
+
+      assert length(all_hwn) > 0
+
+      Enum.each(all_hwn, fn rot ->
+        assert rot.start_date == rot.end_date,
+               "HWN should be single-day but got #{rot.start_date}..#{rot.end_date}"
+
+        assert Date.day_of_week(rot.start_date) == 6,
+               "HWN date #{rot.start_date} should be Saturday (day 6), got day #{Date.day_of_week(rot.start_date)}"
+      end)
+    end
+  end
 end

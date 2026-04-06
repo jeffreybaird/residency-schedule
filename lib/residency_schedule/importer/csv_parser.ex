@@ -250,10 +250,13 @@ defmodule ResidencySchedule.Importer.CsvParser do
               {rotations, [warning | warnings]}
 
             rotation_type ->
+              {adj_start, adj_end} =
+                adjust_highland_dates(rotation_type, start_date, end_date)
+
               rotation = %{
                 slot_index: slot_index,
-                start_date: start_date,
-                end_date: end_date,
+                start_date: adj_start,
+                end_date: adj_end,
                 rotation_type: rotation_type
               }
 
@@ -264,6 +267,36 @@ defmodule ResidencySchedule.Importer.CsvParser do
     |> then(fn {rotations, warnings} ->
       {Enum.reverse(rotations), Enum.reverse(warnings)}
     end)
+  end
+
+  @doc """
+  Adjusts date ranges for Highland rotations whose actual shift times differ
+  from the standard slot boundaries.
+
+  Highland Night Float runs Sunday night through Friday night, so its start
+  date shifts back one day (from Monday to Sunday). Highland Weekend Nights
+  is a single Saturday night shift, so its end date is set equal to its
+  start date.
+
+      iex> ResidencySchedule.Importer.CsvParser.adjust_highland_dates(:highland_night_float, ~D[2025-07-07], ~D[2025-07-11])
+      {~D[2025-07-06], ~D[2025-07-11]}
+
+      iex> ResidencySchedule.Importer.CsvParser.adjust_highland_dates(:highland_weekend_nights, ~D[2025-07-05], ~D[2025-07-06])
+      {~D[2025-07-05], ~D[2025-07-05]}
+
+      iex> ResidencySchedule.Importer.CsvParser.adjust_highland_dates(:strong_obstetrics, ~D[2025-07-07], ~D[2025-07-11])
+      {~D[2025-07-07], ~D[2025-07-11]}
+  """
+  def adjust_highland_dates(:highland_night_float, start_date, end_date) do
+    {Date.add(start_date, -1), end_date}
+  end
+
+  def adjust_highland_dates(:highland_weekend_nights, start_date, _end_date) do
+    {start_date, start_date}
+  end
+
+  def adjust_highland_dates(_rotation_type, start_date, end_date) do
+    {start_date, end_date}
   end
 
   defp reject_empty_cells(cells) do
