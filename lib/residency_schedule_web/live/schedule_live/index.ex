@@ -288,60 +288,24 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   @doc false
   def load_all_schedules(socket, schedules, today) do
-    # Only build grid data from schedules that have started
-    active_schedules = filter_started_schedules(schedules, today)
+    schedule_map = Map.new(schedules, &{&1.id, &1})
+    schedule_ids = Enum.map(schedules, & &1.id)
 
-    case active_schedules do
-      [] ->
-        assign(socket,
-          schedules: schedules,
-          all_slots: [],
-          unified_residents: [],
-          filter_year: nil
-        )
+    all_schedule_residents = Residents.list_residents_across_schedules(schedule_ids)
 
-      _ ->
-        schedule_map = Map.new(active_schedules, &{&1.id, &1})
-        schedule_ids = Enum.map(active_schedules, & &1.id)
+    residents_by_schedule = Enum.group_by(all_schedule_residents, & &1.schedule_id)
+    sections = build_slot_sections(schedules, residents_by_schedule)
+    all_slots = build_combined_slots(sections)
 
-        all_schedule_residents = Residents.list_residents_across_schedules(schedule_ids)
+    unified_residents =
+      build_unified_residents(all_schedule_residents, schedule_map, today)
 
-        residents_by_schedule = Enum.group_by(all_schedule_residents, & &1.schedule_id)
-        sections = build_slot_sections(active_schedules, residents_by_schedule)
-        all_slots = build_combined_slots(sections)
-
-        unified_residents =
-          build_unified_residents(all_schedule_residents, schedule_map, today)
-
-        assign(socket,
-          schedules: schedules,
-          all_slots: all_slots,
-          unified_residents: unified_residents,
-          filter_year: nil
-        )
-    end
-  end
-
-  @doc """
-  Returns true if a schedule's academic year has started. A schedule for
-  academic year Y starts around late June / early July of year Y, so we
-  consider it started once today is on or after June 1 of that year.
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.schedule_started?(2025, ~D[2025-06-01])
-      true
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.schedule_started?(2026, ~D[2026-04-06])
-      false
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.schedule_started?(2023, ~D[2026-04-06])
-      true
-  """
-  def schedule_started?(academic_year, today) do
-    academic_year < today.year or (academic_year == today.year and today.month >= 6)
-  end
-
-  defp filter_started_schedules(schedules, today) do
-    Enum.filter(schedules, &schedule_started?(&1.academic_year, today))
+    assign(socket,
+      schedules: schedules,
+      all_slots: all_slots,
+      unified_residents: unified_residents,
+      filter_year: nil
+    )
   end
 
   defp build_slot_sections(schedules, residents_by_schedule) do
@@ -381,7 +345,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     all_schedule_residents
     |> Enum.group_by(& &1.resident_id)
     |> Enum.map(fn {_person_id, srs} -> build_person_row(srs, schedule_map) end)
-    |> Enum.reject(&graduated?(&1, schedule_map, today))
+    |> Enum.reject(&graduated?(&1, today))
     |> Enum.sort_by(&{&1.current_year, &1.sort_number})
   end
 
@@ -395,6 +359,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     earliest = hd(sorted)
 
     rotation_lookup = build_rotation_lookup(sorted)
+    last_rotation_end = find_last_rotation_end(sorted)
 
     %{
       resident_id: latest.resident_id,
@@ -403,7 +368,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       position_code: latest.position_code,
       current_year: latest.residency_year,
       sort_number: earliest.schedule_number,
-      latest_schedule_id: latest.schedule_id,
+      last_rotation_end: last_rotation_end,
       rotation_lookup: rotation_lookup
     }
   end
@@ -418,27 +383,34 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     |> Map.new()
   end
 
-  @doc """
-  Returns true if a resident has graduated — i.e. they completed R4 in an
-  academic year that has ended (June 30 of year+1 is in the past).
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, latest_schedule_id: 1}, %{1 => %{academic_year: 2023}}, ~D[2025-07-01])
-      true
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, latest_schedule_id: 1}, %{1 => %{academic_year: 2025}}, ~D[2025-07-01])
-      false
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 3, latest_schedule_id: 1}, %{1 => %{academic_year: 2023}}, ~D[2025-07-01])
-      false
-  """
-  def graduated?(resident, schedule_map, today) do
-    resident.current_year == 4 and
-      academic_year_ended?(schedule_map[resident.latest_schedule_id].academic_year, today)
+  defp find_last_rotation_end(schedule_residents) do
+    schedule_residents
+    |> Enum.flat_map(& &1.rotations)
+    |> Enum.map(& &1.end_date)
+    |> Enum.max(Date, fn -> nil end)
   end
 
-  defp academic_year_ended?(academic_year, today) do
-    end_date = Date.new!(academic_year + 1, 6, 30)
-    Date.compare(end_date, today) == :lt
+  @doc """
+  Returns true if a resident has graduated — they are R4 and their last
+  rotation has already ended. Non-R4 residents never graduate. R4 residents
+  with remaining shifts are still active.
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, last_rotation_end: ~D[2024-06-15]}, ~D[2025-07-01])
+      true
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, last_rotation_end: ~D[2026-06-20]}, ~D[2026-04-06])
+      false
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 3, last_rotation_end: ~D[2024-06-15]}, ~D[2025-07-01])
+      false
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, last_rotation_end: nil}, ~D[2025-07-01])
+      false
+  """
+  def graduated?(resident, today) do
+    resident.current_year == 4 and
+      resident.last_rotation_end != nil and
+      Date.compare(resident.last_rotation_end, today) == :lt
   end
 
   @doc """
