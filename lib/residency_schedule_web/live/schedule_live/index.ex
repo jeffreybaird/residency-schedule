@@ -12,18 +12,16 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   @impl true
   def mount(_params, session, socket) do
     schedules = Schedules.list_schedules()
-    schedule = List.first(schedules)
     is_admin = session["admin"] == true
 
     socket =
-      if schedule do
-        load_schedule_data(socket, schedule, schedules)
+      if schedules != [] do
+        load_all_schedules(socket, schedules)
       else
         assign(socket,
           schedules: [],
-          schedule: nil,
-          residents_by_year: %{},
-          slots: [],
+          schedule_sections: [],
+          all_slots: [],
           filter_year: nil
         )
       end
@@ -38,17 +36,11 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   @impl true
-  def handle_params(%{"schedule_id" => id}, _uri, socket) do
-    schedule = Schedules.get_schedule!(String.to_integer(id))
-    {:noreply, load_schedule_data(socket, schedule, socket.assigns.schedules)}
-  end
-
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_event("select_schedule", %{"id" => id}, socket) do
-    schedule = Schedules.get_schedule!(String.to_integer(id))
-    {:noreply, load_schedule_data(socket, schedule, socket.assigns.schedules)}
+  def handle_event("scroll_to_schedule", %{"id" => id}, socket) do
+    {:noreply, push_event(socket, "scroll-to-schedule", %{schedule_id: id})}
   end
 
   @impl true
@@ -80,14 +72,13 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           [] ->
             assign(socket,
               schedules: [],
-              schedule: nil,
-              residents_by_year: %{},
-              slots: [],
+              schedule_sections: [],
+              all_slots: [],
               filter_year: nil
             )
 
-          [next | _] ->
-            load_schedule_data(socket, next, remaining)
+          _ ->
+            load_all_schedules(socket, remaining)
         end
 
       {:noreply, assign(socket, delete_confirm_id: nil, delete_error: nil)}
@@ -103,22 +94,20 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
     ~H"""
     <div class="min-h-screen bg-gray-50">
-      <%= if length(@schedules) >= 1 do %>
+      <%= if @schedules != [] do %>
         <div class="bg-white border-b border-gray-200 px-4 sm:px-6 py-2 flex items-center gap-3 flex-wrap">
           <span class="text-sm text-gray-500">Schedule:</span>
           <%= for s <- @schedules do %>
             <div class="flex items-center gap-0.5">
               <button
-                phx-click="select_schedule"
+                phx-click="scroll_to_schedule"
                 phx-value-id={s.id}
                 class={[
                   "px-3 py-1 text-sm font-medium transition-colors",
                   if(@is_admin, do: "rounded-l-full", else: "rounded-full"),
-                  if(@schedule && @schedule.id == s.id,
-                    do: "bg-blue-600 text-white",
-                    else: "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  )
+                  "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 ]}
+                data-schedule-pill={s.id}
               >
                 {s.label}
               </button>
@@ -126,13 +115,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 <button
                   phx-click="request_delete"
                   phx-value-id={s.id}
-                  class={[
-                    "px-1.5 py-1 rounded-r-full text-sm font-medium transition-colors",
-                    if(@schedule && @schedule.id == s.id,
-                      do: "bg-blue-700 text-blue-100 hover:bg-red-600 hover:text-white",
-                      else: "bg-gray-200 text-gray-500 hover:bg-red-100 hover:text-red-700"
-                    )
-                  ]}
+                  class="px-1.5 py-1 rounded-r-full text-sm font-medium transition-colors bg-gray-200 text-gray-500 hover:bg-red-100 hover:text-red-700"
                   title={"Delete #{s.label}"}
                 >
                   &times;
@@ -179,7 +162,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
         </div>
       <% end %>
 
-      <%= if @schedule do %>
+      <%= if @all_slots != [] do %>
         <div class="px-4 sm:px-6 py-4 flex flex-wrap items-center gap-4 border-b border-gray-200 bg-white">
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-sm text-gray-500 font-medium">Year:</span>
@@ -212,7 +195,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           <table class="border-separate border-spacing-0 text-xs">
             <thead>
               <tr class="bg-gray-100 sticky top-0 z-30">
-                <%!-- z-40 so header stickies beat both body stickies and data cells --%>
                 <th
                   class="sticky left-0 z-40 bg-gray-100 px-2 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-300 whitespace-nowrap overflow-hidden"
                   style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
@@ -225,17 +207,23 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 >
                   Name
                 </th>
-                <%= for {_idx, start_date, end_date} <- @slots do %>
+                <%= for {schedule_id, _idx, start_date, end_date, first_in_schedule?} <- @all_slots do %>
                   <% slot_past = Date.compare(end_date, @today) == :lt %>
                   <% slot_today = not slot_past and Date.compare(start_date, @today) != :gt %>
                   <th
                     class={[
                       "px-1 py-2 text-center font-medium border-b border-gray-200 whitespace-nowrap",
-                      if(slot_past, do: "text-gray-300", else: "text-gray-500")
+                      if(slot_past, do: "text-gray-300", else: "text-gray-500"),
+                      if(first_in_schedule? and schedule_id != elem(hd(@all_slots), 0),
+                        do: "border-l-2 border-l-blue-300",
+                        else: ""
+                      )
                     ]}
                     style="min-width: 52px"
                     data-slot-year={start_date.year}
                     data-today-slot={if slot_today, do: "true"}
+                    data-schedule-id={schedule_id}
+                    data-schedule-start={if first_in_schedule?, do: schedule_id}
                   >
                     {slot_header_label(start_date, end_date)}
                   </th>
@@ -243,47 +231,58 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
               </tr>
             </thead>
             <tbody>
-              <%= for {year, residents} <- visible_residents(@residents_by_year, @filter_year) do %>
-                <tr class="bg-gray-50">
-                  <td
-                    colspan={2 + length(@slots)}
-                    class="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200"
-                  >
-                    R{year} Residents
-                  </td>
-                </tr>
-                <%= for resident <- residents do %>
-                  <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
-                    <%!-- z-20 so body stickies beat scrolling data cells --%>
+              <%= for section <- @schedule_sections do %>
+                <%= for {year, residents} <- visible_residents(section.residents_by_year, @filter_year) do %>
+                  <tr class="bg-gray-50">
                     <td
-                      class="sticky left-0 z-20 bg-white px-2 py-1 font-mono text-gray-500 border-r border-gray-200 overflow-hidden"
-                      style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
+                      colspan={2 + length(@all_slots)}
+                      class="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200"
                     >
-                      <.link navigate={"/residents/#{resident.id}"} class="hover:text-blue-600">
-                        {resident.position_code}
-                      </.link>
+                      {section.schedule.label} · R{year} Residents
                     </td>
-                    <td
-                      class="sticky z-20 bg-white px-2 py-1 text-gray-700 font-medium border-r border-gray-200 overflow-hidden"
-                      style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
-                    >
-                      <.link
-                        navigate={"/residents/#{resident.id}"}
-                        class="hover:text-blue-600 truncate block"
-                      >
-                        {resident.name}
-                      </.link>
-                    </td>
-                    <%= for {colspan, rotation} <- cell_groups(@slots, resident.rotations) do %>
-                      <% past = rotation != nil && Date.compare(rotation.end_date, @today) == :lt %>
-                      <td
-                        colspan={colspan}
-                        class="px-0.5 py-0.5 text-center border-r border-gray-100"
-                      >
-                        {render_rotation_cell(rotation, past)}
-                      </td>
-                    <% end %>
                   </tr>
+                  <%= for resident <- residents do %>
+                    <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                      <td
+                        class="sticky left-0 z-20 bg-white px-2 py-1 font-mono text-gray-500 border-r border-gray-200 overflow-hidden"
+                        style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
+                      >
+                        <.link navigate={"/residents/#{resident.id}"} class="hover:text-blue-600">
+                          {resident.position_code}
+                        </.link>
+                      </td>
+                      <td
+                        class="sticky z-20 bg-white px-2 py-1 text-gray-700 font-medium border-r border-gray-200 overflow-hidden"
+                        style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
+                      >
+                        <.link
+                          navigate={"/residents/#{resident.id}"}
+                          class="hover:text-blue-600 truncate block"
+                        >
+                          {resident.name}
+                        </.link>
+                      </td>
+                      <%!-- Empty cells for slots before this schedule --%>
+                      <%= if section.slot_offset > 0 do %>
+                        <td colspan={section.slot_offset} class="px-0.5 py-0.5"></td>
+                      <% end %>
+                      <%!-- Rotation cells for this schedule's slots --%>
+                      <%= for {colspan, rotation} <- cell_groups(section.slots, resident.rotations) do %>
+                        <% past = rotation != nil && Date.compare(rotation.end_date, @today) == :lt %>
+                        <td
+                          colspan={colspan}
+                          class="px-0.5 py-0.5 text-center border-r border-gray-100"
+                        >
+                          {render_rotation_cell(rotation, past)}
+                        </td>
+                      <% end %>
+                      <%!-- Empty cells for slots after this schedule --%>
+                      <% trailing = length(@all_slots) - section.slot_offset - length(section.slots) %>
+                      <%= if trailing > 0 do %>
+                        <td colspan={trailing} class="px-0.5 py-0.5"></td>
+                      <% end %>
+                    </tr>
+                  <% end %>
                 <% end %>
               <% end %>
             </tbody>
@@ -308,16 +307,55 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   # --- Private helpers ---
 
-  defp load_schedule_data(socket, schedule, schedules) do
-    residents = fetch_residents_with_rotations(schedule.id)
+  @doc false
+  def load_all_schedules(socket, schedules) do
+    {sections, _offset} =
+      schedules
+      |> Enum.map(&build_section/1)
+      |> Enum.map_reduce(0, fn section, offset ->
+        {%{section | slot_offset: offset}, offset + length(section.slots)}
+      end)
+
+    all_slots = build_combined_slots(sections)
 
     assign(socket,
       schedules: schedules,
+      schedule_sections: sections,
+      all_slots: all_slots,
+      filter_year: nil
+    )
+  end
+
+  defp build_section(schedule) do
+    residents = fetch_residents_with_rotations(schedule.id)
+
+    %{
       schedule: schedule,
       residents_by_year: group_residents_by_year(residents),
       slots: build_slots(residents),
-      filter_year: nil
-    )
+      slot_offset: 0
+    }
+  end
+
+  @doc """
+  Builds a flat list of all slots across all schedule sections, annotated with
+  schedule_id and whether each slot is the first in its schedule.
+
+      iex> sections = [
+      ...>   %{schedule: %{id: 1}, slots: [{0, ~D[2023-07-03], ~D[2023-07-09]}]},
+      ...>   %{schedule: %{id: 2}, slots: [{0, ~D[2024-07-01], ~D[2024-07-07]}]}
+      ...> ]
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.build_combined_slots(sections)
+      [{1, 0, ~D[2023-07-03], ~D[2023-07-09], true}, {2, 0, ~D[2024-07-01], ~D[2024-07-07], true}]
+  """
+  def build_combined_slots(sections) do
+    Enum.flat_map(sections, fn section ->
+      section.slots
+      |> Enum.with_index()
+      |> Enum.map(fn {{idx, start_date, end_date}, i} ->
+        {section.schedule.id, idx, start_date, end_date, i == 0}
+      end)
+    end)
   end
 
   defp fetch_residents_with_rotations(schedule_id) do
