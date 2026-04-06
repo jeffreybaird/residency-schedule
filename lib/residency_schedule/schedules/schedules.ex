@@ -5,11 +5,11 @@ defmodule ResidencySchedule.Schedules do
   alias ResidencySchedule.Residents
 
   @doc """
-  Returns all schedules ordered by academic_year descending.
+  Returns all schedules ordered by academic_year ascending (oldest first).
   """
   def list_schedules do
     Schedule
-    |> order_by(desc: :academic_year)
+    |> order_by(asc: :academic_year)
     |> Repo.all()
   end
 

@@ -164,13 +164,24 @@ Hooks.ScrollToToday = {
 Hooks.YearTracker = {
   mounted() {
     this.yearEl = document.getElementById("gantt-year-indicator")
+    this.stickyWidth = 72 + 128 // @id_col_px + @name_col_px
     this.updateYear()
+    this.updateActivePill()
     this.scrollToToday()
-    this.el.addEventListener("scroll", () => this.updateYear(), {passive: true})
+    this.el.addEventListener("scroll", () => {
+      this.updateYear()
+      this.updateActivePill()
+    }, {passive: true})
+
+    // Listen for scroll-to-schedule events from LiveView
+    this.handleEvent("scroll-to-schedule", ({schedule_id}) => {
+      this.scrollToSchedule(schedule_id)
+    })
   },
 
   updated() {
     this.updateYear()
+    this.updateActivePill()
   },
 
   scrollToToday() {
@@ -178,15 +189,21 @@ Hooks.YearTracker = {
     if (!todayTh) return
     const containerRect = this.el.getBoundingClientRect()
     const thRect = todayTh.getBoundingClientRect()
-    const stickyWidth = 72 + 128 // @id_col_px + @name_col_px
-    this.el.scrollLeft += thRect.left - containerRect.left - stickyWidth - 8
+    this.el.scrollLeft += thRect.left - containerRect.left - this.stickyWidth - 8
+  },
+
+  scrollToSchedule(scheduleId) {
+    const th = this.el.querySelector(`th[data-schedule-start="${scheduleId}"]`)
+    if (!th) return
+    const containerRect = this.el.getBoundingClientRect()
+    const thRect = th.getBoundingClientRect()
+    this.el.scrollLeft += thRect.left - containerRect.left - this.stickyWidth - 8
   },
 
   updateYear() {
     if (!this.yearEl) return
     const containerRect = this.el.getBoundingClientRect()
-    // Offset past the two sticky label columns (id + name); must match @id_col_px + @name_col_px
-    const firstDataX = containerRect.left + 72 + 128
+    const firstDataX = containerRect.left + this.stickyWidth
 
     const headers = this.el.querySelectorAll("th[data-slot-year]")
     for (const th of headers) {
@@ -195,6 +212,31 @@ Hooks.YearTracker = {
         return
       }
     }
+  },
+
+  updateActivePill() {
+    const containerRect = this.el.getBoundingClientRect()
+    const firstDataX = containerRect.left + this.stickyWidth
+    let activeId = null
+
+    // Find which schedule's columns are currently visible
+    const headers = this.el.querySelectorAll("th[data-schedule-id]")
+    for (const th of headers) {
+      if (th.getBoundingClientRect().right > firstDataX) {
+        activeId = th.dataset.scheduleId
+        break
+      }
+    }
+
+    // Update pill styles
+    const pills = document.querySelectorAll("[data-schedule-pill]")
+    pills.forEach(pill => {
+      const isActive = pill.dataset.schedulePill === activeId
+      pill.classList.toggle("bg-blue-600", isActive)
+      pill.classList.toggle("text-white", isActive)
+      pill.classList.toggle("bg-gray-100", !isActive)
+      pill.classList.toggle("text-gray-700", !isActive)
+    })
   }
 }
 
