@@ -21,7 +21,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       else
         assign(socket,
           schedules: [],
-          schedule_sections: [],
           all_slots: [],
           unified_residents: [],
           filter_year: nil
@@ -74,7 +73,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           [] ->
             assign(socket,
               schedules: [],
-              schedule_sections: [],
               all_slots: [],
               unified_residents: [],
               filter_year: nil
@@ -234,47 +232,37 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
               </tr>
             </thead>
             <tbody>
-              <%= for {year, residents} <- visible_residents(@unified_residents, @filter_year) do %>
-                <tr class="bg-gray-50">
+              <%= for resident <- visible_residents(@unified_residents, @filter_year) do %>
+                <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
                   <td
-                    colspan={2 + length(@all_slots)}
-                    class="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200"
+                    class="sticky left-0 z-20 bg-white px-2 py-1 font-mono text-gray-500 border-r border-gray-200 overflow-hidden"
+                    style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
                   >
-                    R{year} Residents
+                    <.link navigate={"/residents/#{resident.id}"} class="hover:text-blue-600">
+                      {resident.position_code}
+                    </.link>
                   </td>
+                  <td
+                    class="sticky z-20 bg-white px-2 py-1 text-gray-700 font-medium border-r border-gray-200 overflow-hidden"
+                    style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
+                  >
+                    <.link
+                      navigate={"/residents/#{resident.id}"}
+                      class="hover:text-blue-600 truncate block"
+                    >
+                      {resident.name}
+                    </.link>
+                  </td>
+                  <%= for {colspan, rotation} <- cell_groups_unified(@all_slots, resident.rotation_lookup) do %>
+                    <% past = rotation != nil && Date.compare(rotation.end_date, @today) == :lt %>
+                    <td
+                      colspan={colspan}
+                      class="px-0.5 py-0.5 text-center border-r border-gray-100"
+                    >
+                      {render_rotation_cell(rotation, past)}
+                    </td>
+                  <% end %>
                 </tr>
-                <%= for resident <- residents do %>
-                  <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
-                    <td
-                      class="sticky left-0 z-20 bg-white px-2 py-1 font-mono text-gray-500 border-r border-gray-200 overflow-hidden"
-                      style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
-                    >
-                      <.link navigate={"/residents/#{resident.id}"} class="hover:text-blue-600">
-                        {resident.position_code}
-                      </.link>
-                    </td>
-                    <td
-                      class="sticky z-20 bg-white px-2 py-1 text-gray-700 font-medium border-r border-gray-200 overflow-hidden"
-                      style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
-                    >
-                      <.link
-                        navigate={"/residents/#{resident.id}"}
-                        class="hover:text-blue-600 truncate block"
-                      >
-                        {resident.name}
-                      </.link>
-                    </td>
-                    <%= for {colspan, rotation} <- cell_groups_unified(@all_slots, resident.rotation_lookup) do %>
-                      <% past = rotation != nil && Date.compare(rotation.end_date, @today) == :lt %>
-                      <td
-                        colspan={colspan}
-                        class="px-0.5 py-0.5 text-center border-r border-gray-100"
-                      >
-                        {render_rotation_cell(rotation, past)}
-                      </td>
-                    <% end %>
-                  </tr>
-                <% end %>
               <% end %>
             </tbody>
           </table>
@@ -303,7 +291,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     schedule_map = Map.new(schedules, &{&1.id, &1})
     schedule_ids = Enum.map(schedules, & &1.id)
 
-    # Load all schedule residents once, then use for both slots and unified rows
     all_schedule_residents = Residents.list_residents_across_schedules(schedule_ids)
 
     residents_by_schedule = Enum.group_by(all_schedule_residents, & &1.schedule_id)
@@ -315,7 +302,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
     assign(socket,
       schedules: schedules,
-      schedule_sections: sections,
       all_slots: all_slots,
       unified_residents: unified_residents,
       filter_year: nil
@@ -346,20 +332,20 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   @doc """
-  Builds a list of unified resident rows from all schedules. Each person gets one
-  row spanning all schedules. Graduated residents (R4 in a completed academic year)
-  are excluded.
+  Builds a list of unified resident rows from started schedules. Each person
+  gets one row. Graduated residents (R4 in a completed academic year) are
+  excluded. The current year and position code come from the person's latest
+  schedule appearance.
 
       iex> schedule_map = %{1 => %{id: 1, academic_year: 2023}}
-      iex> residents = ResidencyScheduleWeb.ScheduleLive.Index.build_unified_residents([], schedule_map, ~D[2026-04-06])
-      iex> residents
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.build_unified_residents([], schedule_map, ~D[2026-04-06])
       []
   """
   def build_unified_residents(all_schedule_residents, schedule_map, today) do
     all_schedule_residents
     |> Enum.group_by(& &1.resident_id)
     |> Enum.map(fn {_person_id, srs} -> build_person_row(srs, schedule_map) end)
-    |> Enum.reject(&graduated?(&1, schedule_map, today))
+    |> Enum.reject(&graduated?(&1, today))
     |> Enum.sort_by(&{&1.current_year, &1.sort_number})
   end
 
@@ -373,6 +359,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     earliest = hd(sorted)
 
     rotation_lookup = build_rotation_lookup(sorted)
+    last_rotation_end = find_last_rotation_end(sorted)
 
     %{
       resident_id: latest.resident_id,
@@ -381,7 +368,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       position_code: latest.position_code,
       current_year: latest.residency_year,
       sort_number: earliest.schedule_number,
-      latest_schedule_id: latest.schedule_id,
+      last_rotation_end: last_rotation_end,
       rotation_lookup: rotation_lookup
     }
   end
@@ -396,27 +383,34 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     |> Map.new()
   end
 
-  @doc """
-  Returns true if a resident has graduated — i.e. they completed R4 in an
-  academic year that has ended (June 30 of year+1 is in the past).
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, latest_schedule_id: 1}, %{1 => %{academic_year: 2023}}, ~D[2025-07-01])
-      true
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, latest_schedule_id: 1}, %{1 => %{academic_year: 2025}}, ~D[2025-07-01])
-      false
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 3, latest_schedule_id: 1}, %{1 => %{academic_year: 2023}}, ~D[2025-07-01])
-      false
-  """
-  def graduated?(resident, schedule_map, today) do
-    resident.current_year == 4 and
-      academic_year_ended?(schedule_map[resident.latest_schedule_id].academic_year, today)
+  defp find_last_rotation_end(schedule_residents) do
+    schedule_residents
+    |> Enum.flat_map(& &1.rotations)
+    |> Enum.map(& &1.end_date)
+    |> Enum.max(Date, fn -> nil end)
   end
 
-  defp academic_year_ended?(academic_year, today) do
-    end_date = Date.new!(academic_year + 1, 6, 30)
-    Date.compare(end_date, today) == :lt
+  @doc """
+  Returns true if a resident has graduated — they are R4 and their last
+  rotation has already ended. Non-R4 residents never graduate. R4 residents
+  with remaining shifts are still active.
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, last_rotation_end: ~D[2024-06-15]}, ~D[2025-07-01])
+      true
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, last_rotation_end: ~D[2026-06-20]}, ~D[2026-04-06])
+      false
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 3, last_rotation_end: ~D[2024-06-15]}, ~D[2025-07-01])
+      false
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, last_rotation_end: nil}, ~D[2025-07-01])
+      false
+  """
+  def graduated?(resident, today) do
+    resident.current_year == 4 and
+      resident.last_rotation_end != nil and
+      Date.compare(resident.last_rotation_end, today) == :lt
   end
 
   @doc """
@@ -542,15 +536,11 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   defp abbrev(rotation_type), do: Map.get(@abbrev_map, rotation_type, rotation_type)
 
-  defp visible_residents(unified_residents, filter_year) do
-    unified_residents
-    |> filter_by_year(filter_year)
-    |> Enum.group_by(& &1.current_year)
-    |> Enum.sort_by(&elem(&1, 0))
-  end
+  defp visible_residents(unified_residents, nil), do: unified_residents
 
-  defp filter_by_year(residents, nil), do: residents
-  defp filter_by_year(residents, year), do: Enum.filter(residents, &(&1.current_year == year))
+  defp visible_residents(unified_residents, year) do
+    Enum.filter(unified_residents, &(&1.current_year == year))
+  end
 
   @doc """
   Returns the current date. In test, this can be overridden via application env
