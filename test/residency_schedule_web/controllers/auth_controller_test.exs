@@ -164,11 +164,13 @@ defmodule ResidencyScheduleWeb.AuthControllerTest do
 
     test "persists home_resident_id on user and redirects", %{conn: conn, user: user} do
       seed_schedule()
-      conn = post(conn, "/set-home/42")
-      assert redirected_to(conn) == "/residents/42"
+      resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
+
+      conn = post(conn, "/set-home/#{resident.id}")
+      assert redirected_to(conn) == "/residents/#{resident.id}"
 
       updated_user = Accounts.get_user!(user.id)
-      assert updated_user.home_resident_id == 42
+      assert updated_user.home_resident_id == resident.id
     end
   end
 
@@ -176,10 +178,12 @@ defmodule ResidencyScheduleWeb.AuthControllerTest do
     setup :authenticate_session
 
     test "clears home_resident_id on user and redirects", %{conn: conn, user: user} do
-      Accounts.set_home_resident(user, 42)
+      seed_schedule()
+      resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
+      Accounts.set_home_resident(user, resident.id)
 
-      conn = post(conn, "/unset-home", %{"resident_id" => "42"})
-      assert redirected_to(conn) == "/residents/42"
+      conn = post(conn, "/unset-home", %{"resident_id" => to_string(resident.id)})
+      assert redirected_to(conn) == "/residents/#{resident.id}"
 
       updated_user = Accounts.get_user!(user.id)
       assert updated_user.home_resident_id == nil

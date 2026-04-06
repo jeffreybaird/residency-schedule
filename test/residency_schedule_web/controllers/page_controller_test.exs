@@ -8,6 +8,6 @@ defmodule ResidencyScheduleWeb.PageControllerTest do
 
   test "GET /login renders login form", %{conn: conn} do
     conn = get(conn, ~p"/login")
-    assert html_response(conn, 200) =~ "Sign in"
+    assert html_response(conn, 200) =~ "Email address"
   end
 end
