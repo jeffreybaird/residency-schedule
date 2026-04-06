@@ -11,7 +11,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
   @impl true
   def mount(%{"id" => id}, session, socket) do
-    resident_id = session["resident_id"]
+    current_user = load_current_user(session)
+    home_resident_id = current_user && current_user.home_resident_id
     resident = Residents.get_resident!(String.to_integer(id))
     today = Date.utc_today()
 
@@ -48,7 +49,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
      assign(socket,
        resident: resident,
        year_history: year_history,
-       is_home_resident: resident_id == String.to_integer(id),
+       is_home_resident: home_resident_id == resident.id,
        schedule_start: schedule_start,
        schedule_end: schedule_end,
        night_shift_counts: night_shift_counts,
@@ -890,5 +891,12 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       {type, days}
     end)
     |> Enum.sort_by(fn {type, _} -> Enum.find_index(@night_shift_types, &(&1 == type)) end)
+  end
+
+  defp load_current_user(session) do
+    case session["user_id"] do
+      nil -> nil
+      user_id -> ResidencySchedule.Accounts.get_user(user_id)
+    end
   end
 end

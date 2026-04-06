@@ -38,12 +38,17 @@ defmodule ResidencyScheduleWeb.ConnCase do
   end
 
   @doc """
-  Sets :authenticated in the session so the RequireAuth plug passes.
-  Use as `setup :authenticate_session` in any LiveView or controller test.
+  Creates an approved user and sets :user_id and :authenticated in the session
+  so the RequireAuth plug passes. Use as `setup :authenticate_session`.
   """
   def authenticate_session(%{conn: conn}) do
-    conn = Plug.Test.init_test_session(conn, authenticated: true)
-    %{conn: conn}
+    {:ok, user} =
+      ResidencySchedule.Accounts.create_user(%{
+        email: "test-#{System.unique_integer()}@urmc.rochester.edu"
+      })
+
+    conn = Plug.Test.init_test_session(conn, user_id: user.id, authenticated: true)
+    %{conn: conn, user: user}
   end
 
   @doc """
@@ -51,7 +56,12 @@ defmodule ResidencyScheduleWeb.ConnCase do
   Use as `setup :admin_authenticate_session` in LiveView tests behind the admin pipeline.
   """
   def admin_authenticate_session(%{conn: conn}) do
-    conn = Plug.Test.init_test_session(conn, admin: true, authenticated: true)
-    %{conn: conn}
+    {:ok, user} =
+      ResidencySchedule.Accounts.create_user(%{
+        email: "admin-#{System.unique_integer()}@urmc.rochester.edu"
+      })
+
+    conn = Plug.Test.init_test_session(conn, user_id: user.id, admin: true, authenticated: true)
+    %{conn: conn, user: user}
   end
 end
