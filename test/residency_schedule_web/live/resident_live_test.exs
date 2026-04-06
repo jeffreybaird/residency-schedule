@@ -37,12 +37,10 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       assert html =~ "Set as Home"
     end
 
-    test "shows Home badge when resident is home resident", %{conn: conn} do
+    test "shows Home badge when resident is home resident", %{conn: conn, user: user} do
       resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
 
-      conn =
-        conn
-        |> Plug.Test.init_test_session(authenticated: true, resident_id: resident.id)
+      ResidencySchedule.Accounts.set_home_resident(user, resident.id)
 
       {:ok, _view, html} = live(conn, "/residents/#{resident.id}")
       assert html =~ "✓ Home"

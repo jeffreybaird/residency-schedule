@@ -1,6 +1,7 @@
 defmodule ResidencyScheduleWeb.AdminLive.Index do
   use ResidencyScheduleWeb, :live_view
 
+  alias ResidencySchedule.Accounts
   alias ResidencySchedule.Schedules
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
@@ -12,6 +13,8 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
      assign(socket,
        schedules: Schedules.list_schedules(),
        delete_confirm_id: nil,
+       pending_users: Accounts.list_pending_users(),
+       approved_users: Accounts.list_approved_users(),
        existing_overrides: ShiftOverrides.list_all_overrides(),
        override_rotation_type: nil,
        override_start_date: nil,
@@ -126,6 +129,30 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
     {:noreply, assign(socket, existing_overrides: ShiftOverrides.list_all_overrides())}
   end
 
+  @impl true
+  def handle_event("approve_user", %{"id" => id}, socket) do
+    user = Accounts.get_user!(String.to_integer(id))
+    Accounts.approve_user(user)
+
+    {:noreply,
+     assign(socket,
+       pending_users: Accounts.list_pending_users(),
+       approved_users: Accounts.list_approved_users()
+     )}
+  end
+
+  @impl true
+  def handle_event("revoke_user", %{"id" => id}, socket) do
+    user = Accounts.get_user!(String.to_integer(id))
+    Accounts.revoke_user(user)
+
+    {:noreply,
+     assign(socket,
+       pending_users: Accounts.list_pending_users(),
+       approved_users: Accounts.list_approved_users()
+     )}
+  end
+
   defp nilify_empty(nil), do: nil
   defp nilify_empty(""), do: nil
   defp nilify_empty(val), do: val
@@ -218,6 +245,66 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                   <% end %>
                 </ul>
               </div>
+            <% end %>
+          </div>
+        </div>
+
+        <%!-- Users card --%>
+        <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
+              Users
+            </span>
+          </div>
+
+          <%= if @pending_users != [] do %>
+            <div class="px-4 py-4">
+              <p class="text-sm font-medium text-gray-800 mb-2">
+                Pending Approval ({length(@pending_users)})
+              </p>
+              <ul class="space-y-2">
+                <%= for u <- @pending_users do %>
+                  <li class="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                    <div>
+                      <span class="text-sm font-medium text-gray-700">{u.email}</span>
+                      <span class="text-xs text-gray-400 ml-2">
+                        {Calendar.strftime(u.inserted_at, "%b %-d, %Y")}
+                      </span>
+                    </div>
+                    <button
+                      phx-click="approve_user"
+                      phx-value-id={u.id}
+                      class="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 transition-colors"
+                    >
+                      Approve
+                    </button>
+                  </li>
+                <% end %>
+              </ul>
+            </div>
+          <% end %>
+
+          <div class="px-4 py-4 border-t border-gray-100">
+            <p class="text-sm font-medium text-gray-800 mb-2">
+              Approved Users ({length(@approved_users)})
+            </p>
+            <%= if @approved_users == [] do %>
+              <p class="text-xs text-gray-400">No approved users yet.</p>
+            <% else %>
+              <ul class="space-y-2">
+                <%= for u <- @approved_users do %>
+                  <li class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 bg-white">
+                    <span class="text-sm text-gray-700">{u.email}</span>
+                    <button
+                      phx-click="revoke_user"
+                      phx-value-id={u.id}
+                      class="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
+                    >
+                      Revoke
+                    </button>
+                  </li>
+                <% end %>
+              </ul>
             <% end %>
           </div>
         </div>

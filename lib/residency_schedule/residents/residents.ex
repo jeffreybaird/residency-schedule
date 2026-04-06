@@ -89,34 +89,6 @@ defmodule ResidencySchedule.Residents do
   end
 
   @doc """
-  Finds the most recent schedule resident whose canonical name matches the given password.
-  Matching is case-insensitive (via PostgreSQL `lower` on both the stored name and the
-  password). Accepts a spaced initial the same as a run-on form (e.g. `"paige r"` and
-  `"paiger"` both match `"Paige R"`).
-
-  Exempt from doctest — hits the database. See `ResidentsTest`.
-  """
-  def find_by_password(password) do
-    trimmed = String.trim(password)
-
-    from(sr in ScheduleResident,
-      join: r in assoc(sr, :resident),
-      join: s in assoc(sr, :schedule),
-      where:
-        fragment("lower(trim(?)) = lower(trim(?))", r.name, ^trimmed) or
-          fragment(
-            "regexp_replace(lower(trim(?)), '^(.+) ([a-z])$', '\\1\\2') = lower(trim(?))",
-            r.name,
-            ^trimmed
-          ),
-      order_by: [desc: s.academic_year],
-      limit: 1,
-      select: %{sr | name: r.name}
-    )
-    |> Repo.one()
-  end
-
-  @doc """
   Finds or creates a Resident (person) by name, then inserts a ScheduleResident
   for the given schedule. Automatically assigns a unique calendar_token.
   Returns `{:ok, schedule_resident}` or `{:error, changeset}`.
