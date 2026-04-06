@@ -13,10 +13,11 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   def mount(_params, session, socket) do
     schedules = Schedules.list_schedules()
     is_admin = session["admin"] == true
+    today = current_date()
 
     socket =
       if schedules != [] do
-        load_all_schedules(socket, schedules)
+        load_all_schedules(socket, schedules, today)
       else
         assign(socket,
           schedules: [],
@@ -32,7 +33,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
        delete_confirm_id: nil,
        delete_error: nil,
        is_admin: is_admin,
-       today: Date.utc_today()
+       today: today
      )}
   end
 
@@ -80,7 +81,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
             )
 
           _ ->
-            load_all_schedules(socket, remaining)
+            load_all_schedules(socket, remaining, current_date())
         end
 
       {:noreply, assign(socket, delete_confirm_id: nil, delete_error: nil)}
@@ -298,7 +299,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   # --- Private helpers ---
 
   @doc false
-  def load_all_schedules(socket, schedules) do
+  def load_all_schedules(socket, schedules, today) do
     schedule_map = Map.new(schedules, &{&1.id, &1})
     schedule_ids = Enum.map(schedules, & &1.id)
 
@@ -310,7 +311,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     all_slots = build_combined_slots(sections)
 
     unified_residents =
-      build_unified_residents(all_schedule_residents, schedule_map, Date.utc_today())
+      build_unified_residents(all_schedule_residents, schedule_map, today)
 
     assign(socket,
       schedules: schedules,
@@ -550,6 +551,17 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   defp filter_by_year(residents, nil), do: residents
   defp filter_by_year(residents, year), do: Enum.filter(residents, &(&1.current_year == year))
+
+  @doc """
+  Returns the current date. In test, this can be overridden via application env
+  `:residency_schedule, :current_date` to make tests deterministic.
+
+      iex> is_struct(ResidencyScheduleWeb.ScheduleLive.Index.current_date(), Date)
+      true
+  """
+  def current_date do
+    Application.get_env(:residency_schedule, :current_date, Date.utc_today())
+  end
 
   defp filter_tab_class(current, value) do
     base = "px-3 py-1 rounded-full text-sm font-medium transition-colors"
