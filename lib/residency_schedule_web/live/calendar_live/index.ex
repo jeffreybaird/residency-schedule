@@ -161,8 +161,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         <%= if @selected_date do %>
           <div class="fixed inset-0 z-50 flex items-center justify-center">
             <div phx-click="close_modal" class="absolute inset-0 bg-black/40"></div>
-            <div class="relative bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 z-10 max-h-[80vh] overflow-y-auto">
-              <div class="flex items-start justify-between mb-4">
+            <div class="relative bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 z-10 max-h-[80vh] flex flex-col">
+              <div class="flex items-start justify-between p-6 pb-4 shrink-0">
                 <h3 class="text-lg font-semibold text-gray-800">
                   {Calendar.strftime(@selected_date, "%A, %B %-d, %Y")}
                 </h3>
@@ -174,54 +174,56 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                 </button>
               </div>
 
-              <%= if @day_detail == [] do %>
-                <p class="text-sm text-gray-400">No rotations recorded for this day.</p>
-              <% else %>
-                <div class="space-y-4">
-                  <%= for {type, entries} <- @day_detail do %>
-                    <% color = Rotations.rotation_type_color(type) %>
-                    <div>
-                      <div class="flex items-center gap-2 mb-2">
-                        <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
-                          {Rotations.rotation_type_label(type)}
-                        </span>
-                        <span class="text-xs text-gray-400">
-                          {length(entries)} resident{if length(entries) != 1, do: "s"}
-                        </span>
-                      </div>
-                      <ul class="space-y-1 pl-1">
-                        <%= for entry <- entries do %>
-                          <li class="flex items-center gap-2 text-sm">
-                            <span class="text-xs text-gray-400 font-mono w-10">
-                              {entry.resident.position_code}
-                            </span>
-                            <.link
-                              navigate={"/residents/#{entry.resident.id}"}
-                              class={[
-                                "hover:text-blue-600 hover:underline",
-                                if(entry.overridden,
-                                  do: "line-through text-gray-400",
-                                  else: "text-gray-700"
-                                )
-                              ]}
-                            >
-                              {entry.resident.name}
-                            </.link>
-                            <%= if entry.overridden do %>
-                              <span class="text-xs text-gray-400 italic">
-                                → {entry.covered_by.name}
+              <div class="overflow-y-auto px-6 pb-6">
+                <%= if @day_detail == [] do %>
+                  <p class="text-sm text-gray-400">No rotations recorded for this day.</p>
+                <% else %>
+                  <div class="space-y-4">
+                    <%= for {type, entries} <- @day_detail do %>
+                      <% color = Rotations.rotation_type_color(type) %>
+                      <div>
+                        <div class="flex items-center gap-2 mb-2">
+                          <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
+                            {Rotations.rotation_type_label(type)}
+                          </span>
+                          <span class="text-xs text-gray-400">
+                            {length(entries)} resident{if length(entries) != 1, do: "s"}
+                          </span>
+                        </div>
+                        <ul class="space-y-1 pl-1">
+                          <%= for entry <- entries do %>
+                            <li class="flex items-center gap-2 text-sm">
+                              <span class="text-xs text-gray-400 font-mono w-10">
+                                {entry.resident.position_code}
                               </span>
-                            <% end %>
-                            <%= if entry.is_coverage do %>
-                              <span class="text-xs text-blue-500 italic">(covering)</span>
-                            <% end %>
-                          </li>
-                        <% end %>
-                      </ul>
-                    </div>
-                  <% end %>
-                </div>
-              <% end %>
+                              <.link
+                                navigate={"/residents/#{entry.resident.id}"}
+                                class={[
+                                  "hover:text-blue-600 hover:underline",
+                                  if(entry.overridden,
+                                    do: "line-through text-gray-400",
+                                    else: "text-gray-700"
+                                  )
+                                ]}
+                              >
+                                {entry.resident.name}
+                              </.link>
+                              <%= if entry.overridden do %>
+                                <span class="text-xs text-gray-400 italic">
+                                  → {entry.covered_by.name}
+                                </span>
+                              <% end %>
+                              <%= if entry.is_coverage do %>
+                                <span class="text-xs text-blue-500 italic">(covering)</span>
+                              <% end %>
+                            </li>
+                          <% end %>
+                        </ul>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
             </div>
           </div>
         <% end %>
