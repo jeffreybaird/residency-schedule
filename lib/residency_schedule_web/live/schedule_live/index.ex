@@ -52,7 +52,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   @impl true
   def handle_event("view_academic_year", %{"aca_year" => aca_year}, socket) do
-    {:noreply, assign(socket, viewed_aca_year: String.to_integer(aca_year))}
+    {:noreply, assign(socket, viewed_aca_year: to_integer(aca_year))}
   end
 
   @impl true
@@ -579,6 +579,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   def current_academic_year(date) do
     if date.month >= 7, do: date.year, else: date.year - 1
   end
+
+  defp to_integer(value) when is_integer(value), do: value
+  defp to_integer(value) when is_binary(value), do: String.to_integer(value)
 
   defp filter_tab_class(current, value) do
     base = "px-3 py-1 rounded-full text-sm font-medium transition-colors"

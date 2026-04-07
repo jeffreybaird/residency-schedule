@@ -26,6 +26,7 @@ defmodule Mix.Tasks.NormalizeCsvNames do
     |> Path.join("*.csv")
     |> Path.wildcard()
     |> Enum.reject(&String.contains?(Path.basename(&1), "name_mapping"))
+    |> Enum.reject(&String.contains?(Path.basename(&1), "template"))
     |> Enum.each(&normalize_file/1)
   end
 

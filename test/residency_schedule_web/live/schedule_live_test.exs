@@ -91,6 +91,13 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       assert html =~ "Alexis"
       refute html =~ "Kathryn"
     end
+
+    test "view_academic_year handles integer aca_year from JS hooks", %{view: view} do
+      render_hook(view, "view_academic_year", %{"aca_year" => 2023})
+      html = view |> element("button[phx-value-year='4']") |> render_click()
+      assert html =~ "Alexis"
+      refute html =~ "Kathryn"
+    end
   end
 
   describe "with schedule data (R4 not yet graduated)" do
