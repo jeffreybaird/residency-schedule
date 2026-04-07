@@ -15,7 +15,7 @@ defmodule ResidencyScheduleWeb.Router do
   end
 
   pipeline :authenticated do
-    plug ResidencyScheduleWeb.Plugs.RequireAuth
+    plug ResidencyScheduleWeb.Plugs.RequireAuthOrAdmin
   end
 
   pipeline :admin_authenticated do

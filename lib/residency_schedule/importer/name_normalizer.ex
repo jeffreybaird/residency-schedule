@@ -1,4 +1,4 @@
-my defmodule ResidencySchedule.Importer.NameNormalizer do
+defmodule ResidencySchedule.Importer.NameNormalizer do
   @moduledoc """
   Maps raw resident names to canonical first-name forms.
 
