@@ -403,14 +403,14 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     all_schedule_residents
     |> Enum.group_by(& &1.resident_id)
     |> Enum.map(fn {_person_id, srs} ->
-      row = build_person_row(srs, schedule_map)
+      row = build_person_row(srs, schedule_map, aca_year)
       level = aca_year - row.cohort_academic_year + row.cohort_residency_year
       Map.put(row, :cohort_level, level)
     end)
     |> Enum.sort_by(&{&1.graduation_year, &1.sort_number})
   end
 
-  defp build_person_row(schedule_residents, schedule_map) do
+  defp build_person_row(schedule_residents, schedule_map, current_aca_year) do
     sorted =
       Enum.sort_by(schedule_residents, fn sr ->
         schedule_map[sr.schedule_id].academic_year
@@ -419,11 +419,18 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     latest = List.last(sorted)
     earliest = hd(sorted)
 
+    # Link to the schedule covering the current academic year if the resident
+    # has one; otherwise pick the most recent schedule they appear in.
+    detail_sr =
+      Enum.find(sorted, latest, fn sr ->
+        schedule_map[sr.schedule_id].academic_year == current_aca_year
+      end)
+
     rotation_lookup = build_rotation_lookup(sorted)
 
     %{
       resident_id: latest.resident_id,
-      id: latest.id,
+      id: detail_sr.id,
       name: latest.name,
       position_code: latest.position_code,
       current_year: latest.residency_year,

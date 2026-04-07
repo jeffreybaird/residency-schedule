@@ -4,7 +4,8 @@
       "Bash(mix test:*)",
       "Bash(curl -sL \"https://cdn.jsdelivr.net/npm/shepherd.js@13.0.3/dist/css/shepherd.css\" -o /Users/jeffreybaird/personal-repos/residency-schedule/assets/vendor/shepherd.css)",
       "Bash(mix ecto.migrate)",
-      "Bash(MIX_ENV=test mix ecto.migrate)"
+      "Bash(MIX_ENV=test mix ecto.migrate)",
+      "Bash(mix run:*)"
     ]
   }
 }
