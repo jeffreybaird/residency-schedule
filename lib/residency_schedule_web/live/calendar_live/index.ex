@@ -6,7 +6,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   alias ResidencySchedule.ShiftOverrides
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
     any_schedules? = Schedules.list_schedules() != []
     current_month = Date.utc_today() |> Date.beginning_of_month()
 
@@ -22,7 +22,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
        rotation_index: rotation_index,
        override_index: override_index,
        selected_date: nil,
-       day_detail: []
+       day_detail: [],
+       current_user: load_current_user(session)
      )}
   end
 
@@ -75,15 +76,29 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   end
 
   @impl true
+  def handle_event("tour_completed", _params, socket) do
+    if socket.assigns.current_user do
+      ResidencySchedule.Accounts.complete_tour(socket.assigns.current_user)
+    end
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-4xl mx-auto py-10 px-4">
+    <div
+      id="guided-tour"
+      phx-hook="GuidedTour"
+      data-tour-page="calendar"
+      class="max-w-4xl mx-auto py-10 px-4"
+    >
       <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 class="text-2xl font-bold text-gray-800">Calendar</h1>
       </div>
 
       <%= if @any_schedules? do %>
-        <div class="flex items-center justify-between mb-4">
+        <div id="tour-month-nav" class="flex items-center justify-between mb-4">
           <button
             phx-click="prev_month"
             class="px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 text-sm font-medium transition-colors"
@@ -101,7 +116,10 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
           </button>
         </div>
 
-        <div class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+        <div
+          id="tour-calendar-grid"
+          class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm"
+        >
           <%= for {short, long} <- [{"Su","Sun"},{"Mo","Mon"},{"Tu","Tue"},{"We","Wed"},{"Th","Thu"},{"Fr","Fri"},{"Sa","Sat"}] do %>
             <div class="bg-gray-50 px-1 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
               <span class="sm:hidden">{short}</span>
@@ -261,5 +279,12 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     Rotations.rotation_type_color(rotation_type)
     |> String.split()
     |> List.first()
+  end
+
+  defp load_current_user(session) do
+    case session["user_id"] do
+      nil -> nil
+      user_id -> ResidencySchedule.Accounts.get_user(user_id)
+    end
   end
 end

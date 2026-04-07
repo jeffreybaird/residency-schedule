@@ -23,42 +23,51 @@ import "phoenix_html"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
-import {createTour} from "./tour.js"
+import {buildTour, consumeTourState} from "./tour.js"
 
 // YearTracker: updates a DOM element with the calendar year of the leftmost
 // visible data column in the Gantt scroll container as the user scrolls.
 const Hooks = {}
 
 // GuidedTour: launches the Shepherd walkthrough on first login or when
-// the user clicks "Take a tour". Persists completion via LiveView event.
+// the user clicks "Take a tour". Resumes across page navigations via sessionStorage.
 Hooks.GuidedTour = {
   mounted() {
-    this._startTour = () => this.runTour()
+    this._page = this.el.dataset.tourPage || "schedule"
+    this._startTour = () => this._run(this._page)
 
-    // Auto-start on first visit (server tells us via data attr)
-    if (this.el.dataset.autoStart === "true") {
-      // Small delay so the page finishes rendering first
-      setTimeout(() => this.runTour(), 500)
+    // Check if we're resuming after a page navigation.
+    // consumeTourState() reads AND clears sessionStorage so it only fires once.
+    const saved = consumeTourState()
+    if (saved && saved.resume === this._page) {
+      // Resuming takes priority — never also auto-start
+      setTimeout(() => this._run(this._page, saved.startAt), 500)
+    } else if (this.el.dataset.autoStart === "true") {
+      // First-time tour for a new user (no resume state in sessionStorage)
+      setTimeout(() => this._run(this._page), 500)
     }
 
-    // Listen for manual re-trigger from nav link
+    // Listen for manual re-trigger from "Take a tour" link
     window.addEventListener("start-tour", this._startTour)
 
     // Listen for server-pushed re-trigger
-    this.handleEvent("start-tour", () => this.runTour())
+    this.handleEvent("start-tour", () => this._run(this._page))
   },
 
   destroyed() {
     window.removeEventListener("start-tour", this._startTour)
   },
 
-  runTour() {
-    const tour = createTour()
+  _run(page, startAtId) {
+    const tour = buildTour(page, startAtId)
     tour.on("complete", () => {
       this.pushEvent("tour_completed", {})
     })
     tour.on("cancel", () => {
-      this.pushEvent("tour_completed", {})
+      // Navigation cancels save state before calling cancel — don't mark complete
+      if (!sessionStorage.getItem("guided_tour_state")) {
+        this.pushEvent("tour_completed", {})
+      }
     })
     tour.start()
   }

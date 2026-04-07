@@ -66,8 +66,18 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
        night_shifts_remaining_highland: night_shifts_remaining_highland,
        stats_expanded: true,
        night_shifts_expanded: false,
-       shift_coworkers_modal: nil
+       shift_coworkers_modal: nil,
+       current_user: current_user
      )}
+  end
+
+  @impl true
+  def handle_event("tour_completed", _params, socket) do
+    if socket.assigns.current_user do
+      ResidencySchedule.Accounts.complete_tour(socket.assigns.current_user)
+    end
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -176,7 +186,12 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-4xl mx-auto py-10 px-4">
+    <div
+      id="guided-tour"
+      phx-hook="GuidedTour"
+      data-tour-page="resident"
+      class="max-w-4xl mx-auto py-10 px-4"
+    >
       <div class="mb-4">
         <h1 class="text-2xl font-bold text-gray-800">
           {@resident.name}
