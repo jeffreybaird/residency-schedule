@@ -55,7 +55,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       |> render_click()
 
       view
-      |> element("#service-filter-option-#{selected_type}")
+      |> element(~s(#service-filter-panel button[phx-value-service="#{selected_type}"]))
       |> render_click()
 
       assert has_element?(view, "#rotation-table tbody tr[data-rotation-type='#{selected_type}']")
@@ -70,11 +70,11 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       |> render_click()
 
       view
-      |> element("#service-filter-option-#{first_type}")
+      |> element(~s(#service-filter-panel button[phx-value-service="#{first_type}"]))
       |> render_click()
 
       view
-      |> element("#service-filter-option-#{second_type}")
+      |> element(~s(#service-filter-panel button[phx-value-service="#{second_type}"]))
       |> render_click()
 
       assert has_element?(view, "#rotation-table tbody tr[data-rotation-type='#{first_type}']")
@@ -94,7 +94,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       assert has_element?(view, "#service-filter-panel")
 
       view
-      |> element("#service-filter-option-#{selected_type}")
+      |> element(~s(#service-filter-panel button[phx-value-service="#{selected_type}"]))
       |> render_click()
 
       assert has_element?(view, "#service-filter-panel")
@@ -156,7 +156,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       assert has_element?(view, "#service-filter-panel")
 
       view
-      |> element("#service-filter-option-#{selected_type}")
+      |> element(~s(#service-filter-panel button[phx-value-service="#{selected_type}"]))
       |> render_click()
 
       assert has_element?(view, "#service-filter-panel")

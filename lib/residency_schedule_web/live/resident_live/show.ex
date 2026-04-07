@@ -14,7 +14,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     current_user = load_current_user(session)
     home_resident_id = current_user && current_user.home_resident_id
     resident = Residents.get_resident!(String.to_integer(id))
-    today = Date.utc_today()
+    today = ResidencyScheduleWeb.ScheduleLive.Index.current_date()
 
     year_history =
       resident.name
@@ -575,10 +575,12 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             </table>
           </div>
 
+          <%!-- Desktop dropdown --%>
           <%= if @available_services != [] && @service_filter_open do %>
             <div
               id="service-filter-panel"
               class={[
+                "hidden sm:block",
                 "w-[min(22rem,calc(100vw-2rem))]",
                 "rounded-2xl border border-gray-200/80 bg-white py-2 shadow-lg shadow-gray-900/10",
                 "transition-[opacity,transform] duration-75 ease-out motion-reduce:transition-none",
@@ -587,70 +589,18 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
               role="menu"
               aria-label="Service filters"
             >
-              <div class="flex items-start justify-between gap-3 border-b border-gray-100 px-3 pb-2">
-                <div class="min-w-0">
-                  <p class="text-sm font-semibold text-gray-900">Visible services</p>
-                  <p class="text-xs text-gray-500">
-                    {service_filter_count_label(@service_filters, @available_services)}
-                  </p>
-                </div>
+              {service_filter_body(assigns)}
+            </div>
 
-                <button
-                  id="service-filter-clear"
-                  type="button"
-                  phx-click="clear_service_filters"
-                  role="menuitem"
-                  class={[
-                    "shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors duration-75",
-                    if(@service_filters == [],
-                      do: "bg-blue-600 text-white hover:bg-blue-700",
-                      else: "text-blue-600 hover:bg-blue-50"
-                    )
-                  ]}
-                >
-                  All
-                </button>
-              </div>
-
+            <%!-- Mobile bottom sheet --%>
+            <div class="sm:hidden fixed inset-0 z-[70] flex items-end justify-center">
+              <div phx-click="close_service_filter_menu" class="absolute inset-0 bg-black/40"></div>
               <div
-                id="service-filter-options"
-                class="max-h-72 overflow-y-auto px-1 py-1"
-                role="group"
-                aria-label="Service options"
+                class="relative w-full bg-white rounded-t-2xl shadow-lg py-2 max-h-[70vh] flex flex-col"
+                role="menu"
+                aria-label="Service filters"
               >
-                <%= for service <- @available_services do %>
-                  <% selected = service.rotation_type in @service_filters %>
-                  <button
-                    id={"service-filter-option-#{service.rotation_type}"}
-                    type="button"
-                    phx-click="toggle_service_filter"
-                    phx-value-service={service.rotation_type}
-                    aria-pressed={selected}
-                    role="menuitemcheckbox"
-                    aria-checked={selected}
-                    class={[
-                      "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm",
-                      "transition-colors duration-75 ease-out motion-reduce:transition-none",
-                      if(selected,
-                        do: "bg-blue-50/80 text-gray-900",
-                        else: "text-gray-800 hover:bg-gray-50"
-                      )
-                    ]}
-                  >
-                    <span class="min-w-0 flex-1 font-medium">{service.label}</span>
-                    <span class={[
-                      "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors duration-75",
-                      if(selected,
-                        do: "border-blue-600 bg-blue-600 text-white",
-                        else: "border-gray-300 bg-white"
-                      )
-                    ]}>
-                      <%= if selected do %>
-                        <.icon name="hero-check" class="h-3.5 w-3.5" />
-                      <% end %>
-                    </span>
-                  </button>
-                <% end %>
+                {service_filter_body(assigns)}
               </div>
             </div>
           <% end %>
@@ -818,9 +768,33 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     Enum.filter(entries, fn entry -> entry.rotation_type in service_filters end)
   end
 
-  defp today_anchor_slot_index(entries, today) do
+  @doc """
+  Returns the slot index to scroll to on mount.
+
+  Picks the first entry whose end_date is on or after today (i.e. the current
+  or next upcoming rotation). When today is past every entry in the list,
+  falls back to the first entry so the table starts at the beginning of the
+  schedule rather than an arbitrary scroll position.
+
+      iex> entries = [
+      ...>   %{slot_index: 0, end_date: ~D[2024-07-15]},
+      ...>   %{slot_index: 1, end_date: ~D[2024-08-15]}
+      ...> ]
+      iex> ResidencyScheduleWeb.ResidentLive.Show.today_anchor_slot_index(entries, ~D[2024-07-20])
+      1
+
+      iex> entries = [
+      ...>   %{slot_index: 0, end_date: ~D[2024-07-15]},
+      ...>   %{slot_index: 1, end_date: ~D[2024-08-15]}
+      ...> ]
+      iex> ResidencyScheduleWeb.ResidentLive.Show.today_anchor_slot_index(entries, ~D[2025-01-01])
+      0
+  """
+  def today_anchor_slot_index([], _today), do: nil
+
+  def today_anchor_slot_index(entries, today) do
     case Enum.find(entries, fn entry -> Date.compare(entry.end_date, today) != :lt end) do
-      nil -> nil
+      nil -> hd(entries).slot_index
       entry -> entry.slot_index
     end
   end
@@ -850,6 +824,73 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       today_anchor_slot_index: today_anchor_slot_index(filtered_entries, socket.assigns.today),
       shift_coworkers_modal: nil
     )
+  end
+
+  defp service_filter_body(assigns) do
+    ~H"""
+    <div class="flex items-start justify-between gap-3 border-b border-gray-100 px-3 pb-2">
+      <div class="min-w-0">
+        <p class="text-sm font-semibold text-gray-900">Visible services</p>
+        <p class="text-xs text-gray-500">
+          {service_filter_count_label(@service_filters, @available_services)}
+        </p>
+      </div>
+
+      <button
+        type="button"
+        phx-click="clear_service_filters"
+        role="menuitem"
+        class={[
+          "shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors duration-75",
+          if(@service_filters == [],
+            do: "bg-blue-600 text-white hover:bg-blue-700",
+            else: "text-blue-600 hover:bg-blue-50"
+          )
+        ]}
+      >
+        All
+      </button>
+    </div>
+
+    <div
+      class="max-h-72 overflow-y-auto px-1 py-1"
+      role="group"
+      aria-label="Service options"
+    >
+      <%= for service <- @available_services do %>
+        <% selected = service.rotation_type in @service_filters %>
+        <button
+          type="button"
+          phx-click="toggle_service_filter"
+          phx-value-service={service.rotation_type}
+          aria-pressed={selected}
+          role="menuitemcheckbox"
+          aria-checked={selected}
+          class={[
+            "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm",
+            "transition-colors duration-75 ease-out motion-reduce:transition-none",
+            if(selected,
+              do: "bg-blue-50/80 text-gray-900",
+              else: "text-gray-800 hover:bg-gray-50"
+            )
+          ]}
+        >
+          <span class="min-w-0 flex-1 font-medium">{service.label}</span>
+          <span class={[
+            "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors duration-75",
+            if(selected,
+              do: "border-blue-600 bg-blue-600 text-white",
+              else: "border-gray-300 bg-white"
+            )
+          ]}>
+            <%= if selected do %>
+              <.icon name="hero-check" class="h-3.5 w-3.5" />
+            <% end %>
+          </span>
+        </button>
+      <% end %>
+    </div>
+    """
   end
 
   defp service_filter_count_label([], available_services),
