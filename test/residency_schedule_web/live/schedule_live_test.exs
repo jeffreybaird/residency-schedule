@@ -14,6 +14,21 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
   end
 
+  describe "admin session without resident user" do
+    setup do
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(admin: true, authenticated: true)
+
+      {:ok, conn: conn}
+    end
+
+    test "allows access to schedule index", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/")
+      assert html =~ "No schedule uploaded yet"
+    end
+  end
+
   describe "empty state" do
     test "shows upload prompt when no schedule exists", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/")

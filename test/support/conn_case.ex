@@ -39,7 +39,7 @@ defmodule ResidencyScheduleWeb.ConnCase do
 
   @doc """
   Creates an approved user and sets :user_id and :authenticated in the session
-  so the RequireAuth plug passes. Use as `setup :authenticate_session`.
+  so the `RequireAuthOrAdmin` plug passes as a resident user. Use as `setup :authenticate_session`.
   """
   def authenticate_session(%{conn: conn}) do
     {:ok, user} =
@@ -52,7 +52,8 @@ defmodule ResidencyScheduleWeb.ConnCase do
   end
 
   @doc """
-  Sets :admin and :authenticated in the session so both RequireAuth and RequireAdmin plugs pass.
+  Sets :admin, :user_id, and :authenticated in the session so `RequireAuthOrAdmin` and
+  `RequireAdmin` plugs pass.
   Use as `setup :admin_authenticate_session` in LiveView tests behind the admin pipeline.
   """
   def admin_authenticate_session(%{conn: conn}) do
