@@ -51,9 +51,9 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       assert html =~ "Carson"
     end
 
-    test "graduated R4 cohort rendered with Graduated label", %{html: html} do
+    test "graduated R4 cohort rendered with c/o label", %{html: html} do
       assert html =~ "Alexis"
-      assert html =~ "Graduated 2023"
+      assert html =~ "c/o 2023"
     end
 
     test "R1/R2/R3/R4 year filter tabs are present", %{html: html} do
@@ -139,9 +139,9 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       assert html =~ "2026"
     end
 
-    test "incoming class is rendered with Incoming label", %{html: html} do
+    test "incoming class is rendered with c/o label", %{html: html} do
       assert html =~ "Hannah"
-      assert html =~ "Incoming 2026"
+      assert html =~ "c/o 2029"
     end
   end
 
