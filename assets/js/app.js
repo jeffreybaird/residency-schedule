@@ -313,11 +313,29 @@ Hooks.YearTracker = {
     })
   },
 
+  _visibleAcaYearRange() {
+    const containerRect = this.el.getBoundingClientRect()
+    const firstDataX = containerRect.left + this.stickyWidth
+    const rightEdge = containerRect.right
+    const headers = this.el.querySelectorAll("th[data-slot-aca-year]")
+    let min = null
+    let max = null
+    for (const th of headers) {
+      const rect = th.getBoundingClientRect()
+      if (rect.right < firstDataX) continue
+      if (rect.left > rightEdge) break
+      const year = parseInt(th.dataset.slotAcaYear)
+      if (min === null || year < min) min = year
+      if (max === null || year > max) max = year
+    }
+    return { min, max }
+  },
+
   updateCohortVisibility() {
-    const visibleAcaYear = this._visibleAcaYear()
-    if (visibleAcaYear === null) return
-    const minGrad = visibleAcaYear
-    const maxGrad = visibleAcaYear + 3
+    const { min: minAcaYear, max: maxAcaYear } = this._visibleAcaYearRange()
+    if (minAcaYear === null) return
+    const minGrad = minAcaYear
+    const maxGrad = maxAcaYear + 3
     const rows = this.el.querySelectorAll("tr[data-cohort-graduation-year]")
     rows.forEach(row => {
       const gradYear = parseInt(row.dataset.cohortGraduationYear)

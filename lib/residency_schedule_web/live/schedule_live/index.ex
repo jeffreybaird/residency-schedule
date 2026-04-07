@@ -277,16 +277,17 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                   data-year-group={graduation_year}
                   data-cohort-graduation-year={graduation_year}
                   class={[
-                    "bg-gray-100 border-t-2 border-gray-300",
+                    "border-t-2 border-gray-300",
                     if(initially_hidden, do: "hidden")
                   ]}
                 >
                   <td
-                    colspan="9999"
-                    class="sticky left-0 px-2 py-0.5 text-xs font-bold text-gray-500 uppercase tracking-widest"
+                    class="sticky left-0 z-20 bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500 uppercase tracking-widest border-r border-gray-200"
+                    style={"width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
                   >
                     {cohort_separator_label(cohort_level, graduation_year)}
                   </td>
+                  <td colspan="9999" class="bg-gray-100"></td>
                 </tr>
                 <%= for resident <- year_residents do %>
                   <tr
@@ -453,12 +454,17 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     |> Enum.reject(fn {_, rs} -> rs == [] end)
   end
 
-  defp cohort_separator_label(cohort_level, graduation_year) do
-    cond do
-      cohort_level in 1..4 -> "R#{cohort_level}"
-      cohort_level > 4 -> "Graduated #{graduation_year}–#{graduation_year + 1}"
-      true -> "Incoming #{graduation_year - 3}–#{graduation_year - 2}"
-    end
+  @doc """
+  Returns the label for a cohort separator row.
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.cohort_separator_label(2, 2026)
+      "c/o 2026"
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.cohort_separator_label(5, 2023)
+      "c/o 2023"
+  """
+  def cohort_separator_label(_cohort_level, graduation_year) do
+    "c/o #{graduation_year}"
   end
 
   @doc """
