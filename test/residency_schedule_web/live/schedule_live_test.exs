@@ -145,6 +145,34 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
   end
 
+  describe "guided tour" do
+    setup %{conn: conn} do
+      seed_schedule()
+      {:ok, view, html} = live(conn, "/")
+      %{view: view, html: html}
+    end
+
+    test "new user sees tour auto-start attribute", %{html: html} do
+      assert html =~ ~s(data-auto-start="true")
+    end
+
+    test "tour_completed event marks tour as done", %{view: view, user: user} do
+      view |> element("#guided-tour") |> render_hook("tour_completed", %{})
+      updated_user = ResidencySchedule.Accounts.get_user(user.id)
+      assert updated_user.tour_completed == true
+    end
+
+    test "returning user with completed tour does not auto-start", %{user: user, conn: conn} do
+      ResidencySchedule.Accounts.complete_tour(user)
+      {:ok, _view, html} = live(conn, "/")
+      assert html =~ ~s(data-auto-start="false")
+    end
+
+    test "Take a tour link is present", %{html: html} do
+      assert html =~ "Take a tour"
+    end
+  end
+
   describe "build_combined_slots/1" do
     test "combines slots from multiple sections in order" do
       sections = [

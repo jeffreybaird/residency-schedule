@@ -189,6 +189,32 @@ defmodule ResidencySchedule.Accounts do
     |> Repo.update()
   end
 
+  # ── Tour ───────────────────────────────────────────────────────────────────
+
+  @doc """
+  Marks the user's guided tour as completed.
+  Returns `{:ok, user}` or `{:error, changeset}`.
+
+  Exempt from doctest — hits the database.
+  """
+  def complete_tour(user) do
+    user
+    |> User.tour_changeset(%{tour_completed: true})
+    |> Repo.update()
+  end
+
+  @doc """
+  Resets the user's tour so it will show again on next visit.
+  Returns `{:ok, user}` or `{:error, changeset}`.
+
+  Exempt from doctest — hits the database.
+  """
+  def reset_tour(user) do
+    user
+    |> User.tour_changeset(%{tour_completed: false})
+    |> Repo.update()
+  end
+
   # ── Magic link tokens ──────────────────────────────────────────────────────
 
   @doc """
