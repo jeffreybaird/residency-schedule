@@ -6,6 +6,7 @@ defmodule ResidencySchedule.Accounts.User do
     field :email, :string
     field :password_hash, :string
     field :approved, :boolean, default: false
+    field :tour_completed, :boolean, default: false
 
     belongs_to :home_resident, ResidencySchedule.Residents.ScheduleResident
 
@@ -75,6 +76,21 @@ defmodule ResidencySchedule.Accounts.User do
   def approval_changeset(user, attrs) do
     user
     |> cast(attrs, [:approved])
+  end
+
+  @doc """
+  Changeset for marking the tour as completed.
+
+      iex> cs = ResidencySchedule.Accounts.User.tour_changeset(
+      ...>   %ResidencySchedule.Accounts.User{},
+      ...>   %{tour_completed: true}
+      ...> )
+      iex> cs.valid?
+      true
+  """
+  def tour_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:tour_completed])
   end
 
   @doc """

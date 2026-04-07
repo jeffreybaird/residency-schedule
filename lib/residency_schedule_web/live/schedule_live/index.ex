@@ -1,6 +1,7 @@
 defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   use ResidencyScheduleWeb, :live_view
 
+  alias ResidencySchedule.Accounts
   alias ResidencySchedule.Schedules
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
@@ -13,6 +14,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     schedules = Schedules.list_schedules()
     is_admin = session["admin"] == true
     today = current_date()
+    current_user = load_current_user(session)
+    show_tour = current_user != nil and not current_user.tour_completed
 
     socket =
       if schedules != [] do
@@ -32,7 +35,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
        delete_error: nil,
        is_admin: is_admin,
        today: today,
-       viewed_aca_year: current_academic_year(today)
+       viewed_aca_year: current_academic_year(today),
+       current_user: current_user,
+       show_tour: show_tour
      )}
   end
 
@@ -42,6 +47,20 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   @impl true
   def handle_event("scroll_to_schedule", %{"id" => id}, socket) do
     {:noreply, push_event(socket, "scroll-to-schedule", %{schedule_id: id})}
+  end
+
+  @impl true
+  def handle_event("tour_completed", _params, socket) do
+    if socket.assigns.current_user do
+      Accounts.complete_tour(socket.assigns.current_user)
+    end
+
+    {:noreply, assign(socket, show_tour: false)}
+  end
+
+  @impl true
+  def handle_event("restart_tour", _params, socket) do
+    {:noreply, push_event(socket, "start-tour", %{})}
   end
 
   @impl true
@@ -98,9 +117,17 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     assigns = assign(assigns, :name_col_px, @name_col_px)
 
     ~H"""
-    <div class="min-h-screen bg-gray-50">
+    <div
+      id="guided-tour"
+      phx-hook="GuidedTour"
+      data-auto-start={to_string(@show_tour)}
+      class="min-h-screen bg-gray-50"
+    >
       <%= if @schedules != [] do %>
-        <div class="bg-white border-b border-gray-200 px-4 sm:px-6 py-2 flex items-center gap-3 flex-wrap">
+        <div
+          id="tour-schedule-pills"
+          class="bg-white border-b border-gray-200 px-4 sm:px-6 py-2 flex items-center gap-3 flex-wrap"
+        >
           <span class="text-sm text-gray-500">Schedule:</span>
           <%= for s <- @schedules do %>
             <div class="flex items-center gap-0.5">
@@ -169,7 +196,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
       <%= if @all_slots != [] do %>
         <div class="px-4 sm:px-6 py-4 flex flex-wrap items-center gap-4 border-b border-gray-200 bg-white">
-          <div class="flex flex-wrap items-center gap-2">
+          <div id="tour-year-filter" class="flex flex-wrap items-center gap-2">
             <span class="text-sm text-gray-500 font-medium">Year:</span>
             <button
               phx-click="filter_year"
@@ -189,11 +216,20 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
             <% end %>
           </div>
 
-          <span
-            id="gantt-year-indicator"
-            class="ml-auto text-sm font-semibold text-gray-500 tabular-nums"
-          >
-          </span>
+          <div class="ml-auto flex items-center gap-3">
+            <button
+              phx-click="restart_tour"
+              class="text-sm text-blue-500 hover:text-blue-700 transition-colors"
+              title="Take a guided tour"
+            >
+              Take a tour
+            </button>
+            <span
+              id="gantt-year-indicator"
+              class="text-sm font-semibold text-gray-500 tabular-nums"
+            >
+            </span>
+          </div>
         </div>
 
         <div id="gantt-scroll" phx-hook="YearTracker" class="overflow-x-auto">
@@ -589,5 +625,12 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     if current == value,
       do: "#{base} bg-blue-600 text-white",
       else: "#{base} bg-gray-100 text-gray-700 hover:bg-gray-200"
+  end
+
+  defp load_current_user(session) do
+    case session["user_id"] do
+      nil -> nil
+      user_id -> Accounts.get_user(user_id)
+    end
   end
 end

@@ -142,6 +142,30 @@ defmodule ResidencySchedule.AccountsTest do
     end
   end
 
+  describe "tour" do
+    setup do
+      {:ok, user} = Accounts.create_user(%{email: "tour@urmc.rochester.edu"})
+      %{user: user}
+    end
+
+    test "new users have tour_completed as false", %{user: user} do
+      assert user.tour_completed == false
+    end
+
+    test "complete_tour/1 marks tour as completed", %{user: user} do
+      {:ok, updated} = Accounts.complete_tour(user)
+      assert updated.tour_completed == true
+    end
+
+    test "reset_tour/1 resets tour_completed to false", %{user: user} do
+      {:ok, completed} = Accounts.complete_tour(user)
+      assert completed.tour_completed == true
+
+      {:ok, reset} = Accounts.reset_tour(completed)
+      assert reset.tour_completed == false
+    end
+  end
+
   describe "magic link tokens" do
     setup do
       {:ok, user} = Accounts.create_user(%{email: "token@urmc.rochester.edu"})

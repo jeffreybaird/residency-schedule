@@ -23,10 +23,46 @@ import "phoenix_html"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
+import {createTour} from "./tour.js"
 
 // YearTracker: updates a DOM element with the calendar year of the leftmost
 // visible data column in the Gantt scroll container as the user scrolls.
 const Hooks = {}
+
+// GuidedTour: launches the Shepherd walkthrough on first login or when
+// the user clicks "Take a tour". Persists completion via LiveView event.
+Hooks.GuidedTour = {
+  mounted() {
+    this._startTour = () => this.runTour()
+
+    // Auto-start on first visit (server tells us via data attr)
+    if (this.el.dataset.autoStart === "true") {
+      // Small delay so the page finishes rendering first
+      setTimeout(() => this.runTour(), 500)
+    }
+
+    // Listen for manual re-trigger from nav link
+    window.addEventListener("start-tour", this._startTour)
+
+    // Listen for server-pushed re-trigger
+    this.handleEvent("start-tour", () => this.runTour())
+  },
+
+  destroyed() {
+    window.removeEventListener("start-tour", this._startTour)
+  },
+
+  runTour() {
+    const tour = createTour()
+    tour.on("complete", () => {
+      this.pushEvent("tour_completed", {})
+    })
+    tour.on("cancel", () => {
+      this.pushEvent("tour_completed", {})
+    })
+    tour.start()
+  }
+}
 
 // Positions #service-filter-panel with fixed coordinates under #service-filter-toggle so the
 // menu is not clipped by #rotation-table-scroll (overflow-auto).
