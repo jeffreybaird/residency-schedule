@@ -300,6 +300,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                       class="sticky left-0 z-20 bg-white px-2 py-1 text-gray-700 font-medium border-r border-gray-200 overflow-hidden"
                       style={"width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
                       data-tour-resident-name="true"
+                      data-cohort-graduation-year={graduation_year}
                     >
                       <.link
                         navigate={"/residents/#{resident.id}"}

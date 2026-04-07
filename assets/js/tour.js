@@ -35,9 +35,13 @@ const SCHEDULE_STEPS = [
   },
   {
     id: "resident-name",
-    attachTo: { element: "td[data-tour-resident-name]", on: "right" },
+    attachTo: {
+      element:
+        "td[data-tour-resident-name][data-cohort-graduation-year='2026']",
+      on: "right",
+    },
     title: "Resident Names",
-    text: "This column shows every resident\u2019s name. Let\u2019s click one to see their personal schedule page.",
+    text: "Clicking on a resident\u2019s name will take you to their personal schedule page.",
     buttons: ["back", "navigate-resident"],
   },
   {
@@ -303,11 +307,9 @@ function buildButtons(keys, tour) {
         text: "Let\u2019s go \u2192",
         classes: "shepherd-button",
         action: () => {
-          const allCells = Array.from(
-            document.querySelectorAll("td[data-tour-resident-name]"),
-          ).filter((td) => !td.closest("tr.hidden"));
-          const nameCell =
-            allCells.length > 0 ? allCells[allCells.length - 1] : null;
+          const nameCell = document.querySelector(
+            "td[data-tour-resident-name][data-cohort-graduation-year='2026']",
+          );
           const link =
             nameCell && nameCell.querySelector("a[href^='/residents/']");
           if (link) {
