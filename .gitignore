@@ -35,6 +35,4 @@ residency_schedule-*.tar
 npm-debug.log
 /assets/node_modules/
 
-# Ignore data files
-data/*.csv
 
