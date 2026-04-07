@@ -53,9 +53,18 @@ defmodule ResidencySchedule.Accounts do
   Exempt from doctest — hits the database.
   """
   def create_user(attrs) do
-    %User{}
-    |> User.registration_changeset(attrs)
-    |> Repo.insert()
+    with {:ok, user} <-
+           %User{}
+           |> User.registration_changeset(attrs)
+           |> Repo.insert() do
+      unless user.approved, do: notify_admin_of_pending_user(user)
+      {:ok, user}
+    end
+  end
+
+  defp notify_admin_of_pending_user(user) do
+    base_url = ResidencyScheduleWeb.Endpoint.url()
+    ResidencySchedule.Mailer.send_approval_request_email(user, base_url)
   end
 
   @doc """
