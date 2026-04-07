@@ -5,9 +5,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
 
-  # Fixed pixel widths for sticky label columns — must match left-[Xpx] values below.
-  @id_col_px 72
-  @name_col_px 128
+  # Fixed pixel width for the sticky name column — must match left-[Xpx] values below.
+  @name_col_px 148
 
   @impl true
   def mount(_params, session, socket) do
@@ -32,7 +31,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
        delete_confirm_id: nil,
        delete_error: nil,
        is_admin: is_admin,
-       today: today
+       today: today,
+       viewed_aca_year: current_academic_year(today)
      )}
   end
 
@@ -48,6 +48,11 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   def handle_event("filter_year", %{"year" => year}, socket) do
     filter_year = if year == "all", do: nil, else: String.to_integer(year)
     {:noreply, assign(socket, filter_year: filter_year)}
+  end
+
+  @impl true
+  def handle_event("view_academic_year", %{"aca_year" => aca_year}, socket) do
+    {:noreply, assign(socket, viewed_aca_year: String.to_integer(aca_year))}
   end
 
   @impl true
@@ -90,7 +95,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   @impl true
   def render(assigns) do
-    assigns = assign(assigns, :id_col_px, @id_col_px)
     assigns = assign(assigns, :name_col_px, @name_col_px)
 
     ~H"""
@@ -198,13 +202,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
               <tr class="bg-gray-100 sticky top-0 z-30">
                 <th
                   class="sticky left-0 z-40 bg-gray-100 px-2 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-300 whitespace-nowrap overflow-hidden"
-                  style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
-                >
-                  ID
-                </th>
-                <th
-                  class="sticky z-40 bg-gray-100 px-2 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-300 whitespace-nowrap overflow-hidden"
-                  style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
+                  style={"width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
                 >
                   Name
                 </th>
@@ -222,6 +220,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                     ]}
                     style="min-width: 52px"
                     data-slot-year={start_date.year}
+                    data-slot-aca-year={
+                      if start_date.month >= 7, do: start_date.year, else: start_date.year - 1
+                    }
                     data-today-slot={if slot_today, do: "true"}
                     data-schedule-id={schedule_id}
                     data-schedule-start={if first_in_schedule?, do: schedule_id}
@@ -232,37 +233,54 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
               </tr>
             </thead>
             <tbody>
-              <%= for resident <- visible_residents(@unified_residents, @filter_year) do %>
-                <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
+              <%= for {graduation_year, year_residents} <- residents_by_year(@unified_residents, @filter_year, @viewed_aca_year) do %>
+                <% cohort_level = hd(year_residents).cohort_level %>
+                <% initially_hidden = cohort_level not in 1..4 %>
+                <tr
+                  data-year-group={graduation_year}
+                  data-cohort-graduation-year={graduation_year}
+                  class={[
+                    "bg-gray-100 border-t-2 border-gray-300",
+                    if(initially_hidden, do: "hidden")
+                  ]}
+                >
                   <td
-                    class="sticky left-0 z-20 bg-white px-2 py-1 font-mono text-gray-500 border-r border-gray-200 overflow-hidden"
-                    style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
+                    colspan="9999"
+                    class="sticky left-0 px-2 py-0.5 text-xs font-bold text-gray-500 uppercase tracking-widest"
                   >
-                    <.link navigate={"/residents/#{resident.id}"} class="hover:text-blue-600">
-                      {resident.position_code}
-                    </.link>
+                    {cohort_separator_label(cohort_level, graduation_year)}
                   </td>
-                  <td
-                    class="sticky z-20 bg-white px-2 py-1 text-gray-700 font-medium border-r border-gray-200 overflow-hidden"
-                    style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
-                  >
-                    <.link
-                      navigate={"/residents/#{resident.id}"}
-                      class="hover:text-blue-600 truncate block"
-                    >
-                      {resident.name}
-                    </.link>
-                  </td>
-                  <%= for {colspan, rotation} <- cell_groups_unified(@all_slots, resident.rotation_lookup) do %>
-                    <% past = rotation != nil && Date.compare(rotation.end_date, @today) == :lt %>
-                    <td
-                      colspan={colspan}
-                      class="px-0.5 py-0.5 text-center border-r border-gray-100"
-                    >
-                      {render_rotation_cell(rotation, past)}
-                    </td>
-                  <% end %>
                 </tr>
+                <%= for resident <- year_residents do %>
+                  <tr
+                    data-cohort-graduation-year={graduation_year}
+                    class={[
+                      "hover:bg-gray-50 transition-colors border-b border-gray-100",
+                      if(initially_hidden, do: "hidden")
+                    ]}
+                  >
+                    <td
+                      class="sticky left-0 z-20 bg-white px-2 py-1 text-gray-700 font-medium border-r border-gray-200 overflow-hidden"
+                      style={"width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
+                    >
+                      <.link
+                        navigate={"/residents/#{resident.id}"}
+                        class="hover:text-blue-600 truncate block"
+                      >
+                        {resident.name}
+                      </.link>
+                    </td>
+                    <%= for {colspan, rotation} <- cell_groups_unified(@all_slots, resident.rotation_lookup) do %>
+                      <% past = rotation != nil && Date.compare(rotation.end_date, @today) == :lt %>
+                      <td
+                        colspan={colspan}
+                        class="px-0.5 py-0.5 text-center border-r border-gray-100"
+                      >
+                        {render_rotation_cell(rotation, past)}
+                      </td>
+                    <% end %>
+                  </tr>
+                <% end %>
               <% end %>
             </tbody>
           </table>
@@ -332,21 +350,24 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   @doc """
-  Builds a list of unified resident rows from started schedules. Each person
-  gets one row. Graduated residents (R4 in a completed academic year) are
-  excluded. The current year and position code come from the person's latest
-  schedule appearance.
+  Builds a list of unified resident rows filtered to the 4 cohort classes
+  active in today's academic year. Each cohort's level is derived from
+  how many academic years have passed since they entered the program.
 
-      iex> schedule_map = %{1 => %{id: 1, academic_year: 2023}}
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.build_unified_residents([], schedule_map, ~D[2026-04-06])
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.build_unified_residents([], %{}, ~D[2026-04-06])
       []
   """
   def build_unified_residents(all_schedule_residents, schedule_map, today) do
+    aca_year = current_academic_year(today)
+
     all_schedule_residents
     |> Enum.group_by(& &1.resident_id)
-    |> Enum.map(fn {_person_id, srs} -> build_person_row(srs, schedule_map) end)
-    |> Enum.reject(&graduated?(&1, today))
-    |> Enum.sort_by(&{&1.current_year, &1.sort_number})
+    |> Enum.map(fn {_person_id, srs} ->
+      row = build_person_row(srs, schedule_map)
+      level = aca_year - row.cohort_academic_year + row.cohort_residency_year
+      Map.put(row, :cohort_level, level)
+    end)
+    |> Enum.sort_by(&{&1.graduation_year, &1.sort_number})
   end
 
   defp build_person_row(schedule_residents, schedule_map) do
@@ -359,7 +380,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     earliest = hd(sorted)
 
     rotation_lookup = build_rotation_lookup(sorted)
-    last_rotation_end = find_last_rotation_end(sorted)
 
     %{
       resident_id: latest.resident_id,
@@ -368,7 +388,10 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       position_code: latest.position_code,
       current_year: latest.residency_year,
       sort_number: earliest.schedule_number,
-      last_rotation_end: last_rotation_end,
+      cohort_academic_year: schedule_map[earliest.schedule_id].academic_year,
+      cohort_residency_year: earliest.residency_year,
+      graduation_year:
+        schedule_map[earliest.schedule_id].academic_year - earliest.residency_year + 4,
       rotation_lookup: rotation_lookup
     }
   end
@@ -383,34 +406,20 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     |> Map.new()
   end
 
-  defp find_last_rotation_end(schedule_residents) do
-    schedule_residents
-    |> Enum.flat_map(& &1.rotations)
-    |> Enum.map(& &1.end_date)
-    |> Enum.max(Date, fn -> nil end)
+  defp residents_by_year(unified_residents, filter_year, viewed_aca_year) do
+    unified_residents
+    |> visible_residents(filter_year, viewed_aca_year)
+    |> Enum.group_by(& &1.graduation_year)
+    |> Enum.sort_by(fn {gy, _} -> gy end)
+    |> Enum.reject(fn {_, rs} -> rs == [] end)
   end
 
-  @doc """
-  Returns true if a resident has graduated — they are R4 and their last
-  rotation has already ended. Non-R4 residents never graduate. R4 residents
-  with remaining shifts are still active.
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, last_rotation_end: ~D[2024-06-15]}, ~D[2025-07-01])
-      true
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, last_rotation_end: ~D[2026-06-20]}, ~D[2026-04-06])
-      false
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 3, last_rotation_end: ~D[2024-06-15]}, ~D[2025-07-01])
-      false
-
-      iex> ResidencyScheduleWeb.ScheduleLive.Index.graduated?(%{current_year: 4, last_rotation_end: nil}, ~D[2025-07-01])
-      false
-  """
-  def graduated?(resident, today) do
-    resident.current_year == 4 and
-      resident.last_rotation_end != nil and
-      Date.compare(resident.last_rotation_end, today) == :lt
+  defp cohort_separator_label(cohort_level, graduation_year) do
+    cond do
+      cohort_level in 1..4 -> "R#{cohort_level}"
+      cohort_level > 4 -> "Graduated #{graduation_year}–#{graduation_year + 1}"
+      true -> "Incoming #{graduation_year - 3}–#{graduation_year - 2}"
+    end
   end
 
   @doc """
@@ -536,10 +545,11 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   defp abbrev(rotation_type), do: Map.get(@abbrev_map, rotation_type, rotation_type)
 
-  defp visible_residents(unified_residents, nil), do: unified_residents
+  defp visible_residents(unified_residents, nil, _viewed_aca_year), do: unified_residents
 
-  defp visible_residents(unified_residents, year) do
-    Enum.filter(unified_residents, &(&1.current_year == year))
+  defp visible_residents(unified_residents, level, viewed_aca_year) do
+    target_grad_year = viewed_aca_year + 4 - level
+    Enum.filter(unified_residents, &(&1.graduation_year == target_grad_year))
   end
 
   @doc """
@@ -551,6 +561,23 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   """
   def current_date do
     Application.get_env(:residency_schedule, :current_date, Date.utc_today())
+  end
+
+  @doc """
+  Derives the academic year start integer from a date. The residency academic
+  year runs July 1 through June 30.
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.current_academic_year(~D[2026-07-01])
+      2026
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.current_academic_year(~D[2026-06-30])
+      2025
+
+      iex> ResidencyScheduleWeb.ScheduleLive.Index.current_academic_year(~D[2026-04-06])
+      2025
+  """
+  def current_academic_year(date) do
+    if date.month >= 7, do: date.year, else: date.year - 1
   end
 
   defp filter_tab_class(current, value) do

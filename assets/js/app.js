@@ -163,14 +163,19 @@ Hooks.ScrollToToday = {
 
 Hooks.YearTracker = {
   mounted() {
+    this._lastAcaYear = null
+    this._acaYearTimer = null
     this.yearEl = document.getElementById("gantt-year-indicator")
-    this.stickyWidth = 72 + 128 // @id_col_px + @name_col_px
+    this.stickyWidth = 148 // @name_col_px (ID column removed)
     this.updateYear()
     this.updateActivePill()
     this.scrollToToday()
+    this.updateCohortVisibility()
     this.el.addEventListener("scroll", () => {
       this.updateYear()
       this.updateActivePill()
+      this.updateCohortVisibility()
+      this._pushAcaYearChange()
     }, {passive: true})
 
     // Listen for scroll-to-schedule events from LiveView
@@ -182,6 +187,7 @@ Hooks.YearTracker = {
   updated() {
     this.updateYear()
     this.updateActivePill()
+    this.updateCohortVisibility()
   },
 
   scrollToToday() {
@@ -197,7 +203,30 @@ Hooks.YearTracker = {
     if (!th) return
     const containerRect = this.el.getBoundingClientRect()
     const thRect = th.getBoundingClientRect()
-    this.el.scrollLeft += thRect.left - containerRect.left - this.stickyWidth - 8
+    this.el.scrollLeft += thRect.left - containerRect.left - this.stickyWidth
+    this.updateCohortVisibility()
+  },
+
+  _visibleAcaYear() {
+    const containerRect = this.el.getBoundingClientRect()
+    const firstDataX = containerRect.left + this.stickyWidth
+    const headers = this.el.querySelectorAll("th[data-slot-aca-year]")
+    for (const th of headers) {
+      if (th.getBoundingClientRect().right > firstDataX) {
+        return parseInt(th.dataset.slotAcaYear)
+      }
+    }
+    return null
+  },
+
+  _pushAcaYearChange() {
+    const acaYear = this._visibleAcaYear()
+    if (acaYear === null || acaYear === this._lastAcaYear) return
+    this._lastAcaYear = acaYear
+    clearTimeout(this._acaYearTimer)
+    this._acaYearTimer = setTimeout(() => {
+      this.pushEvent("view_academic_year", {aca_year: acaYear})
+    }, 300)
   },
 
   updateYear() {
@@ -236,6 +265,18 @@ Hooks.YearTracker = {
       pill.classList.toggle("text-white", isActive)
       pill.classList.toggle("bg-gray-100", !isActive)
       pill.classList.toggle("text-gray-700", !isActive)
+    })
+  },
+
+  updateCohortVisibility() {
+    const visibleAcaYear = this._visibleAcaYear()
+    if (visibleAcaYear === null) return
+    const minGrad = visibleAcaYear
+    const maxGrad = visibleAcaYear + 3
+    const rows = this.el.querySelectorAll("tr[data-cohort-graduation-year]")
+    rows.forEach(row => {
+      const gradYear = parseInt(row.dataset.cohortGraduationYear)
+      row.classList.toggle("hidden", gradYear < minGrad || gradYear > maxGrad)
     })
   }
 }
