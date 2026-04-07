@@ -6,8 +6,9 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
   alias ResidencySchedule.Rotations
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
     schedule = Schedules.latest_schedule()
+    current_user = load_current_user(session)
 
     socket =
       if schedule do
@@ -27,7 +28,8 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
           today_anchor_date_start: nil,
           summary: [],
           stats_expanded: true,
-          summary_expanded: false
+          summary_expanded: false,
+          current_user: current_user
         )
       else
         assign(socket,
@@ -44,7 +46,8 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
           today_anchor_date_start: nil,
           summary: [],
           stats_expanded: true,
-          summary_expanded: false
+          summary_expanded: false,
+          current_user: current_user
         )
       end
 
@@ -87,6 +90,15 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
   end
 
   @impl true
+  def handle_event("tour_completed", _params, socket) do
+    if socket.assigns.current_user do
+      ResidencySchedule.Accounts.complete_tour(socket.assigns.current_user)
+    end
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("toggle_stats", _params, socket) do
     {:noreply, assign(socket, stats_expanded: !socket.assigns.stats_expanded)}
   end
@@ -99,7 +111,12 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-4xl mx-auto py-10 px-4">
+    <div
+      id="guided-tour"
+      phx-hook="GuidedTour"
+      data-tour-page="compare"
+      class="max-w-4xl mx-auto py-10 px-4"
+    >
       <%!-- Non-sticky: title + schedule switcher --%>
       <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h1 class="text-2xl font-bold text-gray-800">Compare Schedules</h1>
@@ -163,7 +180,10 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
 
             <%= if @stats_expanded do %>
               <%!-- Dropdowns --%>
-              <div class="grid grid-cols-2 divide-x divide-gray-200 bg-gray-50">
+              <div
+                id="tour-compare-dropdowns"
+                class="grid grid-cols-2 divide-x divide-gray-200 bg-gray-50"
+              >
                 <div class="px-4 py-3">
                   <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
                     Resident A
@@ -404,4 +424,11 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
 
   defp parse_id(""), do: nil
   defp parse_id(id), do: String.to_integer(id)
+
+  defp load_current_user(session) do
+    case session["user_id"] do
+      nil -> nil
+      user_id -> ResidencySchedule.Accounts.get_user(user_id)
+    end
+  end
 end

@@ -117,4 +117,38 @@
 .shepherd-element{background:#fff;border-radius:5px;box-shadow:0 1px 4px rgba(0,0,0,.2);max-width:400px;opacity:0;outline:none;transition:opacity .3s,visibility .3s;visibility:hidden;width:100%;z-index:9999}.shepherd-enabled.shepherd-element{opacity:1;visibility:visible}.shepherd-element[data-popper-reference-hidden]:not(.shepherd-centered){opacity:0;pointer-events:none;visibility:hidden}.shepherd-element,.shepherd-element *,.shepherd-element :after,.shepherd-element :before{box-sizing:border-box}.shepherd-arrow,.shepherd-arrow:before{height:16px;position:absolute;width:16px;z-index:-1}.shepherd-arrow:before{background:#fff;content:"";transform:rotate(45deg)}.shepherd-element[data-popper-placement^=top]>.shepherd-arrow{bottom:-8px}.shepherd-element[data-popper-placement^=bottom]>.shepherd-arrow{top:-8px}.shepherd-element[data-popper-placement^=left]>.shepherd-arrow{right:-8px}.shepherd-element[data-popper-placement^=right]>.shepherd-arrow{left:-8px}.shepherd-element.shepherd-centered>.shepherd-arrow{opacity:0}.shepherd-element.shepherd-has-title[data-popper-placement^=bottom]>.shepherd-arrow:before{background-color:#e6e6e6}.shepherd-target-click-disabled.shepherd-enabled.shepherd-target,.shepherd-target-click-disabled.shepherd-enabled.shepherd-target *{pointer-events:none}
 .shepherd-modal-overlay-container{height:0;left:0;opacity:0;overflow:hidden;pointer-events:none;position:fixed;top:0;transition:all .3s ease-out,height 0ms .3s,opacity .3s 0ms;width:100vw;z-index:9997}.shepherd-modal-overlay-container.shepherd-modal-is-visible{height:100vh;opacity:.5;transform:translateZ(0);transition:all .3s ease-out,height 0s 0s,opacity .3s 0s}.shepherd-modal-overlay-container.shepherd-modal-is-visible path{pointer-events:all}
 
+/* When the tour is paused, hide the overlay and tooltip but keep them in the DOM
+   so Shepherd's internal state is preserved and resume works cleanly. */
+body.tour-paused .shepherd-modal-overlay-container,
+body.tour-paused .shepherd-element { visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }
+
+/* Floating "Continue Tour" button — shown when the user clicks into the app */
+#tour-continue-btn {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 10000;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: #3288e6;
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(50, 136, 230, 0.4);
+  animation: tour-pulse 2s ease-in-out infinite;
+  transition: background 0.2s, transform 0.15s;
+}
+#tour-continue-btn:hover {
+  background: #196fcc;
+  transform: scale(1.05);
+  animation: none;
+}
+
+@keyframes tour-pulse {
+  0%, 100% { box-shadow: 0 4px 16px rgba(50, 136, 230, 0.4); }
+  50% { box-shadow: 0 4px 24px rgba(50, 136, 230, 0.7), 0 0 0 6px rgba(50, 136, 230, 0.15); }
+}
+
 /* This file is for your main application CSS */
