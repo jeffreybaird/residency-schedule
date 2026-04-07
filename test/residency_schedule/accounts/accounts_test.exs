@@ -1,6 +1,8 @@
 defmodule ResidencySchedule.AccountsTest do
   use ResidencySchedule.DataCase, async: true
 
+  import Swoosh.TestAssertions
+
   alias ResidencySchedule.Accounts
   alias ResidencySchedule.Accounts.User
 
@@ -125,12 +127,14 @@ defmodule ResidencySchedule.AccountsTest do
       assert hd(pending).email == "pending@gmail.com"
     end
 
-    test "approve_user/1 sets approved to true" do
+    test "approve_user/1 sets approved to true and sends approval email" do
       {:ok, user} = Accounts.create_user(%{email: "toapprove@gmail.com"})
       assert user.approved == false
 
       {:ok, approved} = Accounts.approve_user(user)
       assert approved.approved == true
+
+      assert_email_sent(subject: "You've been approved — Residency Schedule")
     end
 
     test "revoke_user/1 sets approved to false" do
