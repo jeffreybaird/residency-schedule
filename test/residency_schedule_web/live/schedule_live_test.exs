@@ -48,11 +48,12 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
 
     test "renders non-graduated residents in the grid", %{html: html} do
-      assert html =~ "R1-1"
+      assert html =~ "Carson"
     end
 
-    test "hides graduated R4 residents whose last rotation has ended", %{html: html} do
-      refute html =~ "Alexis"
+    test "graduated R4 cohort rendered with Graduated label", %{html: html} do
+      assert html =~ "Alexis"
+      assert html =~ "Graduated 2023"
     end
 
     test "R1/R2/R3/R4 year filter tabs are present", %{html: html} do
@@ -60,26 +61,35 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       assert html =~ "R4"
     end
 
-    test "year filter shows only R1 residents when R1 selected", %{view: view} do
-      html = view |> element("button[phx-value-year='1']") |> render_click()
-      assert html =~ "R1-1"
-      refute html =~ "R3-1"
+    test "year filter shows only the cohort currently at R2", %{view: view} do
+      html = view |> element("button[phx-value-year='2']") |> render_click()
+      assert html =~ "Carson"
+      refute html =~ "Kathryn"
     end
 
     test "All filter restores all residents", %{view: view} do
-      view |> element("button[phx-value-year='1']") |> render_click()
+      view |> element("button[phx-value-year='2']") |> render_click()
       html = view |> element("button[phx-value-year='all']") |> render_click()
-      assert html =~ "R1-1"
-      assert html =~ "R3-1"
+      assert html =~ "Carson"
+      assert html =~ "Kathryn"
     end
 
-    test "no year group headers in the grid", %{html: html} do
-      refute html =~ "R1 Residents"
-      refute html =~ "R4 Residents"
+    test "year group separator rows appear between classes", %{html: html} do
+      assert html =~ ~s(data-year-group="2023")
+      assert html =~ ~s(data-year-group="2026")
     end
 
     test "pill buttons use scroll_to_schedule event", %{html: html} do
       assert html =~ "scroll_to_schedule"
+    end
+
+    test "R4 filter shows cohort active in viewed year after view_academic_year event", %{
+      view: view
+    } do
+      render_hook(view, "view_academic_year", %{"aca_year" => "2023"})
+      html = view |> element("button[phx-value-year='4']") |> render_click()
+      assert html =~ "Alexis"
+      refute html =~ "Kathryn"
     end
   end
 
@@ -95,13 +105,13 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
 
     test "shows R4 residents when their rotations have not ended", %{html: html} do
       assert html =~ "Alexis"
-      assert html =~ "R4-1"
+      assert html =~ ~s(data-year-group="2023")
     end
 
     test "R4 filter shows R4 residents", %{view: view} do
       html = view |> element("button[phx-value-year='4']") |> render_click()
-      assert html =~ "R4-1"
-      refute html =~ "R1-1"
+      assert html =~ "Alexis"
+      refute html =~ "Carson"
     end
   end
 
@@ -120,6 +130,11 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
 
     test "shows schedule pill for future schedule", %{html: html} do
       assert html =~ "2026"
+    end
+
+    test "incoming class is rendered with Incoming label", %{html: html} do
+      assert html =~ "Hannah"
+      assert html =~ "Incoming 2026"
     end
   end
 
@@ -191,35 +206,17 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
   end
 
-  describe "graduated?/2" do
-    test "R4 whose last rotation has ended is graduated" do
-      resident = %{current_year: 4, last_rotation_end: ~D[2024-06-15]}
-      assert Index.graduated?(resident, ~D[2025-07-01])
+  describe "current_academic_year/1" do
+    test "July date returns that year" do
+      assert Index.current_academic_year(~D[2026-07-01]) == 2026
     end
 
-    test "R4 with remaining rotations is not graduated" do
-      resident = %{current_year: 4, last_rotation_end: ~D[2026-06-20]}
-      refute Index.graduated?(resident, ~D[2026-04-06])
+    test "June date returns prior year" do
+      assert Index.current_academic_year(~D[2026-06-30]) == 2025
     end
 
-    test "R4 whose last rotation ends today is not graduated" do
-      resident = %{current_year: 4, last_rotation_end: ~D[2025-06-20]}
-      refute Index.graduated?(resident, ~D[2025-06-20])
-    end
-
-    test "non-R4 is never graduated even with past rotations" do
-      resident = %{current_year: 3, last_rotation_end: ~D[2020-06-15]}
-      refute Index.graduated?(resident, ~D[2025-07-01])
-    end
-
-    test "R4 with no rotations is not graduated" do
-      resident = %{current_year: 4, last_rotation_end: nil}
-      refute Index.graduated?(resident, ~D[2025-07-01])
-    end
-
-    test "R1 with no rotations is not graduated" do
-      resident = %{current_year: 1, last_rotation_end: nil}
-      refute Index.graduated?(resident, ~D[2025-07-01])
+    test "mid-year date returns academic year that started in prior calendar year" do
+      assert Index.current_academic_year(~D[2026-04-06]) == 2025
     end
   end
 
