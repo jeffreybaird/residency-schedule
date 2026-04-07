@@ -7,16 +7,23 @@ defmodule ResidencySchedule.AccountsTest do
   alias ResidencySchedule.Accounts.User
 
   describe "create_user/1" do
-    test "creates an approved user for URMC email" do
+    test "creates an approved user for URMC email and does not notify admin" do
       {:ok, user} = Accounts.create_user(%{email: "jane@urmc.rochester.edu"})
       assert user.email == "jane@urmc.rochester.edu"
       assert user.approved == true
+
+      refute_email_sent(to: [{nil, "jeffreybaird@hey.com"}])
     end
 
-    test "creates an unapproved user for non-URMC email" do
+    test "creates an unapproved user for non-URMC email and notifies admin" do
       {:ok, user} = Accounts.create_user(%{email: "jane@gmail.com"})
       assert user.email == "jane@gmail.com"
       assert user.approved == false
+
+      assert_email_sent(
+        to: [{nil, "jeffreybaird@hey.com"}],
+        subject: "New approval request — jane@gmail.com"
+      )
     end
 
     test "rejects duplicate email" do
@@ -130,6 +137,9 @@ defmodule ResidencySchedule.AccountsTest do
     test "approve_user/1 sets approved to true and sends approval email" do
       {:ok, user} = Accounts.create_user(%{email: "toapprove@gmail.com"})
       assert user.approved == false
+
+      # Drain the admin notification from create_user
+      assert_email_sent(to: [{nil, "jeffreybaird@hey.com"}])
 
       {:ok, approved} = Accounts.approve_user(user)
       assert approved.approved == true

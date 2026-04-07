@@ -90,6 +90,45 @@ defmodule ResidencySchedule.Mailer do
     end
   end
 
+  @doc """
+  Notifies the admin that a new user is requesting approval.
+
+  Exempt from doctest — sends email.
+  """
+  def send_approval_request_email(user, base_url) do
+    email =
+      new()
+      |> to(admin_email())
+      |> from({from_name(), @from_address})
+      |> subject("New approval request — #{user.email}")
+      |> text_body("""
+      A new user has signed up and is waiting for approval:
+
+      Email: #{user.email}
+      Signed up: #{Calendar.strftime(user.inserted_at, "%b %-d, %Y at %-I:%M %p UTC")}
+
+      Review pending users at: #{base_url}/admin
+      """)
+      |> html_body("""
+      <p>A new user has signed up and is waiting for approval:</p>
+      <p><strong>Email:</strong> #{user.email}</p>
+      <p><strong>Signed up:</strong> #{Calendar.strftime(user.inserted_at, "%b %-d, %Y at %-I:%M %p UTC")}</p>
+      <p><a href="#{base_url}/admin">Review pending users</a></p>
+      """)
+
+    case deliver(email) do
+      {:ok, _metadata} = success ->
+        success
+
+      {:error, reason} = error ->
+        require Logger
+        Logger.error("Mailer.send_approval_request_email failed: #{inspect(reason)}")
+        error
+    end
+  end
+
+  defp admin_email, do: "jeffreybaird@hey.com"
+
   defp from_name do
     Application.get_env(:residency_schedule, :mailer_from_name, "Residency Schedule")
   end
