@@ -13,6 +13,12 @@ defmodule ResidencySchedule.Accounts.User do
     timestamps(type: :utc_datetime)
   end
 
+  @whitelisted_emails [
+    "brendablennon@gmail.com",
+    "clarelennonbaird@gmail.com",
+    "jlbaird87@gmail.com"
+  ]
+
   @doc """
   Changeset for creating a user via magic link signup.
 
@@ -126,9 +132,17 @@ defmodule ResidencySchedule.Accounts.User do
 
   defp maybe_auto_approve(changeset) do
     case get_change(changeset, :email) do
-      nil -> changeset
-      email -> if urmc_email?(email), do: put_change(changeset, :approved, true), else: changeset
+      nil ->
+        changeset
+
+      email ->
+        if whitelisted_email?(email), do: put_change(changeset, :approved, true), else: changeset
     end
+  end
+
+  defp whitelisted_email?(email) do
+    @whitelisted_emails
+    |> Enum.member?(String.downcase(email)) || urmc_email?(email)
   end
 
   defp put_password_hash(changeset, %{password: password}) when byte_size(password) > 0 do
