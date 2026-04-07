@@ -172,9 +172,18 @@ defmodule ResidencySchedule.Accounts do
   Exempt from doctest — hits the database.
   """
   def approve_user(user) do
-    user
-    |> User.approval_changeset(%{approved: true})
-    |> Repo.update()
+    with {:ok, approved_user} <-
+           user
+           |> User.approval_changeset(%{approved: true})
+           |> Repo.update() do
+      send_approval_notification(approved_user)
+      {:ok, approved_user}
+    end
+  end
+
+  defp send_approval_notification(user) do
+    base_url = ResidencyScheduleWeb.Endpoint.url()
+    ResidencySchedule.Mailer.send_approval_email(user, base_url)
   end
 
   @doc """

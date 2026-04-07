@@ -115,11 +115,11 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
       id="guided-tour"
       phx-hook="GuidedTour"
       data-tour-page="compare"
-      class="max-w-4xl mx-auto py-10 px-4"
+      class="max-w-4xl mx-auto py-6 sm:py-10 px-3 sm:px-4"
     >
       <%!-- Non-sticky: title + schedule switcher --%>
       <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h1 class="text-2xl font-bold text-gray-800">Compare Schedules</h1>
+        <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Compare Schedules</h1>
         <%= if length(@schedules) > 1 do %>
           <div class="flex flex-wrap items-center gap-2">
             <%= for s <- @schedules do %>
@@ -182,7 +182,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
               <%!-- Dropdowns --%>
               <div
                 id="tour-compare-dropdowns"
-                class="grid grid-cols-2 divide-x divide-gray-200 bg-gray-50"
+                class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-200 bg-gray-50"
               >
                 <div class="px-4 py-3">
                   <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
@@ -191,7 +191,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                   <form phx-change="select_resident_a">
                     <select
                       name="resident_id"
-                      class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      class="w-full border border-gray-200 rounded-md px-2 py-2 sm:py-1.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select a resident…</option>
                       <%= for r <- @residents do %>
@@ -209,7 +209,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                   <form phx-change="select_resident_b">
                     <select
                       name="resident_id"
-                      class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      class="w-full border border-gray-200 rounded-md px-2 py-2 sm:py-1.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select a resident…</option>
                       <%= for r <- @residents do %>
@@ -224,7 +224,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
 
               <%!-- Stats row + summary breakdown (only when both residents selected) --%>
               <%= if @resident_a_id && @resident_b_id do %>
-                <div class="grid grid-cols-2 divide-x divide-gray-200 border-t-2 border-gray-300 bg-gray-50">
+                <div class="grid grid-cols-2 divide-x divide-gray-200 border-t-2 border-gray-300 bg-gray-50 text-center sm:text-left">
                   <div class="px-4 py-3">
                     <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                       Shared Shifts
@@ -312,9 +312,9 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
               <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="sticky top-0 z-10 bg-gray-100">
                   <tr>
-                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Dates</th>
-                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Service</th>
-                    <th class="px-4 py-3 text-right font-semibold text-gray-600">Days</th>
+                    <th class="px-2 sm:px-4 py-3 text-left font-semibold text-gray-600">Dates</th>
+                    <th class="px-2 sm:px-4 py-3 text-left font-semibold text-gray-600">Service</th>
+                    <th class="px-2 sm:px-4 py-3 text-right font-semibold text-gray-600">Days</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -332,15 +332,15 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
                         )
                       ]}
                     >
-                      <td class="px-4 py-2 text-gray-700">
+                      <td class="px-2 sm:px-4 py-2 text-gray-700 whitespace-nowrap">
                         {date_range_label(range.date_start, range.date_end)}
                       </td>
-                      <td class="px-4 py-2">
+                      <td class="px-2 sm:px-4 py-2">
                         <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
                           {Rotations.rotation_type_label(range.rotation_type)}
                         </span>
                       </td>
-                      <td class="px-4 py-2 text-right text-gray-500">
+                      <td class="px-2 sm:px-4 py-2 text-right text-gray-500">
                         {Date.diff(range.date_end, range.date_start) + 1}
                       </td>
                     </tr>
