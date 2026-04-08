@@ -4,11 +4,13 @@ defmodule ResidencyScheduleWeb.Endpoint do
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
   # Set :encryption_salt if you would also like to encrypt it.
+  # max_age: 30 days in seconds — keeps casual auth sessions alive across browser restarts
   @session_options [
     store: :cookie,
     key: "_residency_schedule_key",
     signing_salt: "m4MTGvAk",
-    same_site: "Lax"
+    same_site: "Lax",
+    max_age: 30 * 24 * 60 * 60
   ]
 
   socket "/live", Phoenix.LiveView.Socket,

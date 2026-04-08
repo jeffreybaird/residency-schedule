@@ -212,6 +212,28 @@ defmodule ResidencyScheduleWeb.AuthControllerTest do
     end
   end
 
+  # ── Session persistence ──────────────────────────────────────────────────
+
+  describe "session persistence" do
+    test "login sets a session cookie with 30-day max-age", %{conn: conn} do
+      {:ok, user} = Accounts.create_user(%{email: "persist@urmc.rochester.edu"})
+      Accounts.set_password(user, "testpassword123")
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(login_user_id: user.id)
+        |> post("/login/password", %{"password" => "testpassword123"})
+
+      cookie_header =
+        conn
+        |> get_resp_header("set-cookie")
+        |> Enum.find(&String.starts_with?(&1, "_residency_schedule_key"))
+
+      assert cookie_header != nil
+      assert cookie_header =~ "max-age=2592000"
+    end
+  end
+
   # ── Admin login ────────────────────────────────────────────────────────────
 
   describe "GET /admin/login" do
