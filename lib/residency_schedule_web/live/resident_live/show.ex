@@ -458,36 +458,34 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                   <th class="px-4 py-3 text-center font-semibold text-gray-600">
                     <div class="inline-flex items-center justify-center gap-0.5">
                       <span>Rotation</span>
-                      <%= if @available_services != [] do %>
-                        <button
-                          id="service-filter-toggle"
-                          type="button"
-                          phx-click="toggle_service_filter_menu"
-                          aria-haspopup="true"
-                          aria-expanded={@service_filter_open}
-                          aria-label={
+                      <button
+                        id="service-filter-toggle"
+                        type="button"
+                        phx-click="toggle_service_filter_menu"
+                        aria-haspopup="true"
+                        aria-expanded={@service_filter_open}
+                        aria-label={
+                          if @service_filter_open,
+                            do: "Close service filter menu",
+                            else: "Open service filter menu"
+                        }
+                        class={[
+                          "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors duration-75 ease-out",
+                          if(@service_filter_open,
+                            do: "bg-gray-200 text-gray-800",
+                            else: "text-gray-500 hover:bg-gray-200 hover:text-gray-800"
+                          )
+                        ]}
+                      >
+                        <.icon
+                          name={
                             if @service_filter_open,
-                              do: "Close service filter menu",
-                              else: "Open service filter menu"
+                              do: "hero-chevron-up",
+                              else: "hero-chevron-down"
                           }
-                          class={[
-                            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors duration-75 ease-out",
-                            if(@service_filter_open,
-                              do: "bg-gray-200 text-gray-800",
-                              else: "text-gray-500 hover:bg-gray-200 hover:text-gray-800"
-                            )
-                          ]}
-                        >
-                          <.icon
-                            name={
-                              if @service_filter_open,
-                                do: "hero-chevron-up",
-                                else: "hero-chevron-down"
-                            }
-                            class="h-4 w-4"
-                          />
-                        </button>
-                      <% end %>
+                          class="h-4 w-4"
+                        />
+                      </button>
                     </div>
                   </th>
                   <th class="px-4 py-3 text-center font-semibold text-gray-600">Start</th>
@@ -576,7 +574,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
           </div>
 
           <%!-- Desktop dropdown --%>
-          <%= if @available_services != [] && @service_filter_open do %>
+          <%= if @service_filter_open do %>
             <div
               id="service-filter-panel"
               class={[
@@ -752,10 +750,13 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   end
 
   defp build_service_options(entries) do
-    entries
-    |> Enum.reject(&(&1.rotation_type == "off"))
-    |> Enum.map(& &1.rotation_type)
-    |> Enum.uniq()
+    rotation_types =
+      entries
+      |> Enum.map(& &1.rotation_type)
+      |> Enum.reject(&(&1 == "off"))
+      |> Enum.uniq()
+
+    ["off" | rotation_types]
     |> Enum.sort_by(&String.downcase(entry_label(&1)))
     |> Enum.map(fn rotation_type ->
       %{rotation_type: rotation_type, label: entry_label(rotation_type)}

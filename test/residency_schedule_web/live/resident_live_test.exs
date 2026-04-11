@@ -143,6 +143,47 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       end
     end
 
+    test "shows OFF as an option in the rotation filter dropdown", %{view: view} do
+      view
+      |> element("#service-filter-toggle")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               ~s(#service-filter-panel button[phx-value-service="off"])
+             )
+    end
+
+    test "filters the rotation table to OFF entries when OFF is selected", %{view: view} do
+      view
+      |> element("#service-filter-toggle")
+      |> render_click()
+
+      view
+      |> element(~s(#service-filter-panel button[phx-value-service="off"]))
+      |> render_click()
+
+      assert has_element?(view, "#rotation-table tbody tr[data-rotation-type='off']")
+      refute has_element?(view, "#rotation-table tbody tr[data-rotation-type='oncology']")
+    end
+
+    test "filter toggle button is shown even when a filter has been applied", %{
+      view: view,
+      resident: resident
+    } do
+      [selected_type | _rest] = resident_service_types(resident)
+
+      view
+      |> element("#service-filter-toggle")
+      |> render_click()
+
+      view
+      |> element(~s(#service-filter-panel button[phx-value-service="#{selected_type}"]))
+      |> render_click()
+
+      assert has_element?(view, "#service-filter-toggle")
+    end
+
     test "closes the filter panel when the menu button is clicked again", %{
       view: view,
       resident: resident
