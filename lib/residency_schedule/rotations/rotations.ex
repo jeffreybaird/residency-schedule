@@ -57,18 +57,35 @@ defmodule ResidencySchedule.Rotations do
   }
 
   @doc """
-  Returns all distinct slots (slot_index, start_date, end_date) for a schedule,
+  Returns one `{slot_index, start_date, end_date}` per slot for a schedule,
   ordered by slot_index. Used to compute days-off gaps for a resident.
+
+  When rotations in the same slot have varying date ranges — e.g. Highland
+  night shifts shift or shrink the canonical slot boundaries — the most
+  common `(start_date, end_date)` pair is returned as the canonical range,
+  so each slot_index yields exactly one slot entry.
   """
   def list_schedule_slots(schedule_id) do
     from(r in Rotation,
       join: sr in assoc(r, :schedule_resident),
       where: sr.schedule_id == ^schedule_id,
-      select: {r.slot_index, r.start_date, r.end_date},
-      distinct: true,
-      order_by: r.slot_index
+      select: {r.slot_index, r.start_date, r.end_date}
     )
     |> Repo.all()
+    |> Enum.group_by(fn {slot_index, _, _} -> slot_index end)
+    |> Enum.map(fn {slot_index, entries} ->
+      {start_date, end_date} = canonical_slot_range(entries)
+      {slot_index, start_date, end_date}
+    end)
+    |> Enum.sort_by(fn {slot_index, _, _} -> slot_index end)
+  end
+
+  defp canonical_slot_range(entries) do
+    entries
+    |> Enum.map(fn {_slot_index, start_date, end_date} -> {start_date, end_date} end)
+    |> Enum.frequencies()
+    |> Enum.max_by(fn {_range, count} -> count end)
+    |> elem(0)
   end
 
   @doc """

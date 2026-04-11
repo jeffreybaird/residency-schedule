@@ -88,6 +88,50 @@ defmodule ResidencySchedule.RotationsTest do
     end
   end
 
+  describe "list_schedule_slots/1" do
+    test "returns one slot per slot_index ordered by slot_index", %{schedule: sched} do
+      slots = Rotations.list_schedule_slots(sched.id)
+
+      assert slots == [
+               {0, ~D[2023-07-03], ~D[2023-07-07]},
+               {1, ~D[2023-07-08], ~D[2023-07-09]}
+             ]
+    end
+
+    test "collapses slots where Highland weekend nights shrinks the canonical range", %{
+      schedule: sched
+    } do
+      {:ok, hwn_resident} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R2-1",
+          residency_year: 2,
+          schedule_number: 1,
+          name: "Weekend Nights"
+        })
+
+      {:ok, _} =
+        Rotations.insert_rotations(hwn_resident.id, [
+          %{
+            slot_index: 1,
+            start_date: ~D[2023-07-08],
+            end_date: ~D[2023-07-08],
+            rotation_type: :highland_weekend_nights
+          }
+        ])
+
+      slots = Rotations.list_schedule_slots(sched.id)
+      slot_indices = Enum.map(slots, fn {idx, _, _} -> idx end)
+
+      assert slot_indices == Enum.uniq(slot_indices)
+      assert {1, ~D[2023-07-08], ~D[2023-07-09]} in slots
+    end
+
+    test "returns empty list when schedule has no rotations" do
+      {:ok, empty_sched} = Schedules.upsert_schedule(2099, "2099–2100")
+      assert Rotations.list_schedule_slots(empty_sched.id) == []
+    end
+  end
+
   describe "list_rotations_for_resident/1" do
     test "returns rotations ordered by start_date", %{ra: ra} do
       rotations = Rotations.list_rotations_for_resident(ra.id)
