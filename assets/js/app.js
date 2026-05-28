@@ -146,6 +146,7 @@ Hooks.ScrollToToday = {
   mounted() {
     this.updateTableHeight()
     this.scrollToToday()
+    this._lastAnchorId = this.currentAnchorId()
     this.updateHeaderSticky()
     const stickyEl = document.getElementById("sticky-stats")
     if (stickyEl) {
@@ -157,10 +158,30 @@ Hooks.ScrollToToday = {
     this._scrollHandler = () => this.updateHeaderSticky()
     this.el.addEventListener("scroll", this._scrollHandler, {passive: true})
   },
+  beforeUpdate() {
+    // morphdom re-renders the table body on every patch (e.g. opening the
+    // coworkers modal), which drops the scroll container's offset. Capture it
+    // here so updated() can restore it.
+    this._savedScrollTop = this.el.scrollTop
+  },
   updated() {
     this.updateTableHeight()
-    this.scrollToToday()
+    // Re-anchor to today only when the table content actually changed (e.g. a
+    // service filter swaps the rows). Patches that leave the rows untouched —
+    // opening the coworkers modal, toggling stats — must keep the user where
+    // they were, so restore the pre-patch scroll instead.
+    const anchorId = this.currentAnchorId()
+    if (anchorId !== this._lastAnchorId) {
+      this._lastAnchorId = anchorId
+      this.scrollToToday()
+    } else if (this._savedScrollTop != null) {
+      this.el.scrollTop = this._savedScrollTop
+    }
     this.updateHeaderSticky()
+  },
+  currentAnchorId() {
+    const anchor = this.el.querySelector("[data-today-anchor]")
+    return anchor ? anchor.id : null
   },
   destroyed() {
     if (this._statsObserver) this._statsObserver.disconnect()
