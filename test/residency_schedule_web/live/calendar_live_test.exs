@@ -25,24 +25,180 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
       %{view: view, html: html}
     end
 
-    test "renders month and year heading", %{html: html} do
+    test "renders the calendar heading", %{html: html} do
       assert html =~ "Calendar"
     end
 
-    test "renders calendar day grid", %{html: html} do
+    test "renders the month day grid", %{html: html} do
       assert html =~ "Mon" or html =~ "Mo"
     end
 
-    test "prev_month navigates backward one month", %{view: view} do
+    test "prev navigates backward and changes the period label", %{view: view} do
       html_before = render(view)
-      html_after = view |> element("button[phx-click='prev_month']") |> render_click()
+      html_after = view |> element("button[phx-click='prev']") |> render_click()
       refute html_before == html_after
     end
 
-    test "next_month navigates forward one month", %{view: view} do
+    test "next navigates forward and changes the period label", %{view: view} do
       html_before = render(view)
-      html_after = view |> element("button[phx-click='next_month']") |> render_click()
+      html_after = view |> element("button[phx-click='next']") |> render_click()
       refute html_before == html_after
     end
+
+    test "today returns to the current period", %{view: view} do
+      view |> element("button[phx-click='prev']") |> render_click()
+      html = view |> element("button[phx-click='today']") |> render_click()
+      assert html =~ Calendar.strftime(Date.utc_today(), "%B %Y")
+    end
+  end
+
+  describe "view modes" do
+    setup %{conn: conn} do
+      seed_schedule()
+      {:ok, view, _html} = live(conn, "/calendar?date=2023-07-05")
+      %{view: view}
+    end
+
+    test "defaults to month view", %{view: view} do
+      assert render(view) =~ "July 2023"
+    end
+
+    test "switches to week view", %{view: view} do
+      html = view |> element("button[phx-value-view='week']") |> render_click()
+      # Week label spans a Sun–Sat range, e.g. "Jul 2 – Jul 8, 2023"
+      assert html =~ "Jul 2 – Jul 8, 2023"
+    end
+
+    test "switches to day view and lists rotations for the focused day", %{view: view} do
+      html = view |> element("button[phx-value-view='day']") |> render_click()
+      assert html =~ Calendar.strftime(~D[2023-07-05], "%A, %B %-d, %Y")
+      refute html =~ "No rotations recorded for this day."
+    end
+
+    test "week navigation shifts by seven days", %{view: view} do
+      view |> element("button[phx-value-view='week']") |> render_click()
+      html = view |> element("button[phx-click='next']") |> render_click()
+      assert html =~ "Jul 9 – Jul 15, 2023"
+    end
+
+    test "day navigation shifts by one day", %{view: view} do
+      view |> element("button[phx-value-view='day']") |> render_click()
+      html = view |> element("button[phx-click='next']") |> render_click()
+      assert html =~ Calendar.strftime(~D[2023-07-06], "%A, %B %-d, %Y")
+    end
+  end
+
+  describe "deep links" do
+    setup do
+      seed_schedule()
+      :ok
+    end
+
+    test "date param sets the focused period", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/calendar?date=2023-08-01")
+      assert html =~ "August 2023"
+    end
+
+    test "view param selects the initial view mode", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/calendar?date=2023-07-05&view=day")
+      assert html =~ Calendar.strftime(~D[2023-07-05], "%A, %B %-d, %Y")
+    end
+
+    test "invalid date param falls back to today", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/calendar?date=not-a-date")
+      assert html =~ Calendar.strftime(Date.utc_today(), "%B %Y")
+    end
+  end
+
+  describe "filters" do
+    setup %{conn: conn} do
+      seed_schedule()
+      {:ok, view, _html} = live(conn, "/calendar?date=2023-07-05")
+      %{view: view}
+    end
+
+    test "residents panel lists residents in view", %{view: view} do
+      view |> element("button[phx-value-panel='residents']") |> render_click()
+      assert has_element?(view, "button[phx-click='toggle_resident_filter']")
+    end
+
+    test "rotations panel lists rotation types in view", %{view: view} do
+      view |> element("button[phx-value-panel='rotations']") |> render_click()
+      assert has_element?(view, "button[phx-click='toggle_rotation_filter']")
+    end
+
+    test "toggling the panel again closes it", %{view: view} do
+      view |> element("button[phx-value-panel='residents']") |> render_click()
+      assert has_element?(view, "button[phx-click='toggle_resident_filter']")
+      view |> element("button[phx-value-panel='residents']") |> render_click()
+      refute has_element?(view, "button[phx-click='toggle_resident_filter']")
+    end
+
+    test "selecting a rotation type filters the day view to that type", %{view: view} do
+      view |> element("button[phx-value-view='day']") |> render_click()
+      view |> element("button[phx-value-panel='rotations']") |> render_click()
+
+      # Grab the first available rotation type and filter to it.
+      type =
+        view
+        |> render()
+        |> rotation_filter_value()
+
+      view |> element("button[phx-value-type='#{type}']") |> render_click()
+      html = render(view)
+
+      assert html =~ "(1)"
+      refute html =~ "No rotations recorded for this day."
+    end
+
+    test "clearing the rotation filter restores all types", %{view: view} do
+      view |> element("button[phx-value-panel='rotations']") |> render_click()
+      type = view |> render() |> rotation_filter_value()
+      view |> element("button[phx-value-type='#{type}']") |> render_click()
+      assert render(view) =~ "Rotations (1)"
+
+      html = view |> element("button[phx-click='clear_rotation_filter']") |> render_click()
+      refute html =~ "Rotations (1)"
+    end
+
+    test "empty-state month shows no residents in view", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/calendar?date=2020-01-01")
+      view |> element("button[phx-value-panel='residents']") |> render_click()
+      assert render(view) =~ "No residents in view."
+    end
+  end
+
+  describe "day modal" do
+    setup %{conn: conn} do
+      seed_schedule()
+      {:ok, view, _html} = live(conn, "/calendar?date=2023-07-05")
+      %{view: view}
+    end
+
+    test "selecting a day opens the detail modal", %{view: view} do
+      html =
+        view
+        |> element("div[phx-click='select_day'][phx-value-date='2023-07-05']")
+        |> render_click()
+
+      assert html =~ Calendar.strftime(~D[2023-07-05], "%A, %B %-d, %Y")
+      assert has_element?(view, "button[phx-click='open_day_view']")
+    end
+
+    test "modal day-view link switches to day view", %{view: view} do
+      view
+      |> element("div[phx-click='select_day'][phx-value-date='2023-07-05']")
+      |> render_click()
+
+      html = view |> element("button[phx-click='open_day_view']") |> render_click()
+      assert html =~ Calendar.strftime(~D[2023-07-05], "%A, %B %-d, %Y")
+      refute has_element?(view, "div[phx-click='close_modal']")
+    end
+  end
+
+  # Pulls a rotation type value out of an open rotations filter panel.
+  defp rotation_filter_value(html) do
+    [_, type] = Regex.run(~r/phx-value-type="([^"]+)"/, html)
+    type
   end
 end
