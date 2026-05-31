@@ -207,6 +207,46 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
       assert html =~ "Residents (1)"
     end
 
+    test "keeps showing the assigned resident after navigating into the next schedule",
+         %{conn: conn, user: user} do
+      {:ok, s2023} = ResidencySchedule.Schedules.upsert_schedule(2023, "2023–2024")
+      {:ok, s2026} = ResidencySchedule.Schedules.upsert_schedule(2026, "2026–2027")
+
+      {:ok, sr_2023} =
+        ResidencySchedule.Residents.insert_resident(s2023.id, %{
+          position_code: "R3-1",
+          residency_year: 3,
+          schedule_number: 1,
+          name: "Alexis"
+        })
+
+      {:ok, sr_2026} =
+        ResidencySchedule.Residents.insert_resident(s2026.id, %{
+          position_code: "R4-1",
+          residency_year: 4,
+          schedule_number: 1,
+          name: "Alexis"
+        })
+
+      {:ok, _} =
+        ResidencySchedule.Rotations.insert_rotations(sr_2026.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2026-07-06],
+            end_date: ~D[2026-07-12],
+            rotation_type: :oncology
+          }
+        ])
+
+      # Home is pinned to the 2023 record; the 2026 view must still show them.
+      ResidencySchedule.Accounts.set_home_resident(user, sr_2023.id)
+
+      {:ok, _view, html} = live(conn, "/?date=2026-07-08&view=day")
+      assert html =~ "Alexis"
+      # The resident is one entity, so the filter counts them once across years.
+      assert html =~ "Residents (1)"
+    end
+
     test "shows everyone when the user has no assigned resident", %{conn: conn} do
       seed_schedule()
       {:ok, _view, html} = live(conn, "/")

@@ -527,18 +527,28 @@ defmodule ResidencySchedule.RotationsTest do
 
   describe "filter_rotations_by_residents/2" do
     alias ResidencySchedule.Rotations.Rotation
+    alias ResidencySchedule.Residents.ScheduleResident
 
-    test "keeps only rotations for the given resident ids" do
+    test "keeps only rotations for the given resident (person) ids" do
       rots = [
-        %Rotation{id: 1, schedule_resident_id: 7},
-        %Rotation{id: 2, schedule_resident_id: 9}
+        %Rotation{id: 1, schedule_resident: %ScheduleResident{resident_id: 7}},
+        %Rotation{id: 2, schedule_resident: %ScheduleResident{resident_id: 9}}
       ]
 
       assert Rotations.filter_rotations_by_residents(rots, [7]) |> Enum.map(& &1.id) == [1]
     end
 
+    test "matches a person across academic years (different schedule_residents)" do
+      rots = [
+        %Rotation{id: 1, schedule_resident: %ScheduleResident{id: 100, resident_id: 7}},
+        %Rotation{id: 2, schedule_resident: %ScheduleResident{id: 200, resident_id: 7}}
+      ]
+
+      assert Rotations.filter_rotations_by_residents(rots, [7]) |> Enum.map(& &1.id) == [1, 2]
+    end
+
     test "returns all rotations when the id list is empty" do
-      rots = [%Rotation{id: 1, schedule_resident_id: 7}]
+      rots = [%Rotation{id: 1, schedule_resident: %ScheduleResident{resident_id: 7}}]
       assert Rotations.filter_rotations_by_residents(rots, []) == rots
     end
   end

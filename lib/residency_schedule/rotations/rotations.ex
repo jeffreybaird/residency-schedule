@@ -460,11 +460,18 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
-  Keeps only rotations belonging to one of the given `schedule_resident` ids.
-  An empty `resident_ids` list applies no filter and returns the rotations unchanged.
+  Keeps only rotations belonging to one of the given residents (people).
+
+  Matches on the preloaded `schedule_resident`'s `resident_id`, so a resident is
+  matched across every academic year they appear in (each year is a distinct
+  `schedule_resident` for the same person). An empty list applies no filter.
 
       iex> alias ResidencySchedule.Rotations.Rotation
-      iex> rots = [%Rotation{id: 1, schedule_resident_id: 7}, %Rotation{id: 2, schedule_resident_id: 9}]
+      iex> alias ResidencySchedule.Residents.ScheduleResident
+      iex> rots = [
+      ...>   %Rotation{id: 1, schedule_resident: %ScheduleResident{resident_id: 7}},
+      ...>   %Rotation{id: 2, schedule_resident: %ScheduleResident{resident_id: 9}}
+      ...> ]
       iex> ResidencySchedule.Rotations.filter_rotations_by_residents(rots, [7]) |> Enum.map(& &1.id)
       [1]
   """
@@ -472,7 +479,7 @@ defmodule ResidencySchedule.Rotations do
 
   def filter_rotations_by_residents(rotations, resident_ids) do
     id_set = MapSet.new(resident_ids)
-    Enum.filter(rotations, &MapSet.member?(id_set, &1.schedule_resident_id))
+    Enum.filter(rotations, &MapSet.member?(id_set, &1.schedule_resident.resident_id))
   end
 
   @doc """
