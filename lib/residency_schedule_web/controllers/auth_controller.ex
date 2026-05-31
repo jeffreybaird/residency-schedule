@@ -89,11 +89,28 @@ defmodule ResidencyScheduleWeb.AuthController do
   # ── Magic link verification ────────────────────────────────────────────────
 
   @doc """
-  Verifies a magic link token and logs the user in.
-  On first login (no password set), shows the optional set-password prompt.
+  Validates a magic link token from the email (GET) and shows a confirmation
+  prompt. The token is not consumed here, so email scanners that pre-fetch the
+  link cannot invalidate it before the user clicks through.
   """
   def verify(conn, %{"token" => token}) do
-    case Accounts.verify_magic_link_token(token) do
+    case Accounts.validate_magic_link_token(token) do
+      {:ok, user} ->
+        render(conn, :show, step: :confirm_login, email: user.email, token: token)
+
+      {:error, _} ->
+        conn
+        |> put_flash(:error, "This link is invalid or has expired. Please request a new one.")
+        |> redirect(to: "/login")
+    end
+  end
+
+  @doc """
+  Consumes a magic link token (POST) and logs the user in.
+  On first login (no password set), shows the optional set-password prompt.
+  """
+  def confirm(conn, %{"token" => token}) do
+    case Accounts.consume_magic_link_token(token) do
       {:ok, user} ->
         if Accounts.has_password?(user) do
           log_in_user(conn, user)
