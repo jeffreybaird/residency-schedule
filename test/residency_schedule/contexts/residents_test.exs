@@ -178,4 +178,33 @@ defmodule ResidencySchedule.ResidentsTest do
       assert changeset.valid? == false
     end
   end
+
+  describe "list_resident_filter_options/0" do
+    test "returns one option per resident (person)", %{r4: r4, r1: r1} do
+      options = Residents.list_resident_filter_options()
+      ids = Enum.map(options, & &1.id)
+
+      assert r4.resident_id in ids
+      assert r1.resident_id in ids
+      assert ids == Enum.uniq(ids)
+    end
+
+    test "dedupes a person across schedules using their most recent appearance", %{r4: r4} do
+      {:ok, sched_2026} = Schedules.upsert_schedule(2026, "2026–2027")
+
+      {:ok, _alexis_2026} =
+        Residents.insert_resident(sched_2026.id, %{
+          position_code: "R4-9",
+          residency_year: 4,
+          schedule_number: 9,
+          name: "Alexis"
+        })
+
+      options = Residents.list_resident_filter_options()
+      alexis_options = Enum.filter(options, &(&1.id == r4.resident_id))
+
+      assert length(alexis_options) == 1
+      assert hd(alexis_options).position_code == "R4-9"
+    end
+  end
 end
