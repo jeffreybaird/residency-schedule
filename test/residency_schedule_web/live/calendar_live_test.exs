@@ -243,7 +243,8 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
 
       {:ok, _view, html} = live(conn, "/?date=2026-07-08&view=day")
       assert html =~ "Alexis"
-      assert html =~ "Residents (2)"
+      # The resident is one entity, so the filter counts them once across years.
+      assert html =~ "Residents (1)"
     end
 
     test "shows everyone when the user has no assigned resident", %{conn: conn} do
