@@ -73,6 +73,52 @@ Hooks.GuidedTour = {
   }
 }
 
+// CalendarSwipe: on touch devices, a horizontal swipe across the calendar body
+// moves to the next/previous period. The LiveView's "prev"/"next" events are
+// already view-aware (day/week/month), so the hook just pushes them.
+Hooks.CalendarSwipe = {
+  mounted() {
+    this.startX = null
+    this.startY = null
+
+    // Minimum horizontal travel (px) and max vertical drift to count as a swipe.
+    const THRESHOLD = 50
+    const MAX_VERTICAL_RATIO = 0.75
+
+    this._onTouchStart = (e) => {
+      if (e.touches.length !== 1) {
+        this.startX = null
+        return
+      }
+      this.startX = e.touches[0].clientX
+      this.startY = e.touches[0].clientY
+    }
+
+    this._onTouchEnd = (e) => {
+      if (this.startX === null) return
+      const touch = e.changedTouches[0]
+      const dx = touch.clientX - this.startX
+      const dy = touch.clientY - this.startY
+      this.startX = null
+      this.startY = null
+
+      if (Math.abs(dx) < THRESHOLD) return
+      if (Math.abs(dy) > Math.abs(dx) * MAX_VERTICAL_RATIO) return
+
+      // Swipe left → forward (next); swipe right → backward (prev).
+      this.pushEvent(dx < 0 ? "next" : "prev", {})
+    }
+
+    this.el.addEventListener("touchstart", this._onTouchStart, {passive: true})
+    this.el.addEventListener("touchend", this._onTouchEnd, {passive: true})
+  },
+
+  destroyed() {
+    this.el.removeEventListener("touchstart", this._onTouchStart)
+    this.el.removeEventListener("touchend", this._onTouchEnd)
+  }
+}
+
 // Positions #service-filter-panel with fixed coordinates under #service-filter-toggle so the
 // menu is not clipped by #rotation-table-scroll (overflow-auto).
 Hooks.ServiceFilterAnchored = {

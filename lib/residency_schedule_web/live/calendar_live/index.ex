@@ -230,8 +230,9 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
           </button>
         </div>
 
-        <%= case @view_mode do %>
-          <% :month -> %>
+        <div id="calendar-swipe" phx-hook="CalendarSwipe" style="touch-action: pan-y">
+          <%= case @view_mode do %>
+            <% :month -> %>
             <div
               id="tour-calendar-grid"
               class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm"
@@ -304,7 +305,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
               </h3>
               <.detail_groups groups={day_detail_for(assigns, @focus_date)} />
             </div>
-        <% end %>
+          <% end %>
+        </div>
 
         <%!-- Day detail modal (month and week views) --%>
         <%= if @selected_date && @view_mode in [:month, :week] do %>
