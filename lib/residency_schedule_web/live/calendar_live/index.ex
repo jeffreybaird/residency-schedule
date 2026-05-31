@@ -3,6 +3,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
   alias ResidencySchedule.Schedules
   alias ResidencySchedule.Rotations
+  alias ResidencySchedule.Residents
   alias ResidencySchedule.ShiftOverrides
 
   @impl true
@@ -26,8 +27,13 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   end
 
   # Pre-selects the user's assigned (home) resident so the calendar opens on
-  # their own schedule. Users without an assigned resident see everyone.
-  defp default_resident_filter(%{home_resident_id: id}) when is_integer(id), do: [id]
+  # their own schedule. The filter spans every academic year the person appears
+  # in, so navigating into the next schedule keeps showing them. Users without
+  # an assigned resident see everyone.
+  defp default_resident_filter(%{home_resident_id: id}) when is_integer(id) do
+    Residents.list_person_schedule_resident_ids(id)
+  end
+
   defp default_resident_filter(_current_user), do: []
 
   # New users see the guided tour automatically until they complete it.
