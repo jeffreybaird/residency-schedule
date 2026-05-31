@@ -46,15 +46,23 @@ defmodule ResidencySchedule.Residents do
   and the virtual name field populated. Ordered by residency_year, schedule_number.
   Exempt from doctest — hits the database.
   """
-  def list_residents_across_schedules(schedule_ids) do
-    rotations_query = from(r in ResidencySchedule.Rotations.Rotation, order_by: r.start_date)
+  @doc """
+  Returns the ids of every schedule_resident belonging to the same person as the
+  given schedule_resident (the same person appears once per academic year),
+  including the given one, ordered by id.
 
+  Used to keep a resident filter following a person across schedules so the
+  calendar still shows them after navigating into the next academic year.
+
+  Exempt from doctest — hits the database. See `ResidentsTest`.
+  """
+  def list_person_schedule_resident_ids(schedule_resident_id) do
     from(sr in ScheduleResident,
-      join: r in assoc(sr, :resident),
-      where: sr.schedule_id in ^schedule_ids,
-      order_by: [asc: sr.residency_year, asc: sr.schedule_number],
-      preload: [rotations: ^rotations_query],
-      select: %{sr | name: r.name}
+      join: peer in ScheduleResident,
+      on: peer.resident_id == sr.resident_id,
+      where: sr.id == ^schedule_resident_id,
+      order_by: peer.id,
+      select: peer.id
     )
     |> Repo.all()
   end

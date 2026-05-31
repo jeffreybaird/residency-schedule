@@ -178,4 +178,29 @@ defmodule ResidencySchedule.ResidentsTest do
       assert changeset.valid? == false
     end
   end
+
+  describe "list_person_schedule_resident_ids/1" do
+    test "returns every schedule_resident id for the person across schedules", %{r4: r4} do
+      {:ok, sched_2026} = Schedules.upsert_schedule(2026, "2026–2027")
+
+      {:ok, alexis_2026} =
+        Residents.insert_resident(sched_2026.id, %{
+          position_code: "R4-1",
+          residency_year: 4,
+          schedule_number: 1,
+          name: "Alexis"
+        })
+
+      ids = Residents.list_person_schedule_resident_ids(r4.id)
+      assert Enum.sort(ids) == Enum.sort([r4.id, alexis_2026.id])
+    end
+
+    test "returns only the given id when the person is in one schedule", %{r1: r1} do
+      assert Residents.list_person_schedule_resident_ids(r1.id) == [r1.id]
+    end
+
+    test "returns an empty list for an unknown schedule_resident" do
+      assert Residents.list_person_schedule_resident_ids(0) == []
+    end
+  end
 end
