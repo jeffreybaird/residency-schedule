@@ -15,7 +15,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     is_admin = session["admin"] == true
     today = current_date()
     current_user = load_current_user(session)
-    show_tour = current_user != nil and not current_user.tour_completed
 
     socket =
       if schedules != [] do
@@ -36,8 +35,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
        is_admin: is_admin,
        today: today,
        viewed_aca_year: current_academic_year(today),
-       current_user: current_user,
-       show_tour: show_tour
+       current_user: current_user
      )}
   end
 
@@ -55,7 +53,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       Accounts.complete_tour(socket.assigns.current_user)
     end
 
-    {:noreply, assign(socket, show_tour: false)}
+    {:noreply, socket}
   end
 
   @impl true
@@ -121,7 +119,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       id="guided-tour"
       phx-hook="GuidedTour"
       data-tour-page="schedule"
-      data-auto-start={to_string(@show_tour)}
       class="min-h-screen bg-gray-50"
     >
       <%= if @schedules != [] do %>

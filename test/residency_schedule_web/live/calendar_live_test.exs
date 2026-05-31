@@ -46,6 +46,7 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
     end
 
     test "today returns to the current period", %{view: view} do
+      view |> element("button[phx-value-view='month']") |> render_click()
       view |> element("button[phx-click='prev']") |> render_click()
       html = view |> element("button[phx-click='today']") |> render_click()
       assert html =~ Calendar.strftime(Date.utc_today(), "%B %Y")
@@ -59,14 +60,14 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
       %{view: view}
     end
 
-    test "defaults to month view", %{view: view} do
-      assert render(view) =~ "July 2023"
+    test "defaults to week view", %{view: view} do
+      # Week label spans a Sun–Sat range, e.g. "Jul 2 – Jul 8, 2023"
+      assert render(view) =~ "Jul 2 – Jul 8, 2023"
     end
 
-    test "switches to week view", %{view: view} do
-      html = view |> element("button[phx-value-view='week']") |> render_click()
-      # Week label spans a Sun–Sat range, e.g. "Jul 2 – Jul 8, 2023"
-      assert html =~ "Jul 2 – Jul 8, 2023"
+    test "switches to month view", %{view: view} do
+      html = view |> element("button[phx-value-view='month']") |> render_click()
+      assert html =~ "July 2023"
     end
 
     test "switches to day view and lists rotations for the focused day", %{view: view} do
@@ -95,7 +96,7 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
     end
 
     test "date param sets the focused period", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/calendar?date=2023-08-01")
+      {:ok, _view, html} = live(conn, "/calendar?date=2023-08-01&view=month")
       assert html =~ "August 2023"
     end
 
@@ -105,7 +106,7 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
     end
 
     test "invalid date param falls back to today", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/calendar?date=not-a-date")
+      {:ok, _view, html} = live(conn, "/calendar?date=not-a-date&view=month")
       assert html =~ Calendar.strftime(Date.utc_today(), "%B %Y")
     end
   end
@@ -161,10 +162,51 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
       refute html =~ "Rotations (1)"
     end
 
-    test "empty-state month shows no residents in view", %{conn: conn} do
+    test "empty period shows no residents in view", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/calendar?date=2020-01-01")
       view |> element("button[phx-value-panel='residents']") |> render_click()
       assert render(view) =~ "No residents in view."
+    end
+  end
+
+  describe "home page" do
+    test "/ renders the calendar with the tour link", %{conn: conn} do
+      seed_schedule()
+      {:ok, _view, html} = live(conn, "/")
+      assert html =~ "Calendar"
+      assert html =~ "Take a tour"
+    end
+
+    test "defaults to the week view", %{conn: conn} do
+      seed_schedule()
+      {:ok, _view, html} = live(conn, "/?date=2023-07-05")
+      assert html =~ "Jul 2 – Jul 8, 2023"
+    end
+
+    test "new user sees the tour auto-start attribute", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/")
+      assert html =~ ~s(data-auto-start="true")
+    end
+
+    test "returning user with a completed tour does not auto-start", %{conn: conn, user: user} do
+      ResidencySchedule.Accounts.complete_tour(user)
+      {:ok, _view, html} = live(conn, "/")
+      assert html =~ ~s(data-auto-start="false")
+    end
+
+    test "pre-filters to the user's assigned resident", %{conn: conn, user: user} do
+      result = seed_schedule()
+      [resident | _] = ResidencySchedule.Residents.list_residents_for_schedule(result.schedule_id)
+      ResidencySchedule.Accounts.set_home_resident(user, resident.id)
+
+      {:ok, _view, html} = live(conn, "/")
+      assert html =~ "Residents (1)"
+    end
+
+    test "shows everyone when the user has no assigned resident", %{conn: conn} do
+      seed_schedule()
+      {:ok, _view, html} = live(conn, "/")
+      refute html =~ "Residents ("
     end
   end
 

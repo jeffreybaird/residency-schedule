@@ -48,14 +48,14 @@
             href="/"
             class="px-3 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
           >
-            Schedule
+            Calendar
           </a>
           <a
-            id="tour-nav-calendar"
-            href="/calendar"
+            id="tour-nav-schedule"
+            href="/schedule"
             class="px-3 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
           >
-            Calendar
+            Schedule
           </a>
           <a
             id="tour-nav-compare"
@@ -65,17 +65,17 @@
             Compare
           </a>
           <%= if (user = @conn.assigns[:current_user]) && user.home_resident_id do %>
-            <% home_path = "/residents/#{user.home_resident_id}" %>
-            <%= if @conn.request_path == home_path do %>
+            <% my_page_path = "/residents/#{user.home_resident_id}" %>
+            <%= if @conn.request_path == my_page_path do %>
               <span class="px-3 py-1.5 rounded-md text-sm text-green-700 bg-green-50 font-medium">
-                Home
+                My page
               </span>
             <% else %>
               <a
-                href={home_path}
+                href={my_page_path}
                 class="px-3 py-1.5 rounded-md text-sm text-green-700 hover:bg-green-50 transition-colors"
               >
-                Home
+                My page
               </a>
             <% end %>
           <% end %>
@@ -132,26 +132,26 @@
           </summary>
           <div class="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-50">
             <a href="/" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-              Schedule
-            </a>
-            <a href="/calendar" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
               Calendar
+            </a>
+            <a href="/schedule" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+              Schedule
             </a>
             <a href="/compare" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
               Compare
             </a>
             <%= if (user = @conn.assigns[:current_user]) && user.home_resident_id do %>
-              <% home_path = "/residents/#{user.home_resident_id}" %>
-              <%= if @conn.request_path == home_path do %>
+              <% my_page_path = "/residents/#{user.home_resident_id}" %>
+              <%= if @conn.request_path == my_page_path do %>
                 <span class="block px-4 py-2 text-sm text-green-700 font-medium bg-green-50">
-                  Home
+                  My page
                 </span>
               <% else %>
                 <a
-                  href={home_path}
+                  href={my_page_path}
                   class="block px-4 py-2 text-sm text-green-700 hover:bg-green-50"
                 >
-                  Home
+                  My page
                 </a>
               <% end %>
             <% end %>
