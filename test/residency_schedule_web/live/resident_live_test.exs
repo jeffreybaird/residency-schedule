@@ -210,6 +210,86 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
     end
   end
 
+  describe "multi-year career" do
+    test "renders rotations from every academic year on one continuous page", %{conn: conn} do
+      {:ok, s2023} = ResidencySchedule.Schedules.upsert_schedule(2023, "2023–2024")
+      {:ok, s2026} = ResidencySchedule.Schedules.upsert_schedule(2026, "2026–2027")
+
+      {:ok, sr_2023} =
+        ResidencySchedule.Residents.insert_resident(s2023.id, %{
+          position_code: "R3-1",
+          residency_year: 3,
+          schedule_number: 1,
+          name: "Alexis"
+        })
+
+      {:ok, sr_2026} =
+        ResidencySchedule.Residents.insert_resident(s2026.id, %{
+          position_code: "R4-1",
+          residency_year: 4,
+          schedule_number: 1,
+          name: "Alexis"
+        })
+
+      {:ok, _} =
+        Rotations.insert_rotations(sr_2023.id, [
+          %{slot_index: 0, start_date: ~D[2023-07-03], end_date: ~D[2023-07-09], rotation_type: :oncology}
+        ])
+
+      {:ok, _} =
+        Rotations.insert_rotations(sr_2026.id, [
+          %{slot_index: 0, start_date: ~D[2026-07-06], end_date: ~D[2026-07-12], rotation_type: :rei}
+        ])
+
+      # Open the 2023 record; the page should still show the 2026 rotation,
+      # under a year divider, so the user can scroll into the next year.
+      {:ok, _view, html} = live(conn, "/residents/#{sr_2023.id}")
+
+      assert html =~ "2023–2024"
+      assert html =~ "2026–2027"
+      assert html =~ "rotation-entry-oncology-0-2023-07-03-2023-07-09"
+      assert html =~ "rotation-entry-rei-0-2026-07-06-2026-07-12"
+    end
+  end
+
+  describe "row anchor helpers" do
+    alias ResidencyScheduleWeb.ResidentLive.Show
+
+    test "entry_row_id builds a date-unique id" do
+      entry = %{
+        rotation_type: "oncology",
+        slot_index: 2,
+        start_date: ~D[2024-07-01],
+        end_date: ~D[2024-07-15]
+      }
+
+      assert Show.entry_row_id(entry) == "rotation-entry-oncology-2-2024-07-01-2024-07-15"
+    end
+
+    test "today_anchor_id picks the current or next upcoming entry" do
+      entries = [
+        %{rotation_type: "oncology", slot_index: 0, start_date: ~D[2024-07-01], end_date: ~D[2024-07-15]},
+        %{rotation_type: "elective", slot_index: 1, start_date: ~D[2024-08-01], end_date: ~D[2024-08-15]}
+      ]
+
+      assert Show.today_anchor_id(entries, ~D[2024-07-20]) ==
+               "rotation-entry-elective-1-2024-08-01-2024-08-15"
+    end
+
+    test "today_anchor_id falls back to the first entry when today is past everything" do
+      entries = [
+        %{rotation_type: "oncology", slot_index: 0, start_date: ~D[2024-07-01], end_date: ~D[2024-07-15]}
+      ]
+
+      assert Show.today_anchor_id(entries, ~D[2025-01-01]) ==
+               "rotation-entry-oncology-0-2024-07-01-2024-07-15"
+    end
+
+    test "today_anchor_id returns nil when there are no entries" do
+      assert Show.today_anchor_id([], ~D[2024-07-20]) == nil
+    end
+  end
+
   defp resident_service_types(resident) do
     resident.id
     |> Rotations.effective_segments_for_resident()
