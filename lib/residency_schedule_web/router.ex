@@ -50,7 +50,8 @@ defmodule ResidencyScheduleWeb.Router do
 
   scope "/", ResidencyScheduleWeb do
     pipe_through [:browser, :authenticated]
-    live "/", ScheduleLive.Index, :index
+    live "/", CalendarLive.Index, :index
+    live "/schedule", ScheduleLive.Index, :index
     live "/residents/:id", ResidentLive.Show, :show
     live "/calendar", CalendarLive.Index, :index
     live "/compare", CompareLive.Index, :index

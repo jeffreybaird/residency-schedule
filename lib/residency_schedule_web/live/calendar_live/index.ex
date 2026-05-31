@@ -7,20 +7,32 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
   @impl true
   def mount(_params, session, socket) do
+    current_user = load_current_user(session)
+
     socket =
       assign(socket,
         any_schedules?: Schedules.list_schedules() != [],
-        view_mode: :month,
+        view_mode: :week,
         focus_date: Date.utc_today(),
-        resident_filter: [],
+        resident_filter: default_resident_filter(current_user),
         rotation_filter: [],
         filter_panel: nil,
         selected_date: nil,
-        current_user: load_current_user(session)
+        current_user: current_user,
+        show_tour: show_tour?(current_user)
       )
 
     {:ok, socket}
   end
+
+  # Pre-selects the user's assigned (home) resident so the calendar opens on
+  # their own schedule. Users without an assigned resident see everyone.
+  defp default_resident_filter(%{home_resident_id: id}) when is_integer(id), do: [id]
+  defp default_resident_filter(_current_user), do: []
+
+  # New users see the guided tour automatically until they complete it.
+  defp show_tour?(%{tour_completed: false}), do: true
+  defp show_tour?(_current_user), do: false
 
   @impl true
   def handle_params(params, _uri, socket) do
@@ -141,7 +153,12 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       ResidencySchedule.Accounts.complete_tour(socket.assigns.current_user)
     end
 
-    {:noreply, socket}
+    {:noreply, assign(socket, show_tour: false)}
+  end
+
+  @impl true
+  def handle_event("restart_tour", _params, socket) do
+    {:noreply, push_event(socket, "start-tour", %{})}
   end
 
   @impl true
@@ -151,10 +168,20 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       id="guided-tour"
       phx-hook="GuidedTour"
       data-tour-page="calendar"
+      data-auto-start={to_string(@show_tour)}
       class="max-w-4xl mx-auto py-10 px-4"
     >
       <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Calendar</h1>
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-bold text-gray-800">Calendar</h1>
+          <button
+            phx-click="restart_tour"
+            class="text-sm text-blue-500 hover:text-blue-700 transition-colors"
+            title="Take a guided tour"
+          >
+            Take a tour
+          </button>
+        </div>
         <div id="tour-view-toggle" class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
           <%= for {mode, label} <- [{:month, "Month"}, {:week, "Week"}, {:day, "Day"}] do %>
             <button
@@ -240,7 +267,10 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
             </div>
 
           <% :week -> %>
-            <div class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div
+              id="tour-calendar-grid"
+              class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm"
+            >
               <.weekday_headers />
               <%= for day <- week_days(@focus_date) do %>
                 <% groups = group_by_type(visible_rotations(assigns, day)) %>
@@ -268,7 +298,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
             </div>
 
           <% :day -> %>
-            <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+            <div id="tour-calendar-grid" class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
               <h3 class="text-lg font-semibold text-gray-800 mb-4">
                 {Calendar.strftime(@focus_date, "%A, %B %-d, %Y")}
               </h3>
