@@ -103,6 +103,23 @@
             Check your inbox and click the link to sign in. It expires in 15 minutes.
           </p>
         </div>
+      <% :confirm_login -> %>
+        <div class="text-center space-y-4">
+          <p class="text-sm text-gray-700">
+            Click below to finish signing in as
+            <span class="font-medium">{@email}</span>.
+          </p>
+          <form method="post" action="/auth/verify">
+            <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+            <input type="hidden" name="token" value={@token} />
+            <button
+              type="submit"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm transition-colors"
+            >
+              Sign in
+            </button>
+          </form>
+        </div>
       <% :set_password -> %>
         <p class="text-sm text-gray-500 text-center mb-4">
           You're in! Optionally set a password for faster logins next time.

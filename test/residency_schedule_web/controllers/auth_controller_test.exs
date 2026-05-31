@@ -62,26 +62,58 @@ defmodule ResidencyScheduleWeb.AuthControllerTest do
   # ── Magic link verification ────────────────────────────────────────────────
 
   describe "GET /auth/verify" do
-    test "logs in approved user with existing password", %{conn: conn} do
+    test "shows the confirm prompt without consuming the token", %{conn: conn} do
       {:ok, user} = Accounts.create_user(%{email: "verify@urmc.rochester.edu"})
       Accounts.set_password(user, "testpassword123")
       {:ok, token} = Accounts.generate_magic_link_token(user)
 
       conn = get(conn, "/auth/verify", %{"token" => token})
+
+      # The GET only shows the interstitial — it must not log the user in...
+      assert html_response(conn, 200) =~ "Sign in"
+      assert get_session(conn, :user_id) == nil
+
+      # ...and the token must remain consumable (scanner pre-fetch safety).
+      assert {:ok, _} = Accounts.consume_magic_link_token(token)
+    end
+
+    test "rejects invalid token", %{conn: conn} do
+      conn = get(conn, "/auth/verify", %{"token" => "bogus"})
+      assert redirected_to(conn) == "/login"
+    end
+  end
+
+  describe "POST /auth/verify" do
+    test "logs in approved user with existing password", %{conn: conn} do
+      {:ok, user} = Accounts.create_user(%{email: "confirm@urmc.rochester.edu"})
+      Accounts.set_password(user, "testpassword123")
+      {:ok, token} = Accounts.generate_magic_link_token(user)
+
+      conn = post(conn, "/auth/verify", %{"token" => token})
       assert redirected_to(conn) == "/"
       assert get_session(conn, :user_id) == user.id
     end
 
     test "shows set-password form for user without password", %{conn: conn} do
-      {:ok, user} = Accounts.create_user(%{email: "new@urmc.rochester.edu"})
+      {:ok, user} = Accounts.create_user(%{email: "confirmnew@urmc.rochester.edu"})
       {:ok, token} = Accounts.generate_magic_link_token(user)
 
-      conn = get(conn, "/auth/verify", %{"token" => token})
+      conn = post(conn, "/auth/verify", %{"token" => token})
       assert html_response(conn, 200) =~ "set a password"
     end
 
+    test "rejects an already-consumed token", %{conn: conn} do
+      {:ok, user} = Accounts.create_user(%{email: "confirmtwice@urmc.rochester.edu"})
+      Accounts.set_password(user, "testpassword123")
+      {:ok, token} = Accounts.generate_magic_link_token(user)
+
+      post(conn, "/auth/verify", %{"token" => token})
+      conn = post(conn, "/auth/verify", %{"token" => token})
+      assert redirected_to(conn) == "/login"
+    end
+
     test "rejects invalid token", %{conn: conn} do
-      conn = get(conn, "/auth/verify", %{"token" => "bogus"})
+      conn = post(conn, "/auth/verify", %{"token" => "bogus"})
       assert redirected_to(conn) == "/login"
     end
   end
@@ -197,7 +229,7 @@ defmodule ResidencyScheduleWeb.AuthControllerTest do
       {:ok, user} = Accounts.create_user(%{email: "pending@gmail.com"})
       {:ok, token} = Accounts.generate_magic_link_token(user)
 
-      conn = get(conn, "/auth/verify", %{"token" => token})
+      conn = post(conn, "/auth/verify", %{"token" => token})
       # User has no password, so sees set-password form first
       assert html_response(conn, 200) =~ "set a password"
 

@@ -256,31 +256,51 @@ defmodule ResidencySchedule.Accounts do
   end
 
   @doc """
-  Verifies a magic link token. Returns `{:ok, user}` if valid, `{:error, reason}` otherwise.
-  Marks the token as used on success.
+  Validates a magic link token without consuming it. Returns `{:ok, user}` if the
+  token is active (unused and unexpired), `{:error, :invalid_or_expired}` otherwise.
+
+  This is safe to call from a GET request: it does not mark the token as used, so
+  email security scanners that pre-fetch links cannot burn the token.
 
   Exempt from doctest — hits the database.
   """
-  def verify_magic_link_token(token_string) do
-    now = DateTime.utc_now()
+  def validate_magic_link_token(token_string) do
+    case fetch_active_token(token_string) do
+      nil -> {:error, :invalid_or_expired}
+      token -> {:ok, token.user}
+    end
+  end
 
-    query =
-      from(t in MagicLinkToken,
-        where: t.token == ^token_string and is_nil(t.used_at) and t.expires_at > ^now,
-        preload: [:user]
-      )
+  @doc """
+  Consumes a magic link token, marking it as used. Returns `{:ok, user}` if the
+  token was active, `{:error, :invalid_or_expired}` otherwise.
 
-    case Repo.one(query) do
+  Call this only from a state-changing request (POST), never from a GET.
+
+  Exempt from doctest — hits the database.
+  """
+  def consume_magic_link_token(token_string) do
+    case fetch_active_token(token_string) do
       nil ->
         {:error, :invalid_or_expired}
 
       token ->
         token
-        |> MagicLinkToken.changeset(%{used_at: DateTime.truncate(now, :second)})
+        |> MagicLinkToken.changeset(%{used_at: DateTime.truncate(DateTime.utc_now(), :second)})
         |> Repo.update!()
 
         {:ok, token.user}
     end
+  end
+
+  defp fetch_active_token(token_string) do
+    now = DateTime.utc_now()
+
+    from(t in MagicLinkToken,
+      where: t.token == ^token_string and is_nil(t.used_at) and t.expires_at > ^now,
+      preload: [:user]
+    )
+    |> Repo.one()
   end
 
   @doc """
