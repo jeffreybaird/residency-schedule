@@ -33,6 +33,10 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
       assert html =~ "Mon" or html =~ "Mo"
     end
 
+    test "wires the calendar body for swipe navigation", %{html: html} do
+      assert html =~ ~s(phx-hook="CalendarSwipe")
+    end
+
     test "prev navigates backward and changes the period label", %{view: view} do
       html_before = render(view)
       html_after = view |> element("button[phx-click='prev']") |> render_click()
