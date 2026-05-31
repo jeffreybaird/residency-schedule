@@ -166,10 +166,37 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
       refute html =~ "Rotations (1)"
     end
 
-    test "lists every resident even for a period with no shifts", %{conn: conn} do
+    test "shows no residents for an academic year with no schedule", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/calendar?date=2020-01-01")
       view |> element("button[phx-value-panel='residents']") |> render_click()
-      assert has_element?(view, "button[phx-click='toggle_resident_filter']")
+      assert render(view) =~ "No residents yet."
+    end
+
+    test "scopes the resident filter to the viewed academic year", %{conn: conn} do
+      {:ok, s2026} = ResidencySchedule.Schedules.upsert_schedule(2026, "2026–2027")
+
+      {:ok, future} =
+        ResidencySchedule.Residents.insert_resident(s2026.id, %{
+          position_code: "R1-9",
+          residency_year: 1,
+          schedule_number: 9,
+          name: "FutureGradZZ"
+        })
+
+      {:ok, _} =
+        ResidencySchedule.Rotations.insert_rotations(future.id, [
+          %{slot_index: 0, start_date: ~D[2026-07-06], end_date: ~D[2026-07-12], rotation_type: :rei}
+        ])
+
+      # Viewing 2023 must not offer the 2026-only resident...
+      {:ok, view_2023, _html} = live(conn, "/calendar?date=2023-07-05")
+      view_2023 |> element("button[phx-value-panel='residents']") |> render_click()
+      refute render(view_2023) =~ "FutureGradZZ"
+
+      # ...but viewing 2026 must.
+      {:ok, view_2026, _html} = live(conn, "/calendar?date=2026-07-08")
+      view_2026 |> element("button[phx-value-panel='residents']") |> render_click()
+      assert render(view_2026) =~ "FutureGradZZ"
     end
   end
 
