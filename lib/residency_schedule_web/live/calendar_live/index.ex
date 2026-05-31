@@ -26,8 +26,13 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   end
 
   # Pre-selects the user's assigned (home) resident so the calendar opens on
-  # their own schedule. Users without an assigned resident see everyone.
-  defp default_resident_filter(%{home_resident_id: id}) when is_integer(id), do: [id]
+  # their own schedule. Filters by the person (resident_id), so navigating into
+  # the next academic year keeps showing them. Users without an assigned
+  # resident see everyone.
+  defp default_resident_filter(%{home_resident: %{resident_id: resident_id}})
+       when is_integer(resident_id),
+       do: [resident_id]
+
   defp default_resident_filter(_current_user), do: []
 
   # New users see the guided tour automatically until they complete it.
@@ -521,13 +526,15 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
   end
 
-  # Distinct residents appearing in the visible rotations, ordered by seniority.
+  # Distinct residents (people) appearing in the visible rotations, ordered by
+  # seniority. Deduped by resident_id so a person spanning two schedules in the
+  # visible range (e.g. across the academic-year boundary) shows once.
   defp resident_options(rotations) do
     rotations
     |> Enum.map(& &1.schedule_resident)
-    |> Enum.uniq_by(& &1.id)
+    |> Enum.uniq_by(& &1.resident_id)
     |> Enum.sort_by(&{&1.residency_year, &1.schedule_number})
-    |> Enum.map(&%{id: &1.id, position_code: &1.position_code, name: &1.name})
+    |> Enum.map(&%{id: &1.resident_id, position_code: &1.position_code, name: &1.name})
   end
 
   # Distinct rotation types appearing in the visible rotations, ordered by label.
