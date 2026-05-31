@@ -86,6 +86,27 @@ defmodule ResidencySchedule.ShiftOverrides do
   end
 
   @doc """
+  Lists overrides overlapping an inclusive date range across all schedules.
+  Preloads: rotation (with its schedule_resident) and covering_schedule_resident.
+  Schedule resident virtual name fields are populated from the associated Resident.
+
+  Powers the calendar's week and day views, which span arbitrary date ranges
+  rather than a single calendar month.
+
+      iex> ResidencySchedule.ShiftOverrides.list_overrides_in_range(~D[2000-01-01], ~D[2000-01-07])
+      []
+  """
+  def list_overrides_in_range(range_start, range_end) do
+    sr_query = ScheduleResident.with_name_query()
+
+    from(o in ShiftOverride,
+      where: o.override_start_date <= ^range_end and o.override_end_date >= ^range_start,
+      preload: [rotation: [schedule_resident: ^sr_query], covering_schedule_resident: ^sr_query]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Lists shift overrides for a schedule that overlap an inclusive date range.
 
   Preloads `rotation` (with `schedule_resident`) and `covering_schedule_resident`.
