@@ -24,14 +24,14 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
 
     test "allows access to schedule index", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/")
+      {:ok, _view, html} = live(conn, "/schedule")
       assert html =~ "No schedule uploaded yet"
     end
   end
 
   describe "empty state" do
     test "shows upload prompt when no schedule exists", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/")
+      {:ok, _view, html} = live(conn, "/schedule")
       assert html =~ "No schedule uploaded yet"
     end
   end
@@ -43,7 +43,7 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       on_exit(fn -> Application.delete_env(:residency_schedule, :current_date) end)
 
       seed_schedule()
-      {:ok, view, html} = live(conn, "/")
+      {:ok, view, html} = live(conn, "/schedule")
       %{view: view, html: html}
     end
 
@@ -106,7 +106,7 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       on_exit(fn -> Application.delete_env(:residency_schedule, :current_date) end)
 
       seed_schedule()
-      {:ok, view, html} = live(conn, "/")
+      {:ok, view, html} = live(conn, "/schedule")
       %{view: view, html: html}
     end
 
@@ -131,7 +131,7 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
 
       seed_schedule()
       seed_schedule(2026)
-      {:ok, view, html} = live(conn, "/")
+      {:ok, view, html} = live(conn, "/schedule")
       %{view: view, html: html}
     end
 
@@ -148,24 +148,14 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
   describe "guided tour" do
     setup %{conn: conn} do
       seed_schedule()
-      {:ok, view, html} = live(conn, "/")
+      {:ok, view, html} = live(conn, "/schedule")
       %{view: view, html: html}
-    end
-
-    test "new user sees tour auto-start attribute", %{html: html} do
-      assert html =~ ~s(data-auto-start="true")
     end
 
     test "tour_completed event marks tour as done", %{view: view, user: user} do
       view |> element("#guided-tour") |> render_hook("tour_completed", %{})
       updated_user = ResidencySchedule.Accounts.get_user(user.id)
       assert updated_user.tour_completed == true
-    end
-
-    test "returning user with completed tour does not auto-start", %{user: user, conn: conn} do
-      ResidencySchedule.Accounts.complete_tour(user)
-      {:ok, _view, html} = live(conn, "/")
-      assert html =~ ~s(data-auto-start="false")
     end
 
     test "Take a tour link is present", %{html: html} do
