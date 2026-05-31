@@ -31,6 +31,7 @@ defmodule ResidencyScheduleWeb.Router do
     post "/login/send-link", AuthController, :send_magic_link
     post "/login/password", AuthController, :password_login
     get "/auth/verify", AuthController, :verify
+    post "/auth/verify", AuthController, :confirm
     post "/auth/set-password", AuthController, :set_initial_password
     post "/logout", AuthController, :delete
     get "/feed/:token/calendar.ics", IcalController, :feed

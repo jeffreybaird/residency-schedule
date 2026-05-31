@@ -186,34 +186,73 @@ defmodule ResidencySchedule.AccountsTest do
       %{user: user}
     end
 
-    test "generate and verify a token", %{user: user} do
+    test "validate returns the user for an active token", %{user: user} do
       {:ok, token_string} = Accounts.generate_magic_link_token(user)
       assert is_binary(token_string)
 
-      {:ok, verified_user} = Accounts.verify_magic_link_token(token_string)
-      assert verified_user.id == user.id
+      {:ok, validated_user} = Accounts.validate_magic_link_token(token_string)
+      assert validated_user.id == user.id
     end
 
-    test "token can only be used once", %{user: user} do
-      {:ok, token_string} = Accounts.generate_magic_link_token(user)
-      {:ok, _} = Accounts.verify_magic_link_token(token_string)
-      assert {:error, :invalid_or_expired} = Accounts.verify_magic_link_token(token_string)
-    end
-
-    test "rejects invalid token" do
-      assert {:error, :invalid_or_expired} = Accounts.verify_magic_link_token("nonexistent")
-    end
-
-    test "rejects expired token", %{user: user} do
+    test "validate does not consume the token", %{user: user} do
       {:ok, token_string} = Accounts.generate_magic_link_token(user)
 
-      # Manually expire the token
-      Repo.update_all(
-        from(t in ResidencySchedule.Accounts.MagicLinkToken, where: t.token == ^token_string),
-        set: [expires_at: DateTime.add(DateTime.utc_now(), -1, :hour)]
-      )
+      # A scanner pre-fetching the link validates it repeatedly...
+      {:ok, _} = Accounts.validate_magic_link_token(token_string)
+      {:ok, _} = Accounts.validate_magic_link_token(token_string)
 
-      assert {:error, :invalid_or_expired} = Accounts.verify_magic_link_token(token_string)
+      # ...and the real user can still consume it afterward.
+      assert {:ok, consumed_user} = Accounts.consume_magic_link_token(token_string)
+      assert consumed_user.id == user.id
     end
+
+    test "validate rejects an invalid token" do
+      assert {:error, :invalid_or_expired} = Accounts.validate_magic_link_token("nonexistent")
+    end
+
+    test "validate rejects an expired token", %{user: user} do
+      {:ok, token_string} = Accounts.generate_magic_link_token(user)
+      expire_token(token_string)
+
+      assert {:error, :invalid_or_expired} = Accounts.validate_magic_link_token(token_string)
+    end
+
+    test "validate rejects an already-consumed token", %{user: user} do
+      {:ok, token_string} = Accounts.generate_magic_link_token(user)
+      {:ok, _} = Accounts.consume_magic_link_token(token_string)
+
+      assert {:error, :invalid_or_expired} = Accounts.validate_magic_link_token(token_string)
+    end
+
+    test "consume returns the user and marks the token used", %{user: user} do
+      {:ok, token_string} = Accounts.generate_magic_link_token(user)
+
+      {:ok, consumed_user} = Accounts.consume_magic_link_token(token_string)
+      assert consumed_user.id == user.id
+    end
+
+    test "consume can only be used once", %{user: user} do
+      {:ok, token_string} = Accounts.generate_magic_link_token(user)
+      {:ok, _} = Accounts.consume_magic_link_token(token_string)
+      assert {:error, :invalid_or_expired} = Accounts.consume_magic_link_token(token_string)
+    end
+
+    test "consume rejects an invalid token" do
+      assert {:error, :invalid_or_expired} = Accounts.consume_magic_link_token("nonexistent")
+    end
+
+    test "consume rejects an expired token", %{user: user} do
+      {:ok, token_string} = Accounts.generate_magic_link_token(user)
+      expire_token(token_string)
+
+      assert {:error, :invalid_or_expired} = Accounts.consume_magic_link_token(token_string)
+    end
+  end
+
+  defp expire_token(token_string) do
+    Repo.update_all(
+      from(t in ResidencySchedule.Accounts.MagicLinkToken, where: t.token == ^token_string),
+      set: [expires_at: DateTime.add(DateTime.utc_now(), -1, :hour)]
+    )
   end
 end
