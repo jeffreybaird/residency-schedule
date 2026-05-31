@@ -166,10 +166,10 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
       refute html =~ "Rotations (1)"
     end
 
-    test "empty period shows no residents in view", %{conn: conn} do
+    test "lists every resident even for a period with no shifts", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/calendar?date=2020-01-01")
       view |> element("button[phx-value-panel='residents']") |> render_click()
-      assert render(view) =~ "No residents in view."
+      assert has_element?(view, "button[phx-click='toggle_resident_filter']")
     end
   end
 

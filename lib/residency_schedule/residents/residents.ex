@@ -14,6 +14,36 @@ defmodule ResidencySchedule.Residents do
   end
 
   @doc """
+  Returns one option per resident (person) for calendar filtering: their
+  `resident_id`, name, and the position code / seniority from their most recent
+  academic-year appearance. Ordered by residency_year, schedule_number, name.
+
+  Lets every resident be filtered on regardless of whether they have shifts in
+  the visible range.
+
+  Exempt from doctest — hits the database. See `ResidentsTest`.
+  """
+  def list_resident_filter_options do
+    from(sr in ScheduleResident,
+      join: r in assoc(sr, :resident),
+      join: s in assoc(sr, :schedule),
+      select: %{
+        resident_id: sr.resident_id,
+        name: r.name,
+        position_code: sr.position_code,
+        residency_year: sr.residency_year,
+        schedule_number: sr.schedule_number,
+        academic_year: s.academic_year
+      }
+    )
+    |> Repo.all()
+    |> Enum.group_by(& &1.resident_id)
+    |> Enum.map(fn {_resident_id, rows} -> Enum.max_by(rows, & &1.academic_year) end)
+    |> Enum.sort_by(&{&1.residency_year, &1.schedule_number, &1.name})
+    |> Enum.map(&%{id: &1.resident_id, name: &1.name, position_code: &1.position_code})
+  end
+
+  @doc """
   Returns schedule residents for a given schedule, ordered by residency_year, schedule_number.
   The virtual name field is populated from the associated Resident.
   """
