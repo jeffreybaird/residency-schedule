@@ -5,7 +5,7 @@ const MODAL_RADIUS = 4;
 
 // ── Step definitions ─────────────────────────────────────────────────────────
 
-const SCHEDULE_STEPS = [
+const CALENDAR_STEPS = [
   {
     id: "welcome",
     title: "Welcome to URMC OBGYN Scheduling!",
@@ -13,11 +13,55 @@ const SCHEDULE_STEPS = [
     buttons: ["next"],
   },
   {
+    id: "calendar-overview",
+    title: "Your Calendar",
+    text: "This is your home page \u2014 the schedule shown as a calendar. If you\u2019ve been assigned a resident, it opens filtered to your own shifts.",
+    buttons: ["next"],
+  },
+  {
+    id: "calendar-views",
+    attachTo: { element: "#tour-view-toggle", on: "bottom" },
+    title: "Month, Week & Day",
+    text: "Switch between Month, Week, and Day views here. The calendar opens on the current week by default.",
+    buttons: ["back", "next"],
+  },
+  {
+    id: "calendar-filters",
+    attachTo: { element: "#tour-calendar-filters", on: "bottom" },
+    title: "Filter the Calendar",
+    text: "Filter by resident or by rotation to focus on exactly what you need. Picking your own name shows just your schedule; clear it to see everyone.",
+    buttons: ["back", "next"],
+  },
+  {
+    id: "calendar-nav",
+    attachTo: { element: "#tour-month-nav", on: "bottom" },
+    title: "Move Through Time",
+    text: "Step backward and forward \u2014 by month, week, or day depending on your view \u2014 or tap Today to jump back to now.",
+    buttons: ["back", "next"],
+  },
+  {
+    id: "calendar-grid",
+    attachTo: { element: "#tour-calendar-grid", on: "top" },
+    title: "See Each Day",
+    text: "Click any day to see who\u2019s on each rotation. The colored labels show the different services.",
+    buttons: ["back", "next"],
+  },
+  {
+    id: "nav-schedule",
+    attachTo: { element: "#tour-nav-schedule", on: "bottom" },
+    title: "The Schedule Grid",
+    text: "Next, let\u2019s look at the full schedule grid showing every resident across the year.",
+    buttons: ["back", { key: "navigate", dest: "schedule", label: "Let\u2019s go \u2192" }],
+  },
+];
+
+const SCHEDULE_STEPS = [
+  {
     id: "schedule-pills",
     attachTo: { element: "#tour-schedule-pills", on: "bottom" },
     title: "Academic Year Schedules",
     text: "Each pill represents an academic year. All schedules are shown in one continuous timeline \u2014 scroll right to move through them. You can also click a pill to jump to that year.",
-    buttons: ["back", "next"],
+    buttons: ["next"],
   },
   {
     id: "year-filter",
@@ -30,7 +74,7 @@ const SCHEDULE_STEPS = [
     id: "gantt-grid",
     attachTo: { element: "#gantt-scroll", on: "top" },
     title: "The Schedule Grid",
-    text: "This is the main view. Each row is a resident, and each column is a week. Scroll left and right to move through time. The grid automatically starts at today\u2019s date.",
+    text: "Each row is a resident, and each column is a week. Scroll left and right to move through time. The grid automatically starts at today\u2019s date.",
     buttons: ["back", "next"],
   },
   {
@@ -43,20 +87,6 @@ const SCHEDULE_STEPS = [
     title: "Resident Names",
     text: "Clicking on a resident\u2019s name will take you to their personal schedule page.",
     buttons: ["back", "navigate-resident"],
-  },
-  {
-    id: "nav-calendar",
-    attachTo: { element: "#tour-nav-calendar", on: "bottom" },
-    title: "Calendar View",
-    text: "Next, let\u2019s visit the Calendar page to see the schedule as a traditional monthly view.",
-    buttons: ["back", "navigate-calendar"],
-  },
-  {
-    id: "nav-compare",
-    attachTo: { element: "#tour-nav-compare", on: "bottom" },
-    title: "Compare Residents",
-    text: "Finally, let\u2019s check out the Compare page to see how resident schedules overlap.",
-    buttons: ["back", "navigate-compare"],
   },
 ];
 
@@ -97,40 +127,8 @@ const RESIDENT_STEPS = [
       "back",
       {
         key: "navigate",
-        dest: "schedule",
-        startAt: "nav-calendar",
-        label: "Back to schedule \u2192",
-      },
-    ],
-  },
-];
-
-const CALENDAR_STEPS = [
-  {
-    id: "calendar-overview",
-    title: "Calendar View",
-    text: "This page shows the schedule as a familiar monthly calendar. Each day shows colored dots for the rotations happening that day.",
-    buttons: ["next"],
-  },
-  {
-    id: "calendar-month-nav",
-    attachTo: { element: "#tour-month-nav", on: "bottom" },
-    title: "Navigate Months",
-    text: "Use these buttons to move between months. The calendar starts on the current month.",
-    buttons: ["back", "next"],
-  },
-  {
-    id: "calendar-grid",
-    attachTo: { element: "#tour-calendar-grid", on: "top" },
-    title: "The Calendar Grid",
-    text: "Click any day to see a detailed breakdown of who\u2019s on which rotation. Each colored dot represents a different service.",
-    buttons: [
-      "back",
-      {
-        key: "navigate",
-        dest: "schedule",
-        startAt: "nav-compare",
-        label: "Back to schedule \u2192",
+        dest: "compare",
+        label: "See compare \u2192",
       },
     ],
   },
@@ -153,7 +151,7 @@ const COMPARE_STEPS = [
   {
     id: "compare-done",
     title: "That\u2019s Everything!",
-    text: "You\u2019ve seen all the main features. You can restart this tour any time from the \u201CTake a tour\u201D link on the schedule page.",
+    text: "You\u2019ve seen all the main features. You can restart this tour any time from the \u201CTake a tour\u201D link on the calendar (home) page.",
     buttons: ["finish-home"],
   },
 ];
@@ -187,8 +185,8 @@ function consumeTourState() {
 // ── Navigation ───────────────────────────────────────────────────────────────
 
 const PAGE_PATHS = {
-  schedule: "/",
-  calendar: "/calendar",
+  schedule: "/schedule",
+  calendar: "/",
   compare: "/compare",
 };
 
@@ -293,7 +291,7 @@ function buildButtons(keys, tour) {
     }
     if (key === "finish-home") {
       return {
-        text: "Back to schedule \u2192",
+        text: "Back to home \u2192",
         classes: "shepherd-button",
         action: () => {
           tour._finishingHome = true;
