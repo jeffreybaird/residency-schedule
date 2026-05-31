@@ -128,7 +128,7 @@ This should pass cleanly before every push. CI enforces the same checks.
 
 After starting the server:
 
-1. Navigate to [http://localhost:4000/upload](http://localhost:4000/upload)
+1. Navigate to [http://localhost:4000/admin/upload](http://localhost:4000/admin/upload)
 2. Select a CSV file exported from the residency schedule spreadsheet
 3. Click **Import Schedule**
 

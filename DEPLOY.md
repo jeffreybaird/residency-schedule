@@ -285,7 +285,7 @@ git push
 
 After the first deploy, the database exists but has no schedule data. Upload a schedule via the UI:
 
-1. Go to `https://yourdomain.com/upload`
+1. Go to `https://yourdomain.com/admin/upload`
 2. Select your CSV file
 3. Click **Import Schedule**
 
