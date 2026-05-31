@@ -439,6 +439,59 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
+  Returns all rotations overlapping an inclusive date range across all schedules,
+  with `schedule_resident` preloaded (virtual `name` from `Resident`).
+
+  Powers the calendar's week and day views, which span arbitrary date ranges
+  rather than a single calendar month.
+
+      iex> ResidencySchedule.Rotations.list_rotations_in_range_all_schedules(~D[2000-01-01], ~D[2000-01-07])
+      []
+  """
+  def list_rotations_in_range_all_schedules(range_start, range_end) do
+    sr_query = ScheduleResident.with_name_query()
+
+    from(rot in Rotation,
+      join: sr in assoc(rot, :schedule_resident),
+      where: rot.start_date <= ^range_end and rot.end_date >= ^range_start,
+      preload: [schedule_resident: ^sr_query]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Keeps only rotations belonging to one of the given `schedule_resident` ids.
+  An empty `resident_ids` list applies no filter and returns the rotations unchanged.
+
+      iex> alias ResidencySchedule.Rotations.Rotation
+      iex> rots = [%Rotation{id: 1, schedule_resident_id: 7}, %Rotation{id: 2, schedule_resident_id: 9}]
+      iex> ResidencySchedule.Rotations.filter_rotations_by_residents(rots, [7]) |> Enum.map(& &1.id)
+      [1]
+  """
+  def filter_rotations_by_residents(rotations, []), do: rotations
+
+  def filter_rotations_by_residents(rotations, resident_ids) do
+    id_set = MapSet.new(resident_ids)
+    Enum.filter(rotations, &MapSet.member?(id_set, &1.schedule_resident_id))
+  end
+
+  @doc """
+  Keeps only rotations whose `rotation_type` is one of the given `types`.
+  An empty `types` list applies no filter and returns the rotations unchanged.
+
+      iex> alias ResidencySchedule.Rotations.Rotation
+      iex> rots = [%Rotation{id: 1, rotation_type: "oncology"}, %Rotation{id: 2, rotation_type: "vacation"}]
+      iex> ResidencySchedule.Rotations.filter_rotations_by_types(rots, ["oncology"]) |> Enum.map(& &1.id)
+      [1]
+  """
+  def filter_rotations_by_types(rotations, []), do: rotations
+
+  def filter_rotations_by_types(rotations, types) do
+    type_set = MapSet.new(types)
+    Enum.filter(rotations, &MapSet.member?(type_set, &1.rotation_type))
+  end
+
+  @doc """
   Returns rotations filtered by rotation type.
   """
   def list_rotations_by_type(rotation_type) do
