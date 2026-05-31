@@ -3,6 +3,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
   alias ResidencySchedule.Schedules
   alias ResidencySchedule.Rotations
+  alias ResidencySchedule.Residents
   alias ResidencySchedule.ShiftOverrides
 
   @impl true
@@ -19,7 +20,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         filter_panel: nil,
         selected_date: nil,
         current_user: current_user,
-        show_tour: show_tour?(current_user)
+        show_tour: show_tour?(current_user),
+        resident_options: Residents.list_resident_filter_options()
       )
 
     {:ok, socket}
@@ -396,7 +398,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
             </button>
           </div>
           <%= if @resident_options == [] do %>
-            <p class="text-sm text-gray-400">No residents in view.</p>
+            <p class="text-sm text-gray-400">No residents yet.</p>
           <% else %>
             <div class="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
               <%= for resident <- @resident_options do %>
@@ -512,7 +514,6 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     assign(socket,
       rotation_index: index_by_date(rotations, & &1.start_date, & &1.end_date),
       override_index: index_by_date(overrides, & &1.override_start_date, & &1.override_end_date),
-      resident_options: resident_options(rotations),
       type_options: type_options(rotations)
     )
   end
@@ -524,17 +525,6 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       Date.range(start_fun.(item), end_fun.(item)) |> Enum.map(&{&1, item})
     end)
     |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
-  end
-
-  # Distinct residents (people) appearing in the visible rotations, ordered by
-  # seniority. Deduped by resident_id so a person spanning two schedules in the
-  # visible range (e.g. across the academic-year boundary) shows once.
-  defp resident_options(rotations) do
-    rotations
-    |> Enum.map(& &1.schedule_resident)
-    |> Enum.uniq_by(& &1.resident_id)
-    |> Enum.sort_by(&{&1.residency_year, &1.schedule_number})
-    |> Enum.map(&%{id: &1.resident_id, position_code: &1.position_code, name: &1.name})
   end
 
   # Distinct rotation types appearing in the visible rotations, ordered by label.
