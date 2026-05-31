@@ -494,6 +494,73 @@ defmodule ResidencySchedule.RotationsTest do
     end
   end
 
+  describe "list_rotations_in_range_all_schedules/2" do
+    test "returns rotations from all schedules overlapping the range" do
+      rotations =
+        Rotations.list_rotations_in_range_all_schedules(~D[2023-07-03], ~D[2023-07-07])
+
+      types = Enum.map(rotations, & &1.rotation_type)
+      assert "oncology" in types
+      assert "night_float" in types
+    end
+
+    test "excludes rotations outside the range" do
+      rotations =
+        Rotations.list_rotations_in_range_all_schedules(~D[2023-07-08], ~D[2023-07-09])
+
+      types = Enum.map(rotations, & &1.rotation_type)
+      refute "oncology" in types
+      assert "highland_weekend_days" in types
+    end
+
+    test "preloads schedule_resident association" do
+      [rot | _] =
+        Rotations.list_rotations_in_range_all_schedules(~D[2023-07-03], ~D[2023-07-07])
+
+      assert %ResidencySchedule.Residents.ScheduleResident{} = rot.schedule_resident
+    end
+
+    test "returns empty list when nothing overlaps the range" do
+      assert Rotations.list_rotations_in_range_all_schedules(~D[2000-01-01], ~D[2000-01-07]) == []
+    end
+  end
+
+  describe "filter_rotations_by_residents/2" do
+    alias ResidencySchedule.Rotations.Rotation
+
+    test "keeps only rotations for the given resident ids" do
+      rots = [
+        %Rotation{id: 1, schedule_resident_id: 7},
+        %Rotation{id: 2, schedule_resident_id: 9}
+      ]
+
+      assert Rotations.filter_rotations_by_residents(rots, [7]) |> Enum.map(& &1.id) == [1]
+    end
+
+    test "returns all rotations when the id list is empty" do
+      rots = [%Rotation{id: 1, schedule_resident_id: 7}]
+      assert Rotations.filter_rotations_by_residents(rots, []) == rots
+    end
+  end
+
+  describe "filter_rotations_by_types/2" do
+    alias ResidencySchedule.Rotations.Rotation
+
+    test "keeps only rotations of the given types" do
+      rots = [
+        %Rotation{id: 1, rotation_type: "oncology"},
+        %Rotation{id: 2, rotation_type: "vacation"}
+      ]
+
+      assert Rotations.filter_rotations_by_types(rots, ["oncology"]) |> Enum.map(& &1.id) == [1]
+    end
+
+    test "returns all rotations when the type list is empty" do
+      rots = [%Rotation{id: 1, rotation_type: "oncology"}]
+      assert Rotations.filter_rotations_by_types(rots, []) == rots
+    end
+  end
+
   describe "list_co_service_days/2" do
     test "excludes float and post_call rotations", %{schedule: sched} do
       {:ok, r3} =
