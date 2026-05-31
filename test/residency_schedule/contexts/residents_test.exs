@@ -179,32 +179,55 @@ defmodule ResidencySchedule.ResidentsTest do
     end
   end
 
-  describe "list_resident_filter_options/0" do
-    test "returns one option per resident (person)", %{r4: r4, r1: r1} do
-      options = Residents.list_resident_filter_options()
-      ids = Enum.map(options, & &1.id)
-
-      assert r4.resident_id in ids
-      assert r1.resident_id in ids
-      assert ids == Enum.uniq(ids)
-    end
-
-    test "dedupes a person across schedules using their most recent appearance", %{r4: r4} do
-      {:ok, sched_2026} = Schedules.upsert_schedule(2026, "2026–2027")
-
-      {:ok, _alexis_2026} =
-        Residents.insert_resident(sched_2026.id, %{
-          position_code: "R4-9",
-          residency_year: 4,
-          schedule_number: 9,
-          name: "Alexis"
+  describe "list_resident_filter_options_for_year/1" do
+    test "lists residents with a shift that year and excludes the rest", %{schedule: sched} do
+      {:ok, on_service} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R3-1",
+          residency_year: 3,
+          schedule_number: 1,
+          name: "OnService"
         })
 
-      options = Residents.list_resident_filter_options()
-      alexis_options = Enum.filter(options, &(&1.id == r4.resident_id))
+      {:ok, _no_shifts} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R3-2",
+          residency_year: 3,
+          schedule_number: 2,
+          name: "NoShifts"
+        })
 
-      assert length(alexis_options) == 1
-      assert hd(alexis_options).position_code == "R4-9"
+      {:ok, _} =
+        ResidencySchedule.Rotations.insert_rotations(on_service.id, [
+          %{slot_index: 0, start_date: ~D[2023-07-03], end_date: ~D[2023-07-09], rotation_type: :oncology}
+        ])
+
+      {:ok, s2026} = Schedules.upsert_schedule(2026, "2026–2027")
+
+      {:ok, future} =
+        Residents.insert_resident(s2026.id, %{
+          position_code: "R1-1",
+          residency_year: 1,
+          schedule_number: 1,
+          name: "FutureGrad"
+        })
+
+      {:ok, _} =
+        ResidencySchedule.Rotations.insert_rotations(future.id, [
+          %{slot_index: 0, start_date: ~D[2026-07-06], end_date: ~D[2026-07-12], rotation_type: :rei}
+        ])
+
+      names_2023 = Residents.list_resident_filter_options_for_year(2023) |> Enum.map(& &1.name)
+      assert "OnService" in names_2023
+      refute "NoShifts" in names_2023
+      refute "FutureGrad" in names_2023
+
+      assert Residents.list_resident_filter_options_for_year(2026) |> Enum.map(& &1.name) ==
+               ["FutureGrad"]
+    end
+
+    test "returns an empty list for a year with no schedule" do
+      assert Residents.list_resident_filter_options_for_year(1999) == []
     end
   end
 end
