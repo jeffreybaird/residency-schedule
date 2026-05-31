@@ -16,39 +16,44 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     resident = Residents.get_resident!(String.to_integer(id))
     today = ResidencyScheduleWeb.ScheduleLive.Index.current_date()
 
+    appearances =
+      case Residents.list_by_canonical_name(resident.name) do
+        [] -> [resident]
+        list -> list
+      end
+
     year_history =
-      resident.name
-      |> Residents.list_by_canonical_name()
-      |> Enum.map(
+      Enum.map(
+        appearances,
         &%{id: &1.id, label: &1.schedule.label, academic_year: &1.schedule.academic_year}
       )
 
-    schedule_start = schedule_start_date(resident.rotations)
-    schedule_end = schedule_end_date(resident.rotations)
-    night_shift_counts = count_night_shifts(resident.rotations)
+    # A resident is one entity that appears across academic years, so the table
+    # spans their whole career and the stats are career-wide.
+    {all_entries, all_rotations} = build_career_entries(appearances)
 
-    schedule_slots = Rotations.list_schedule_slots(resident.schedule_id)
-    off_slots = compute_off_slots(resident.rotations, schedule_slots)
-    effective_segs = Rotations.effective_segments_for_resident(resident.id)
-    all_entries = merge_effective_entries(effective_segs, off_slots)
+    schedule_start = schedule_start_date(all_rotations)
+    schedule_end = schedule_end_date(all_rotations)
+    night_shift_counts = count_night_shifts(all_rotations)
     available_services = build_service_options(all_entries)
     filtered_entries = filter_entries(all_entries, [])
 
-    today_anchor_slot_index = today_anchor_slot_index(filtered_entries, today)
+    today_anchor_id = today_anchor_id(filtered_entries, today)
 
-    total_shifts = compute_total_shifts(resident.rotations)
-    shifts_remaining = compute_shifts_remaining(resident.rotations, today)
+    total_shifts = compute_total_shifts(all_rotations)
+    shifts_remaining = compute_shifts_remaining(all_rotations, today)
 
     night_shifts_remaining_strong =
-      compute_night_shifts_remaining(resident.rotations, today, @strong_night_types)
+      compute_night_shifts_remaining(all_rotations, today, @strong_night_types)
 
     night_shifts_remaining_highland =
-      compute_night_shifts_remaining(resident.rotations, today, @highland_night_types)
+      compute_night_shifts_remaining(all_rotations, today, @highland_night_types)
 
     {:ok,
      assign(socket,
        resident: resident,
        year_history: year_history,
+       multi_year?: length(year_history) > 1,
        is_home_resident: home_resident_id == resident.id,
        schedule_start: schedule_start,
        schedule_end: schedule_end,
@@ -59,7 +64,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
        service_filters: [],
        service_filter_open: false,
        today: today,
-       today_anchor_slot_index: today_anchor_slot_index,
+       today_anchor_id: today_anchor_id,
        total_shifts: total_shifts,
        shifts_remaining: shifts_remaining,
        night_shifts_remaining_strong: night_shifts_remaining_strong,
@@ -123,6 +128,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     ed = params["end-date"] || params["end_date"]
     slot_raw = params["slot-index"] || params["slot_index"]
 
+    # The row carries its own schedule (entries span multiple academic years),
+    # so coworkers are looked up in that entry's schedule, not the page's.
+    schedule_id = coworker_schedule_id(params, socket.assigns.resident.schedule_id)
+
     cond do
       type == "off" and is_binary(sd) and is_binary(ed) and is_binary(slot_raw) ->
         with {:ok, start_d} <- Date.from_iso8601(sd),
@@ -130,7 +139,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
              {slot_idx, ""} <- Integer.parse(slot_raw) do
           coworker_rows =
             Rotations.list_off_coworker_rows_for_slot_in_range(
-              socket.assigns.resident.schedule_id,
+              schedule_id,
               slot_idx,
               start_d,
               end_d
@@ -154,7 +163,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
              {:ok, end_d} <- Date.from_iso8601(ed) do
           coworker_rows =
             Rotations.list_effective_coworker_rows_for_type_in_range(
-              socket.assigns.resident.schedule_id,
+              schedule_id,
               type,
               start_d,
               end_d
@@ -501,24 +510,34 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                     </td>
                   </tr>
                 <% else %>
-                  <%= for entry <- @filtered_entries do %>
-                    <% past = Date.compare(entry.end_date, @today) == :lt %>
-                    <% covered = Map.get(entry, :covered_by) %>
-                    <% is_coverage = Map.get(entry, :is_coverage, false) %>
-                    <% color = entry_color(entry.rotation_type) %>
-                    <% label = entry_label(entry.rotation_type) %>
-                    <tr
-                      id={
-                      "rotation-entry-#{entry.rotation_type}-#{entry.slot_index}-#{Date.to_iso8601(entry.start_date)}-#{Date.to_iso8601(entry.end_date)}"
-                    }
-                      data-rotation-type={entry.rotation_type}
-                      data-today-anchor={if entry.slot_index == @today_anchor_slot_index, do: "true"}
-                      phx-click="open_shift_coworkers"
-                      phx-value-rotation-type={entry.rotation_type}
-                      phx-value-slot-index={entry.slot_index}
-                      phx-value-start-date={Date.to_iso8601(entry.start_date)}
-                      phx-value-end-date={Date.to_iso8601(entry.end_date)}
-                      class={[
+                  <%= for {year_label, year_entries} <- chunk_by_year(@filtered_entries) do %>
+                    <%= if @multi_year? do %>
+                      <tr class="bg-gray-50">
+                        <td
+                          colspan="4"
+                          class="px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-gray-500"
+                        >
+                          {year_label}
+                        </td>
+                      </tr>
+                    <% end %>
+                    <%= for entry <- year_entries do %>
+                      <% past = Date.compare(entry.end_date, @today) == :lt %>
+                      <% covered = Map.get(entry, :covered_by) %>
+                      <% is_coverage = Map.get(entry, :is_coverage, false) %>
+                      <% color = entry_color(entry.rotation_type) %>
+                      <% label = entry_label(entry.rotation_type) %>
+                      <tr
+                        id={entry_row_id(entry)}
+                        data-rotation-type={entry.rotation_type}
+                        data-today-anchor={if entry_row_id(entry) == @today_anchor_id, do: "true"}
+                        phx-click="open_shift_coworkers"
+                        phx-value-rotation-type={entry.rotation_type}
+                        phx-value-slot-index={entry.slot_index}
+                        phx-value-schedule-id={entry.schedule_id}
+                        phx-value-start-date={Date.to_iso8601(entry.start_date)}
+                        phx-value-end-date={Date.to_iso8601(entry.end_date)}
+                        class={[
                         entry_row_class(entry.rotation_type, past),
                         if(covered, do: "opacity-60", else: ""),
                         "cursor-pointer"
@@ -567,6 +586,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                         {Date.diff(entry.end_date, entry.start_date) + 1}
                       </td>
                     </tr>
+                    <% end %>
                   <% end %>
                 <% end %>
               </tbody>
@@ -749,6 +769,58 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     |> Enum.sort_by(& &1.start_date, Date)
   end
 
+  # Builds the resident's full multi-year timeline. Returns the rotation/off
+  # entries from every academic year (tagged with the year and schedule for
+  # section headers and coworker lookups), sorted chronologically, plus the flat
+  # list of all their rotations for career-wide stats.
+  defp build_career_entries(appearances) do
+    per_year = Enum.map(appearances, &year_entries/1)
+
+    all_entries =
+      per_year
+      |> Enum.flat_map(& &1.entries)
+      |> Enum.sort_by(& &1.start_date, Date)
+
+    all_rotations = Enum.flat_map(per_year, & &1.rotations)
+
+    {all_entries, all_rotations}
+  end
+
+  defp year_entries(schedule_resident) do
+    rotations = Rotations.list_rotations_for_resident(schedule_resident.id)
+    off_slots = compute_off_slots(rotations, Rotations.list_schedule_slots(schedule_resident.schedule_id))
+
+    entries =
+      schedule_resident.id
+      |> Rotations.effective_segments_for_resident()
+      |> merge_effective_entries(off_slots)
+      |> Enum.map(&tag_entry_with_schedule(&1, schedule_resident))
+
+    %{entries: entries, rotations: rotations}
+  end
+
+  defp tag_entry_with_schedule(entry, schedule_resident) do
+    entry
+    |> Map.put(:schedule_id, schedule_resident.schedule_id)
+    |> Map.put(:academic_year, schedule_resident.schedule.academic_year)
+    |> Map.put(:schedule_label, schedule_resident.schedule.label)
+  end
+
+  # Groups chronologically-sorted entries into `{schedule_label, entries}` per
+  # academic year (years never overlap, so same-year entries are contiguous).
+  defp chunk_by_year(entries) do
+    entries
+    |> Enum.chunk_by(& &1.academic_year)
+    |> Enum.map(fn [first | _] = chunk -> {first.schedule_label, chunk} end)
+  end
+
+  defp coworker_schedule_id(params, fallback) do
+    case Integer.parse(params["schedule-id"] || params["schedule_id"] || "") do
+      {schedule_id, ""} -> schedule_id
+      _ -> fallback
+    end
+  end
+
   defp build_service_options(entries) do
     rotation_types =
       entries
@@ -770,34 +842,40 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   end
 
   @doc """
-  Returns the slot index to scroll to on mount.
+  Returns the DOM id of the row to scroll to on mount.
 
   Picks the first entry whose end_date is on or after today (i.e. the current
   or next upcoming rotation). When today is past every entry in the list,
-  falls back to the first entry so the table starts at the beginning of the
-  schedule rather than an arbitrary scroll position.
+  falls back to the first entry so the table starts at the beginning rather
+  than an arbitrary scroll position. The id is unique across the resident's
+  whole multi-year timeline (it includes the entry's dates).
 
       iex> entries = [
-      ...>   %{slot_index: 0, end_date: ~D[2024-07-15]},
-      ...>   %{slot_index: 1, end_date: ~D[2024-08-15]}
+      ...>   %{rotation_type: "oncology", slot_index: 0, start_date: ~D[2024-07-01], end_date: ~D[2024-07-15]},
+      ...>   %{rotation_type: "elective", slot_index: 1, start_date: ~D[2024-08-01], end_date: ~D[2024-08-15]}
       ...> ]
-      iex> ResidencyScheduleWeb.ResidentLive.Show.today_anchor_slot_index(entries, ~D[2024-07-20])
-      1
-
-      iex> entries = [
-      ...>   %{slot_index: 0, end_date: ~D[2024-07-15]},
-      ...>   %{slot_index: 1, end_date: ~D[2024-08-15]}
-      ...> ]
-      iex> ResidencyScheduleWeb.ResidentLive.Show.today_anchor_slot_index(entries, ~D[2025-01-01])
-      0
+      iex> ResidencyScheduleWeb.ResidentLive.Show.today_anchor_id(entries, ~D[2024-07-20])
+      "rotation-entry-elective-1-2024-08-01-2024-08-15"
   """
-  def today_anchor_slot_index([], _today), do: nil
+  def today_anchor_id([], _today), do: nil
 
-  def today_anchor_slot_index(entries, today) do
-    case Enum.find(entries, fn entry -> Date.compare(entry.end_date, today) != :lt end) do
-      nil -> hd(entries).slot_index
-      entry -> entry.slot_index
-    end
+  def today_anchor_id(entries, today) do
+    entry =
+      Enum.find(entries, fn entry -> Date.compare(entry.end_date, today) != :lt end) ||
+        hd(entries)
+
+    entry_row_id(entry)
+  end
+
+  @doc """
+  Builds the stable, timeline-unique DOM id for a rotation/off entry row.
+
+      iex> entry = %{rotation_type: "oncology", slot_index: 2, start_date: ~D[2024-07-01], end_date: ~D[2024-07-15]}
+      iex> ResidencyScheduleWeb.ResidentLive.Show.entry_row_id(entry)
+      "rotation-entry-oncology-2-2024-07-01-2024-07-15"
+  """
+  def entry_row_id(entry) do
+    "rotation-entry-#{entry.rotation_type}-#{entry.slot_index}-#{Date.to_iso8601(entry.start_date)}-#{Date.to_iso8601(entry.end_date)}"
   end
 
   defp toggle_service(service_filters, service) do
@@ -822,7 +900,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     assign(socket,
       service_filters: service_filters,
       filtered_entries: filtered_entries,
-      today_anchor_slot_index: today_anchor_slot_index(filtered_entries, socket.assigns.today),
+      today_anchor_id: today_anchor_id(filtered_entries, socket.assigns.today),
       shift_coworkers_modal: nil
     )
   end

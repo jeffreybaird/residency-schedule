@@ -108,7 +108,7 @@ const RESIDENT_STEPS = [
     id: "resident-rotation-table",
     attachTo: { element: "#rotation-table", on: "top" },
     title: "Rotation Table",
-    text: "This table lists every rotation for the year with dates, color-coded by service. It scrolls to today automatically. Try clicking any row \u2014 it shows who\u2019s on the same rotation that week.",
+    text: "This table lists every rotation across all of their academic years, color-coded by service. It scrolls to today automatically \u2014 keep scrolling to move into the next year. Try clicking any row \u2014 it shows who\u2019s on the same rotation that week.",
     buttons: ["back", "next"],
   },
   {
