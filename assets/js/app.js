@@ -73,6 +73,37 @@ Hooks.GuidedTour = {
   }
 }
 
+// CalendarPrefs: persists the calendar's view mode, resident/rotation filters and
+// open filter panel in localStorage so they survive a page refresh or navigating
+// away and back. On mount it replays the saved prefs to the server; thereafter the
+// server pushes "save_calendar_prefs" whenever they change.
+Hooks.CalendarPrefs = {
+  STORAGE_KEY: "calendar_prefs",
+
+  mounted() {
+    const saved = this.read()
+    if (saved) this.pushEvent("restore_prefs", saved)
+    this.handleEvent("save_calendar_prefs", prefs => this.write(prefs))
+  },
+
+  read() {
+    try {
+      const raw = localStorage.getItem(this.STORAGE_KEY)
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  },
+
+  write(prefs) {
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(prefs))
+    } catch {
+      // localStorage may be unavailable (private mode, quota) — prefs just won't persist.
+    }
+  }
+}
+
 // CalendarSwipe: on touch devices, a horizontal swipe across the calendar body
 // moves to the next/previous period. The LiveView's "prev"/"next" events are
 // already view-aware (day/week/month), so the hook just pushes them.
