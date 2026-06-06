@@ -331,8 +331,10 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
 
       view |> element("button[phx-value-id='#{id}']") |> render_click()
 
-      assert_push_event(view, "save_calendar_prefs", %{residents: residents})
-      assert String.to_integer(id) in residents
+      # Opening the panel also persists (with no residents yet), so match the
+      # one-element list pushed by the toggle rather than that earlier event.
+      assert_push_event(view, "save_calendar_prefs", %{residents: [resident_id]})
+      assert resident_id == String.to_integer(id)
     end
 
     test "opening the filter panel records the open panel in the saved preferences",
