@@ -309,9 +309,85 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
     end
   end
 
+  describe "preference persistence" do
+    setup %{conn: conn} do
+      seed_schedule()
+      {:ok, view, _html} = live(conn, "/calendar?date=2023-07-05")
+      %{view: view}
+    end
+
+    test "wires the calendar for preference persistence", %{view: view} do
+      assert render(view) =~ ~s(phx-hook="CalendarPrefs")
+    end
+
+    test "choosing a view pushes the saved preferences to the client", %{view: view} do
+      view |> element("button[phx-value-view='month']") |> render_click()
+      assert_push_event(view, "save_calendar_prefs", %{view: "month"})
+    end
+
+    test "toggling a resident records the filter in the saved preferences", %{view: view} do
+      view |> element("button[phx-value-panel='residents']") |> render_click()
+      id = view |> render() |> resident_filter_value()
+
+      view |> element("button[phx-value-id='#{id}']") |> render_click()
+
+      # Opening the panel also persists (with no residents yet), so match the
+      # one-element list pushed by the toggle rather than that earlier event.
+      assert_push_event(view, "save_calendar_prefs", %{residents: [resident_id]})
+      assert resident_id == String.to_integer(id)
+    end
+
+    test "opening the filter panel records the open panel in the saved preferences",
+         %{view: view} do
+      view |> element("button[phx-value-panel='residents']") |> render_click()
+      assert_push_event(view, "save_calendar_prefs", %{panel: "residents"})
+    end
+
+    test "restoring preferences applies the saved view, panel and resident filter",
+         %{view: view} do
+      view |> element("button[phx-value-panel='residents']") |> render_click()
+      id = view |> render() |> resident_filter_value() |> String.to_integer()
+
+      html =
+        render_hook(view, "restore_prefs", %{
+          "view" => "day",
+          "residents" => [id],
+          "panel" => "residents"
+        })
+
+      assert html =~ Calendar.strftime(~D[2023-07-05], "%A, %B %-d, %Y")
+      assert html =~ "Residents (1)"
+      assert has_element?(view, "button[phx-click='toggle_resident_filter']")
+    end
+
+    test "restoring an empty resident filter clears the default selection",
+         %{conn: conn, user: user} do
+      result = seed_schedule()
+      [resident | _] = ResidencySchedule.Residents.list_residents_for_schedule(result.schedule_id)
+      ResidencySchedule.Accounts.set_home_resident(user, resident.id)
+
+      {:ok, view, html} = live(conn, "/calendar?date=2023-07-05")
+      assert html =~ "Residents (1)"
+
+      html = render_hook(view, "restore_prefs", %{"residents" => []})
+      refute html =~ "Residents (1)"
+    end
+
+    test "ignores malformed preferences and keeps the current view", %{view: view} do
+      html = render_hook(view, "restore_prefs", %{"view" => "bogus", "residents" => "nope"})
+      assert html =~ "Jul 2 – Jul 8, 2023"
+    end
+  end
+
   # Pulls a rotation type value out of an open rotations filter panel.
   defp rotation_filter_value(html) do
     [_, type] = Regex.run(~r/phx-value-type="([^"]+)"/, html)
     type
+  end
+
+  # Pulls a resident id out of an open residents filter panel.
+  defp resident_filter_value(html) do
+    [_, id] = Regex.run(~r/phx-click="toggle_resident_filter"\s+phx-value-id="([^"]+)"/, html)
+    id
   end
 end

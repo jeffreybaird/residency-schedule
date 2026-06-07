@@ -69,7 +69,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     {:noreply,
      socket
      |> assign(view_mode: parse_view(view), selected_date: nil)
-     |> assign_view_data()}
+     |> assign_view_data()
+     |> persist_prefs()}
   end
 
   @impl true
@@ -116,7 +117,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
        focus_date: Date.from_iso8601!(date_str),
        selected_date: nil
      )
-     |> assign_view_data()}
+     |> assign_view_data()
+     |> persist_prefs()}
   end
 
   @impl true
@@ -128,29 +130,43 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   def handle_event("toggle_filter_panel", %{"panel" => panel}, socket) do
     panel = parse_panel(panel)
     open = if socket.assigns.filter_panel == panel, do: nil, else: panel
-    {:noreply, assign(socket, filter_panel: open)}
+    {:noreply, socket |> assign(filter_panel: open) |> persist_prefs()}
   end
 
   @impl true
   def handle_event("toggle_resident_filter", %{"id" => id}, socket) do
     resident_filter = toggle_in_list(socket.assigns.resident_filter, String.to_integer(id))
-    {:noreply, assign(socket, resident_filter: resident_filter)}
+    {:noreply, socket |> assign(resident_filter: resident_filter) |> persist_prefs()}
   end
 
   @impl true
   def handle_event("toggle_rotation_filter", %{"type" => type}, socket) do
     rotation_filter = toggle_in_list(socket.assigns.rotation_filter, type)
-    {:noreply, assign(socket, rotation_filter: rotation_filter)}
+    {:noreply, socket |> assign(rotation_filter: rotation_filter) |> persist_prefs()}
   end
 
   @impl true
   def handle_event("clear_resident_filter", _params, socket) do
-    {:noreply, assign(socket, resident_filter: [])}
+    {:noreply, socket |> assign(resident_filter: []) |> persist_prefs()}
   end
 
   @impl true
   def handle_event("clear_rotation_filter", _params, socket) do
-    {:noreply, assign(socket, rotation_filter: [])}
+    {:noreply, socket |> assign(rotation_filter: []) |> persist_prefs()}
+  end
+
+  # Restores view mode, resident/rotation filters and the open filter panel from
+  # the client's saved preferences. Pushed by the CalendarPrefs hook on mount, so
+  # choices survive a refresh or navigating away and back.
+  @impl true
+  def handle_event("restore_prefs", params, socket) do
+    {:noreply,
+     socket
+     |> restore_view(params["view"])
+     |> restore_resident_filter(params["residents"])
+     |> restore_rotation_filter(params["rotations"])
+     |> restore_filter_panel(params["panel"])
+     |> assign_view_data()}
   end
 
   @impl true
@@ -177,6 +193,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       data-auto-start={to_string(@show_tour)}
       class="max-w-4xl mx-auto py-10 px-4"
     >
+      <div id="calendar-prefs" phx-hook="CalendarPrefs" class="hidden"></div>
       <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div class="flex items-center gap-3">
           <h1 class="text-2xl font-bold text-gray-800">Calendar</h1>
@@ -600,6 +617,50 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   end
 
   defp period_label(:day, date), do: Calendar.strftime(date, "%A, %B %-d, %Y")
+
+  # Pushes the current view, filters and open panel to the client so the
+  # CalendarPrefs hook can store them in localStorage.
+  defp persist_prefs(socket) do
+    push_event(socket, "save_calendar_prefs", %{
+      view: Atom.to_string(socket.assigns.view_mode),
+      residents: socket.assigns.resident_filter,
+      rotations: socket.assigns.rotation_filter,
+      panel: panel_to_string(socket.assigns.filter_panel)
+    })
+  end
+
+  defp panel_to_string(nil), do: nil
+  defp panel_to_string(panel), do: Atom.to_string(panel)
+
+  defp restore_view(socket, view) when view in ["month", "week", "day"],
+    do: assign(socket, view_mode: parse_view(view))
+
+  defp restore_view(socket, _view), do: socket
+
+  defp restore_resident_filter(socket, ids) when is_list(ids),
+    do: assign(socket, resident_filter: Enum.flat_map(ids, &coerce_resident_id/1))
+
+  defp restore_resident_filter(socket, _ids), do: socket
+
+  defp coerce_resident_id(id) when is_integer(id), do: [id]
+
+  defp coerce_resident_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int, _} -> [int]
+      :error -> []
+    end
+  end
+
+  defp coerce_resident_id(_id), do: []
+
+  defp restore_rotation_filter(socket, types) when is_list(types),
+    do: assign(socket, rotation_filter: Enum.filter(types, &is_binary/1))
+
+  defp restore_rotation_filter(socket, _types), do: socket
+
+  defp restore_filter_panel(socket, "residents"), do: assign(socket, filter_panel: :residents)
+  defp restore_filter_panel(socket, "rotations"), do: assign(socket, filter_panel: :rotations)
+  defp restore_filter_panel(socket, _panel), do: assign(socket, filter_panel: nil)
 
   defp parse_view("week"), do: :week
   defp parse_view("day"), do: :day
