@@ -5,6 +5,7 @@ defmodule ResidencySchedule.Accounts do
 
   import Ecto.Query
   alias ResidencySchedule.Repo
+  alias ResidencySchedule.Accounts.AdminCredential
   alias ResidencySchedule.Accounts.User
   alias ResidencySchedule.Accounts.MagicLinkToken
 
@@ -231,6 +232,67 @@ defmodule ResidencySchedule.Accounts do
     user
     |> User.tour_changeset(%{tour_completed: false})
     |> Repo.update()
+  end
+
+  # ── Admin credential ───────────────────────────────────────────────────────
+
+  @doc """
+  Verifies the admin password. Checks the database-stored credential when one
+  exists; otherwise falls back to the configured bootstrap password
+  (`:delete_password`). Returns a boolean.
+
+  Exempt from doctest — hits the database.
+  """
+  def verify_admin_password(password) when is_binary(password) do
+    case get_admin_credential() do
+      nil -> verify_bootstrap_admin_password(password)
+      credential -> AdminCredential.valid_password?(credential, password)
+    end
+  end
+
+  @doc """
+  Changes the admin password after verifying the current one. The current
+  password is the database-stored one when set, otherwise the configured
+  bootstrap password.
+
+  Returns `{:ok, credential}`, `{:error, :invalid_current_password}`, or
+  `{:error, changeset}` when the new password fails validation.
+
+  Exempt from doctest — hits the database.
+  """
+  def change_admin_password(current_password, new_password) do
+    if verify_admin_password(current_password) do
+      upsert_admin_credential(new_password)
+    else
+      {:error, :invalid_current_password}
+    end
+  end
+
+  @doc """
+  Returns true when a database-stored admin credential exists, i.e. the admin
+  has replaced the bootstrap password with their own.
+
+  Exempt from doctest — hits the database.
+  """
+  def admin_password_customized? do
+    get_admin_credential() != nil
+  end
+
+  defp get_admin_credential do
+    from(c in AdminCredential, order_by: [asc: c.id], limit: 1)
+    |> Repo.one()
+  end
+
+  defp verify_bootstrap_admin_password(password) do
+    :residency_schedule
+    |> Application.fetch_env!(:delete_password)
+    |> then(&Plug.Crypto.secure_compare(password, &1))
+  end
+
+  defp upsert_admin_credential(new_password) do
+    (get_admin_credential() || %AdminCredential{})
+    |> AdminCredential.password_changeset(%{password: new_password})
+    |> Repo.insert_or_update()
   end
 
   # ── Magic link tokens ──────────────────────────────────────────────────────

@@ -24,7 +24,11 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
        available_covering_residents: [],
        override_covering_resident_id: nil,
        override_error: nil,
-       override_success: nil
+       override_success: nil,
+       admin_password_customized: Accounts.admin_password_customized?(),
+       password_error: nil,
+       password_success: nil,
+       password_form_version: 0
      )}
   end
 
@@ -151,6 +155,51 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
        pending_users: Accounts.list_pending_users(),
        approved_users: Accounts.list_approved_users()
      )}
+  end
+
+  @impl true
+  def handle_event("change_admin_password", params, socket) do
+    case change_admin_password_from_form(params) do
+      {:ok, _credential} ->
+        {:noreply,
+         assign(socket,
+           admin_password_customized: true,
+           password_error: nil,
+           password_success: "Admin password updated.",
+           password_form_version: socket.assigns.password_form_version + 1
+         )}
+
+      {:error, message} ->
+        {:noreply, assign(socket, password_error: message, password_success: nil)}
+    end
+  end
+
+  defp change_admin_password_from_form(%{
+         "current_password" => current,
+         "new_password" => new_password,
+         "confirm_password" => confirm
+       }) do
+    with :ok <- validate_password_confirmation(new_password, confirm),
+         {:ok, credential} <- Accounts.change_admin_password(current, new_password) do
+      {:ok, credential}
+    else
+      {:error, :confirmation_mismatch} ->
+        {:error, "New passwords do not match."}
+
+      {:error, :invalid_current_password} ->
+        {:error, "Current password is incorrect."}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:error, changeset_error_message(changeset)}
+    end
+  end
+
+  defp validate_password_confirmation(password, password), do: :ok
+  defp validate_password_confirmation(_password, _confirm), do: {:error, :confirmation_mismatch}
+
+  defp changeset_error_message(changeset) do
+    changeset.errors
+    |> Enum.map_join(", ", fn {field, {message, _opts}} -> "#{field}: #{message}" end)
   end
 
   defp nilify_empty(nil), do: nil
@@ -306,6 +355,89 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                 <% end %>
               </ul>
             <% end %>
+          </div>
+        </div>
+
+        <%!-- Admin password card --%>
+        <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
+              Admin Password
+            </span>
+          </div>
+
+          <div class="px-4 py-4 space-y-4">
+            <div>
+              <p class="text-sm font-medium text-gray-800 mb-0.5">Change Admin Password</p>
+              <p class="text-xs text-gray-500">
+                Used for admin login and for confirming schedule deletion.
+              </p>
+              <%= unless @admin_password_customized do %>
+                <p class="text-xs text-amber-600 mt-1">
+                  The default admin password is still in use — set your own below.
+                </p>
+              <% end %>
+            </div>
+
+            <form
+              id={"admin-password-form-#{@password_form_version}"}
+              phx-submit="change_admin_password"
+              class="space-y-3 max-w-sm"
+            >
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">
+                  Current password
+                </label>
+                <input
+                  type="password"
+                  name="current_password"
+                  autocomplete="current-password"
+                  required
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">
+                  New password
+                </label>
+                <input
+                  type="password"
+                  name="new_password"
+                  autocomplete="new-password"
+                  required
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                />
+                <p class="text-xs text-gray-400 mt-1">At least 8 characters.</p>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">
+                  Confirm new password
+                </label>
+                <input
+                  type="password"
+                  name="confirm_password"
+                  autocomplete="new-password"
+                  required
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <%= if @password_error do %>
+                <p class="text-sm text-red-600">{@password_error}</p>
+              <% end %>
+              <%= if @password_success do %>
+                <p class="text-sm text-green-600">{@password_success}</p>
+              <% end %>
+
+              <button
+                type="submit"
+                class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Update Password
+              </button>
+            </form>
           </div>
         </div>
 

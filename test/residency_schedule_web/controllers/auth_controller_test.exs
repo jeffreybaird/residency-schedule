@@ -289,6 +289,24 @@ defmodule ResidencyScheduleWeb.AuthControllerTest do
     end
   end
 
+  describe "POST /admin/login after the admin password has been changed" do
+    setup do
+      {:ok, _} = Accounts.change_admin_password("admin", "changedsecret1")
+      :ok
+    end
+
+    test "accepts the changed password", %{conn: conn} do
+      conn = post(conn, "/admin/login", %{"password" => "changedsecret1"})
+      assert redirected_to(conn) == "/admin"
+      assert get_session(conn, :admin) == true
+    end
+
+    test "rejects the old bootstrap password", %{conn: conn} do
+      conn = post(conn, "/admin/login", %{"password" => "admin"})
+      assert html_response(conn, 200) =~ "Incorrect admin password"
+    end
+  end
+
   describe "POST /admin/logout" do
     test "clears admin session and redirects to /admin/login", %{conn: conn} do
       conn =

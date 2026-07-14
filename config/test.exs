@@ -20,6 +20,9 @@ config :residency_schedule, ResidencyScheduleWeb.Endpoint,
   secret_key_base: "wHetE8ZRXD9iMYqXDAXJE0jvY9NQZGPzGA+DIS3QTU3K3YBaRlh72bqtt1tcDXpB",
   server: false
 
+# Speed up password hashing in tests — security is irrelevant here
+config :bcrypt_elixir, :log_rounds, 4
+
 # In test we don't send emails
 config :residency_schedule, ResidencySchedule.Mailer, adapter: Swoosh.Adapters.Test
 
