@@ -250,4 +250,43 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       assert Index.build_unified_residents([], %{}, ~D[2026-04-06]) == []
     end
   end
+
+  describe "schedule deletion after the admin password has been changed" do
+    setup do
+      Application.put_env(:residency_schedule, :current_date, ~D[2024-07-01])
+      on_exit(fn -> Application.delete_env(:residency_schedule, :current_date) end)
+
+      {:ok, _} = ResidencySchedule.Accounts.change_admin_password("admin", "newsecret99")
+      seed_schedule()
+
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(admin: true, authenticated: true)
+
+      {:ok, view, _html} = live(conn, "/schedule")
+      %{view: view}
+    end
+
+    test "deletes the schedule with the database-stored password", %{view: view} do
+      view |> element("button[phx-click='request_delete']") |> render_click()
+
+      html =
+        view
+        |> form("form[phx-submit='delete_schedule']", %{"password" => "newsecret99"})
+        |> render_submit()
+
+      assert html =~ "No schedule uploaded yet"
+    end
+
+    test "rejects the old bootstrap password", %{view: view} do
+      view |> element("button[phx-click='request_delete']") |> render_click()
+
+      html =
+        view
+        |> form("form[phx-submit='delete_schedule']", %{"password" => "admin"})
+        |> render_submit()
+
+      assert html =~ "Incorrect password."
+    end
+  end
 end

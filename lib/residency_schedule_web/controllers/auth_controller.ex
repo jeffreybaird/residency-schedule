@@ -210,9 +210,7 @@ defmodule ResidencyScheduleWeb.AuthController do
   end
 
   def admin_create(conn, %{"password" => password}) do
-    admin_password = Application.fetch_env!(:residency_schedule, :delete_password)
-
-    if Plug.Crypto.secure_compare(password, admin_password) do
+    if Accounts.verify_admin_password(password) do
       conn
       |> put_session(:admin, true)
       |> put_session(:authenticated, true)

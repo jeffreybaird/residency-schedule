@@ -65,8 +65,8 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
     test "cancel_delete hides confirmation UI", %{view: view} do
       schedule = List.first(ResidencySchedule.Schedules.list_schedules())
       view |> element("button[phx-value-id='#{schedule.id}']") |> render_click()
-      html = view |> element("button[phx-click='cancel_delete']") |> render_click()
-      refute html =~ "Confirm"
+      view |> element("button[phx-click='cancel_delete']") |> render_click()
+      refute has_element?(view, "button[phx-click='confirm_delete']")
     end
 
     test "confirm_delete removes the schedule", %{view: view} do
@@ -160,6 +160,79 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
         })
 
       refute html =~ "Clare M"
+    end
+  end
+
+  describe "change admin password" do
+    setup %{conn: conn} do
+      conn = Plug.Test.init_test_session(conn, authenticated: true, admin: true)
+      {:ok, view, html} = live(conn, "/admin")
+      %{conn: conn, view: view, html: html}
+    end
+
+    test "renders the admin password card", %{html: html} do
+      assert html =~ "Change Admin Password"
+    end
+
+    test "shows the default-password warning before the password is customized", %{html: html} do
+      assert html =~ "default admin password is still in use"
+    end
+
+    test "changes the password and shows a success message", %{view: view} do
+      html =
+        view
+        |> form("#admin-password-form-0", %{
+          "current_password" => "admin",
+          "new_password" => "newsecret99",
+          "confirm_password" => "newsecret99"
+        })
+        |> render_submit()
+
+      assert html =~ "Admin password updated."
+      refute html =~ "default admin password is still in use"
+      assert ResidencySchedule.Accounts.verify_admin_password("newsecret99")
+    end
+
+    test "shows an error when the confirmation does not match", %{view: view} do
+      html =
+        view
+        |> form("#admin-password-form-0", %{
+          "current_password" => "admin",
+          "new_password" => "newsecret99",
+          "confirm_password" => "different99"
+        })
+        |> render_submit()
+
+      assert html =~ "New passwords do not match."
+      refute ResidencySchedule.Accounts.admin_password_customized?()
+    end
+
+    test "shows an error when the current password is wrong", %{view: view} do
+      html =
+        view
+        |> form("#admin-password-form-0", %{
+          "current_password" => "wrong",
+          "new_password" => "newsecret99",
+          "confirm_password" => "newsecret99"
+        })
+        |> render_submit()
+
+      assert html =~ "Current password is incorrect."
+      refute ResidencySchedule.Accounts.admin_password_customized?()
+    end
+
+    test "shows an error when the new password is too short", %{view: view} do
+      html =
+        view
+        |> form("#admin-password-form-0", %{
+          "current_password" => "admin",
+          "new_password" => "short",
+          "confirm_password" => "short"
+        })
+        |> render_submit()
+
+      assert html =~ "password:"
+      refute ResidencySchedule.Accounts.admin_password_customized?()
     end
   end
 end

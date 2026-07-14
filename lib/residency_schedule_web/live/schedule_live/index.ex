@@ -84,9 +84,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   @impl true
   def handle_event("delete_schedule", %{"schedule_id" => id, "password" => password}, socket) do
-    expected = Application.fetch_env!(:residency_schedule, :delete_password)
-
-    if password == expected do
+    if Accounts.verify_admin_password(password) do
       Schedules.delete_schedule(String.to_integer(id))
       remaining = Schedules.list_schedules()
 
