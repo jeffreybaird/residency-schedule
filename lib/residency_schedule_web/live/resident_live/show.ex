@@ -192,6 +192,20 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     {:noreply, assign(socket, shift_coworkers_modal: nil)}
   end
 
+  # Residents pin their own page ("Home"); user-role accounts follow someone
+  # else's schedule (e.g. a resident's partner), so the copy differs by role.
+  defp home_badge_label(%{role: :resident}), do: "Home"
+  defp home_badge_label(_user), do: "Following"
+
+  defp follow_button_label(%{role: :resident}), do: "Set as Home"
+  defp follow_button_label(_user), do: "Follow"
+
+  defp follow_button_title(%{role: :resident}),
+    do: "Pin this resident — adds a Home shortcut to the nav"
+
+  defp follow_button_title(_user),
+    do: "Follow this resident — their schedule opens by default and appears in the nav"
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -235,7 +249,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
           <%= if @is_home_resident do %>
             <div class="inline-flex items-center gap-1 shrink-0">
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                ✓ Home
+                ✓ {home_badge_label(@current_user)}
               </span>
               <form action="/unset-home" method="post" class="inline">
                 <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
@@ -243,7 +257,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                 <button
                   type="submit"
                   class="px-2 py-1 rounded-full text-xs text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                  title="Remove Home — the nav link will no longer point here"
+                  title="Remove — the nav link will no longer point here"
                 >
                   ✕
                 </button>
@@ -255,9 +269,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
               <button
                 type="submit"
                 class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700 transition-colors"
-                title="Pin this resident — adds a Home shortcut to the nav"
+                title={follow_button_title(@current_user)}
               >
-                Set as Home
+                {follow_button_label(@current_user)}
               </button>
             </form>
           <% end %>

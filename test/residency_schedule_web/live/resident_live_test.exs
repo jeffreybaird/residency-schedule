@@ -37,6 +37,16 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       assert html =~ "Set as Home"
     end
 
+    test "nav labels the home link My page for a resident", %{
+      conn: conn,
+      user: user,
+      resident: resident
+    } do
+      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(user, resident.id)
+      conn = get(conn, "/residents/#{resident.id}")
+      assert html_response(conn, 200) =~ "My page"
+    end
+
     test "shows Home badge when resident is home resident", %{conn: conn, user: user} do
       resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
 
@@ -207,6 +217,49 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       |> render_click()
 
       refute has_element?(view, "#service-filter-panel")
+    end
+  end
+
+  describe "resident page for a user-role follower" do
+    setup do
+      {:ok, follower} =
+        ResidencySchedule.Accounts.create_user(%{
+          email: "partner-#{System.unique_integer()}@gmail.com"
+        })
+
+      {:ok, follower} = ResidencySchedule.Accounts.approve_user(follower)
+      conn = Plug.Test.init_test_session(build_conn(), user_id: follower.id)
+
+      %{schedule_id: _sid} = seed_schedule()
+      resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
+      %{conn: conn, resident: resident, follower: follower}
+    end
+
+    test "shows a Follow button instead of Set as Home", %{conn: conn, resident: resident} do
+      {:ok, _view, html} = live(conn, "/residents/#{resident.id}")
+      assert html =~ "Follow"
+      refute html =~ "Set as Home"
+    end
+
+    test "shows a Following badge once followed", %{
+      conn: conn,
+      resident: resident,
+      follower: follower
+    } do
+      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(follower, resident.id)
+      {:ok, _view, html} = live(conn, "/residents/#{resident.id}")
+      assert html =~ "✓ Following"
+    end
+
+    test "nav labels the followed resident link Following", %{
+      conn: conn,
+      resident: resident,
+      follower: follower
+    } do
+      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(follower, resident.id)
+      conn = get(conn, "/residents/#{resident.id}")
+      assert html_response(conn, 200) =~ "Following"
+      refute html_response(conn, 200) =~ "My page"
     end
   end
 

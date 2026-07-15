@@ -15,6 +15,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
        delete_confirm_id: nil,
        pending_users: Accounts.list_pending_users(),
        approved_users: Accounts.list_approved_users(),
+       role_error: nil,
        existing_overrides: ShiftOverrides.list_all_overrides(),
        override_rotation_type: nil,
        override_start_date: nil,
@@ -148,13 +149,41 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
   @impl true
   def handle_event("revoke_user", %{"id" => id}, socket) do
     user = Accounts.get_user!(String.to_integer(id))
-    Accounts.revoke_user(user)
 
-    {:noreply,
-     assign(socket,
-       pending_users: Accounts.list_pending_users(),
-       approved_users: Accounts.list_approved_users()
-     )}
+    case Accounts.revoke_user(user) do
+      {:ok, _user} ->
+        {:noreply,
+         assign(socket,
+           pending_users: Accounts.list_pending_users(),
+           approved_users: Accounts.list_approved_users(),
+           role_error: nil
+         )}
+
+      {:error, :admin_cannot_be_revoked} ->
+        {:noreply,
+         assign(socket, role_error: "Admins cannot be revoked — change their role first.")}
+
+      {:error, _changeset} ->
+        {:noreply, assign(socket, role_error: "Could not revoke this user.")}
+    end
+  end
+
+  @impl true
+  def handle_event("set_role", %{"user_id" => user_id, "role" => role_param}, socket) do
+    user = Accounts.get_user!(String.to_integer(user_id))
+
+    case set_role_from_param(user, role_param) do
+      {:ok, _user} ->
+        {:noreply,
+         assign(socket,
+           pending_users: Accounts.list_pending_users(),
+           approved_users: Accounts.list_approved_users(),
+           role_error: nil
+         )}
+
+      {:error, message} ->
+        {:noreply, assign(socket, role_error: message)}
+    end
   end
 
   @impl true
@@ -204,6 +233,26 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
     changeset.errors
     |> Enum.map_join(", ", fn {field, {message, _opts}} -> "#{field}: #{message}" end)
   end
+
+  defp set_role_from_param(user, role_param) do
+    case parse_role(role_param) do
+      nil -> {:error, "Unknown role."}
+      role -> translate_set_role_result(Accounts.set_role(user, role))
+    end
+  end
+
+  defp parse_role("user"), do: :user
+  defp parse_role("resident"), do: :resident
+  defp parse_role("admin"), do: :admin
+  defp parse_role(_unknown), do: nil
+
+  defp translate_set_role_result({:ok, user}), do: {:ok, user}
+
+  defp translate_set_role_result({:error, :last_admin}),
+    do: {:error, "Cannot remove the last admin."}
+
+  defp translate_set_role_result({:error, %Ecto.Changeset{} = changeset}),
+    do: {:error, changeset_error_message(changeset)}
 
   defp nilify_empty(nil), do: nil
   defp nilify_empty(""), do: nil
@@ -345,18 +394,34 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
             <% else %>
               <ul class="space-y-2">
                 <%= for u <- @approved_users do %>
-                  <li class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 bg-white">
-                    <span class="text-sm text-gray-700">{u.email}</span>
-                    <button
-                      phx-click="revoke_user"
-                      phx-value-id={u.id}
-                      class="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
-                    >
-                      Revoke
-                    </button>
+                  <li class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 bg-white">
+                    <span class="text-sm text-gray-700 truncate">{u.email}</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <form phx-change="set_role" id={"role-form-#{u.id}"}>
+                        <input type="hidden" name="user_id" value={u.id} />
+                        <select
+                          name="role"
+                          class="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:border-blue-500 focus:outline-none"
+                        >
+                          <option value="user" selected={u.role == :user}>User</option>
+                          <option value="resident" selected={u.role == :resident}>Resident</option>
+                          <option value="admin" selected={u.role == :admin}>Admin</option>
+                        </select>
+                      </form>
+                      <button
+                        phx-click="revoke_user"
+                        phx-value-id={u.id}
+                        class="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
+                      >
+                        Revoke
+                      </button>
+                    </div>
                   </li>
                 <% end %>
               </ul>
+            <% end %>
+            <%= if @role_error do %>
+              <p class="text-sm text-red-600 mt-2">{@role_error}</p>
             <% end %>
           </div>
         </div>

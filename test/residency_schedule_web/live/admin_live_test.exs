@@ -169,6 +169,85 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
     end
   end
 
+  describe "role management" do
+    setup %{conn: conn} do
+      %{conn: conn, user: admin} = admin_authenticate_session(%{conn: conn})
+      %{conn: conn, admin: admin}
+    end
+
+    test "renders a role selector for each approved user", %{conn: conn, admin: admin} do
+      {:ok, _view, html} = live(conn, "/admin")
+      assert html =~ "role-form-#{admin.id}"
+    end
+
+    test "promotes an approved user to admin via the selector", %{conn: conn} do
+      {:ok, member} = ResidencySchedule.Accounts.create_user(%{email: "partner@gmail.com"})
+      {:ok, member} = ResidencySchedule.Accounts.approve_user(member)
+
+      {:ok, view, _html} = live(conn, "/admin")
+
+      view
+      |> form("#role-form-#{member.id}")
+      |> render_change(%{"role" => "admin"})
+
+      assert ResidencySchedule.Accounts.get_user!(member.id).role == :admin
+    end
+
+    test "shows an error when promoting a non-URMC user to resident", %{conn: conn} do
+      {:ok, member} = ResidencySchedule.Accounts.create_user(%{email: "partner@gmail.com"})
+      {:ok, member} = ResidencySchedule.Accounts.approve_user(member)
+
+      {:ok, view, _html} = live(conn, "/admin")
+
+      html =
+        view
+        |> form("#role-form-#{member.id}")
+        |> render_change(%{"role" => "resident"})
+
+      assert html =~ "resident role requires a URMC email address"
+      assert ResidencySchedule.Accounts.get_user!(member.id).role == :user
+    end
+
+    test "refuses to demote the last admin", %{conn: conn, admin: admin} do
+      {:ok, view, _html} = live(conn, "/admin")
+
+      html =
+        view
+        |> form("#role-form-#{admin.id}")
+        |> render_change(%{"role" => "user"})
+
+      assert html =~ "Cannot remove the last admin."
+      assert ResidencySchedule.Accounts.get_user!(admin.id).role == :admin
+    end
+
+    test "demotes an admin when another admin remains", %{conn: conn} do
+      second_admin = create_admin()
+
+      {:ok, view, _html} = live(conn, "/admin")
+
+      view
+      |> form("#role-form-#{second_admin.id}")
+      |> render_change(%{"role" => "user"})
+
+      assert ResidencySchedule.Accounts.get_user!(second_admin.id).role == :user
+    end
+
+    test "revoking an admin shows an error instead of locking them out", %{
+      conn: conn,
+      admin: admin
+    } do
+      {:ok, view, _html} = live(conn, "/admin")
+
+      html =
+        view
+        |> element("button[phx-click='revoke_user'][phx-value-id='#{admin.id}']")
+        |> render_click()
+
+      assert html =~ "Admins cannot be revoked"
+      assert ResidencySchedule.Accounts.get_user!(admin.id).approved == true
+    end
+  end
+
   describe "account password card without a password set" do
     setup %{conn: conn} do
       %{conn: conn, user: admin} = admin_authenticate_session(%{conn: conn})
