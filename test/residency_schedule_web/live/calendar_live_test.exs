@@ -185,7 +185,12 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
 
       {:ok, _} =
         ResidencySchedule.Rotations.insert_rotations(future.id, [
-          %{slot_index: 0, start_date: ~D[2026-07-06], end_date: ~D[2026-07-12], rotation_type: :rei}
+          %{
+            slot_index: 0,
+            start_date: ~D[2026-07-06],
+            end_date: ~D[2026-07-12],
+            rotation_type: :rei
+          }
         ])
 
       # Viewing 2023 must not offer the 2026-only resident...

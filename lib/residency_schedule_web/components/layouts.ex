@@ -4,7 +4,6 @@ defmodule ResidencyScheduleWeb.Layouts do
   used by your application.
   """
   use ResidencyScheduleWeb, :html
-  import Plug.Conn, only: [get_session: 2]
 
   # Embed all files in layouts/* within this module.
   # The default root.html.heex file contains the HTML

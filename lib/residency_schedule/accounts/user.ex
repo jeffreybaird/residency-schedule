@@ -194,5 +194,7 @@ defmodule ResidencySchedule.Accounts.User do
     put_password_hash(changeset, %{password: password})
   end
 
-  defp put_password_hash(changeset, _attrs), do: changeset
+  defp put_password_hash(changeset, _attrs) do
+    add_error(changeset, :password, "can't be blank")
+  end
 end

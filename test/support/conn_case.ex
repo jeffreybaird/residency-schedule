@@ -38,8 +38,8 @@ defmodule ResidencyScheduleWeb.ConnCase do
   end
 
   @doc """
-  Creates an approved user and sets :user_id and :authenticated in the session
-  so the `RequireAuthOrAdmin` plug passes as a resident user. Use as `setup :authenticate_session`.
+  Creates an approved resident user and sets :user_id in the session so the
+  `RequireAuth` plug passes. Use as `setup :authenticate_session`.
   """
   def authenticate_session(%{conn: conn}) do
     {:ok, user} =
@@ -47,22 +47,37 @@ defmodule ResidencyScheduleWeb.ConnCase do
         email: "test-#{System.unique_integer()}@urmc.rochester.edu"
       })
 
-    conn = Plug.Test.init_test_session(conn, user_id: user.id, authenticated: true)
+    conn = Plug.Test.init_test_session(conn, user_id: user.id)
     %{conn: conn, user: user}
   end
 
   @doc """
-  Sets :admin, :user_id, and :authenticated in the session so `RequireAuthOrAdmin` and
-  `RequireAdmin` plugs pass.
-  Use as `setup :admin_authenticate_session` in LiveView tests behind the admin pipeline.
+  Creates an admin-role user and sets :user_id in the session so both the
+  `RequireAuth` and `RequireAdmin` plugs pass.
+  Use as `setup :admin_authenticate_session` in tests behind the admin pipeline.
   """
   def admin_authenticate_session(%{conn: conn}) do
+    admin = create_admin()
+    conn = Plug.Test.init_test_session(conn, user_id: admin.id)
+    %{conn: conn, user: admin}
+  end
+
+  @doc """
+  Creates and returns an approved admin-role user.
+  """
+  def create_admin(password \\ nil) do
     {:ok, user} =
       ResidencySchedule.Accounts.create_user(%{
         email: "admin-#{System.unique_integer()}@urmc.rochester.edu"
       })
 
-    conn = Plug.Test.init_test_session(conn, user_id: user.id, admin: true, authenticated: true)
-    %{conn: conn, user: user}
+    {:ok, admin} = ResidencySchedule.Accounts.set_role(user, :admin)
+
+    if password do
+      {:ok, admin_with_password} = ResidencySchedule.Accounts.set_password(admin, password)
+      admin_with_password
+    else
+      admin
+    end
   end
 end

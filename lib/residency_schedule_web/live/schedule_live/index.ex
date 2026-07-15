@@ -10,11 +10,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   @name_col_px 148
 
   @impl true
-  def mount(_params, session, socket) do
+  def mount(_params, _session, socket) do
     schedules = Schedules.list_schedules()
-    is_admin = session["admin"] == true
     today = current_date()
-    current_user = load_current_user(session)
 
     socket =
       if schedules != [] do
@@ -32,10 +30,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
      assign(socket,
        delete_confirm_id: nil,
        delete_error: nil,
-       is_admin: is_admin,
+       is_admin: Accounts.User.admin?(socket.assigns.current_user),
        today: today,
-       viewed_aca_year: current_academic_year(today),
-       current_user: current_user
+       viewed_aca_year: current_academic_year(today)
      )}
   end
 
@@ -84,7 +81,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   @impl true
   def handle_event("delete_schedule", %{"schedule_id" => id, "password" => password}, socket) do
-    if Accounts.verify_admin_password(password) do
+    if authorized_to_delete?(socket.assigns.current_user, password) do
       Schedules.delete_schedule(String.to_integer(id))
       remaining = Schedules.list_schedules()
 
@@ -104,7 +101,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
       {:noreply, assign(socket, delete_confirm_id: nil, delete_error: nil)}
     else
-      {:noreply, assign(socket, delete_error: "Incorrect password.")}
+      {:noreply, assign(socket, delete_error: delete_error_message(socket.assigns.current_user))}
     end
   end
 
@@ -638,10 +635,18 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       else: "#{base} bg-gray-100 text-gray-700 hover:bg-gray-200"
   end
 
-  defp load_current_user(session) do
-    case session["user_id"] do
-      nil -> nil
-      user_id -> Accounts.get_user(user_id)
+  # Deleting a schedule is destructive, so the admin must confirm with their
+  # own account password — a role check alone is not enough.
+  defp authorized_to_delete?(user, password) do
+    Accounts.User.admin?(user) and
+      match?({:ok, _}, Accounts.authenticate_by_password(user.email, password))
+  end
+
+  defp delete_error_message(user) do
+    if user && Accounts.has_password?(user) do
+      "Incorrect password."
+    else
+      "Set a password for your account on the Admin page first."
     end
   end
 end

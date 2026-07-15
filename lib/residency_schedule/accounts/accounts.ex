@@ -106,6 +106,28 @@ defmodule ResidencySchedule.Accounts do
   end
 
   @doc """
+  Changes the user's own password. When the user already has a password, the
+  current one must be provided and match; when none is set yet, the current
+  password is ignored.
+
+  Returns `{:ok, user}`, `{:error, :invalid_current_password}`, or
+  `{:error, changeset}` when the new password fails validation.
+
+  Exempt from doctest — hits the database.
+  """
+  def change_password(user, current_password, new_password) do
+    if password_change_allowed?(user, current_password) do
+      set_password(user, new_password)
+    else
+      {:error, :invalid_current_password}
+    end
+  end
+
+  defp password_change_allowed?(user, current_password) do
+    not has_password?(user) or User.valid_password?(user, current_password)
+  end
+
+  @doc """
   Authenticates a user by email and password.
   Returns `{:ok, user}` or `{:error, :invalid_credentials}`.
 

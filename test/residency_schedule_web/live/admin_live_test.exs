@@ -4,16 +4,22 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
 
   alias ResidencySchedule.{Schedules, Residents, Rotations}
 
-  describe "unauthenticated access" do
-    test "redirects to /admin/login when no admin session", %{conn: conn} do
+  describe "access control" do
+    test "redirects to /login when not logged in", %{conn: conn} do
       conn = get(conn, "/admin")
-      assert redirected_to(conn) == "/admin/login"
+      assert redirected_to(conn) == "/login"
+    end
+
+    test "redirects an approved non-admin to the site root", %{conn: conn} do
+      %{conn: conn} = authenticate_session(%{conn: conn})
+      conn = get(conn, "/admin")
+      assert redirected_to(conn) == "/"
     end
   end
 
   describe "admin page without schedules" do
     setup %{conn: conn} do
-      conn = Plug.Test.init_test_session(conn, authenticated: true, admin: true)
+      %{conn: conn} = admin_authenticate_session(%{conn: conn})
       {:ok, view, html} = live(conn, "/admin")
       %{conn: conn, view: view, html: html}
     end
@@ -37,7 +43,7 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
 
   describe "admin page with schedules" do
     setup %{conn: conn} do
-      conn = Plug.Test.init_test_session(conn, authenticated: true, admin: true)
+      %{conn: conn} = admin_authenticate_session(%{conn: conn})
       seed_schedule()
       {:ok, view, html} = live(conn, "/admin")
       %{conn: conn, view: view, html: html}
@@ -79,7 +85,7 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
 
   describe "override form — covering residents scoped to rotation's schedule" do
     setup %{conn: conn} do
-      conn = Plug.Test.init_test_session(conn, authenticated: true, admin: true)
+      %{conn: conn} = admin_authenticate_session(%{conn: conn})
 
       # Two schedules with a resident named "Emily K" in each — same person, different years
       {:ok, sched_a} = Schedules.upsert_schedule(2020, "2020–2021")
@@ -163,54 +169,68 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
     end
   end
 
-  describe "change admin password" do
+  describe "account password card without a password set" do
     setup %{conn: conn} do
-      conn = Plug.Test.init_test_session(conn, authenticated: true, admin: true)
+      %{conn: conn, user: admin} = admin_authenticate_session(%{conn: conn})
       {:ok, view, html} = live(conn, "/admin")
-      %{conn: conn, view: view, html: html}
+      %{view: view, html: html, admin: admin}
     end
 
-    test "renders the admin password card", %{html: html} do
-      assert html =~ "Change Admin Password"
+    test "renders the set-password state with a warning", %{html: html} do
+      assert html =~ "Set My Password"
+      assert html =~ "no password yet"
     end
 
-    test "shows the default-password warning before the password is customized", %{html: html} do
-      assert html =~ "default admin password is still in use"
-    end
-
-    test "changes the password and shows a success message", %{view: view} do
+    test "sets a password without requiring the current one", %{view: view, admin: admin} do
       html =
         view
-        |> form("#admin-password-form-0", %{
-          "current_password" => "admin",
+        |> form("#account-password-form-0", %{
           "new_password" => "newsecret99",
           "confirm_password" => "newsecret99"
         })
         |> render_submit()
 
-      assert html =~ "Admin password updated."
-      refute html =~ "default admin password is still in use"
-      assert ResidencySchedule.Accounts.verify_admin_password("newsecret99")
+      assert html =~ "Your password has been updated."
+      refute html =~ "no password yet"
+
+      assert {:ok, _} =
+               ResidencySchedule.Accounts.authenticate_by_password(admin.email, "newsecret99")
+    end
+  end
+
+  describe "account password card with a password set" do
+    setup %{conn: conn} do
+      admin = create_admin("oldsecret99")
+      conn = Plug.Test.init_test_session(conn, user_id: admin.id)
+      {:ok, view, html} = live(conn, "/admin")
+      %{view: view, html: html, admin: admin}
     end
 
-    test "shows an error when the confirmation does not match", %{view: view} do
+    test "renders the change-password state without a warning", %{html: html} do
+      assert html =~ "Change My Password"
+      refute html =~ "no password yet"
+    end
+
+    test "changes the password with the correct current password", %{view: view, admin: admin} do
       html =
         view
-        |> form("#admin-password-form-0", %{
-          "current_password" => "admin",
+        |> form("#account-password-form-0", %{
+          "current_password" => "oldsecret99",
           "new_password" => "newsecret99",
-          "confirm_password" => "different99"
+          "confirm_password" => "newsecret99"
         })
         |> render_submit()
 
-      assert html =~ "New passwords do not match."
-      refute ResidencySchedule.Accounts.admin_password_customized?()
+      assert html =~ "Your password has been updated."
+
+      assert {:ok, _} =
+               ResidencySchedule.Accounts.authenticate_by_password(admin.email, "newsecret99")
     end
 
-    test "shows an error when the current password is wrong", %{view: view} do
+    test "shows an error when the current password is wrong", %{view: view, admin: admin} do
       html =
         view
-        |> form("#admin-password-form-0", %{
+        |> form("#account-password-form-0", %{
           "current_password" => "wrong",
           "new_password" => "newsecret99",
           "confirm_password" => "newsecret99"
@@ -218,21 +238,41 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
         |> render_submit()
 
       assert html =~ "Current password is incorrect."
-      refute ResidencySchedule.Accounts.admin_password_customized?()
+
+      assert {:ok, _} =
+               ResidencySchedule.Accounts.authenticate_by_password(admin.email, "oldsecret99")
     end
 
-    test "shows an error when the new password is too short", %{view: view} do
+    test "shows an error when the confirmation does not match", %{view: view, admin: admin} do
       html =
         view
-        |> form("#admin-password-form-0", %{
-          "current_password" => "admin",
+        |> form("#account-password-form-0", %{
+          "current_password" => "oldsecret99",
+          "new_password" => "newsecret99",
+          "confirm_password" => "different99"
+        })
+        |> render_submit()
+
+      assert html =~ "New passwords do not match."
+
+      assert {:ok, _} =
+               ResidencySchedule.Accounts.authenticate_by_password(admin.email, "oldsecret99")
+    end
+
+    test "shows an error when the new password is too short", %{view: view, admin: admin} do
+      html =
+        view
+        |> form("#account-password-form-0", %{
+          "current_password" => "oldsecret99",
           "new_password" => "short",
           "confirm_password" => "short"
         })
         |> render_submit()
 
       assert html =~ "password:"
-      refute ResidencySchedule.Accounts.admin_password_customized?()
+
+      assert {:ok, _} =
+               ResidencySchedule.Accounts.authenticate_by_password(admin.email, "oldsecret99")
     end
   end
 end

@@ -182,7 +182,7 @@ defmodule ResidencyScheduleWeb.AuthControllerTest do
     test "drops session and redirects to /login", %{conn: conn} do
       conn =
         conn
-        |> Plug.Test.init_test_session(user_id: 1, authenticated: true, admin: true)
+        |> Plug.Test.init_test_session(user_id: 1)
         |> post("/logout")
 
       assert redirected_to(conn) == "/login"
@@ -268,54 +268,29 @@ defmodule ResidencyScheduleWeb.AuthControllerTest do
 
   # ── Admin login ────────────────────────────────────────────────────────────
 
-  describe "GET /admin/login" do
-    test "renders the admin login form", %{conn: conn} do
-      conn = get(conn, "/admin/login")
-      assert html_response(conn, 200) =~ "Admin"
-    end
-  end
-
-  describe "POST /admin/login" do
-    test "sets admin session and redirects to /admin on correct password", %{conn: conn} do
-      conn = post(conn, "/admin/login", %{"password" => "admin"})
-      assert redirected_to(conn) == "/admin"
-      assert get_session(conn, :admin) == true
-      assert get_session(conn, :authenticated) == true
+  describe "role-based /admin access" do
+    test "an admin user can reach /admin", %{conn: conn} do
+      %{conn: conn} = admin_authenticate_session(%{conn: conn})
+      conn = get(conn, "/admin")
+      assert html_response(conn, 200)
     end
 
-    test "re-renders admin login with error on wrong password", %{conn: conn} do
-      conn = post(conn, "/admin/login", %{"password" => "wrong"})
-      assert html_response(conn, 200) =~ "Incorrect admin password"
-    end
-  end
-
-  describe "POST /admin/login after the admin password has been changed" do
-    setup do
-      {:ok, _} = Accounts.change_admin_password("admin", "changedsecret1")
-      :ok
+    test "a resident is redirected from /admin to the site root", %{conn: conn} do
+      %{conn: conn} = authenticate_session(%{conn: conn})
+      conn = get(conn, "/admin")
+      assert redirected_to(conn) == "/"
     end
 
-    test "accepts the changed password", %{conn: conn} do
-      conn = post(conn, "/admin/login", %{"password" => "changedsecret1"})
-      assert redirected_to(conn) == "/admin"
-      assert get_session(conn, :admin) == true
+    test "an anonymous visitor is redirected from /admin to /login", %{conn: conn} do
+      conn = get(conn, "/admin")
+      assert redirected_to(conn) == "/login"
     end
 
-    test "rejects the old bootstrap password", %{conn: conn} do
-      conn = post(conn, "/admin/login", %{"password" => "admin"})
-      assert html_response(conn, 200) =~ "Incorrect admin password"
-    end
-  end
-
-  describe "POST /admin/logout" do
-    test "clears admin session and redirects to /admin/login", %{conn: conn} do
-      conn =
-        conn
-        |> Plug.Test.init_test_session(authenticated: true, admin: true)
-        |> post("/admin/logout")
-
-      assert redirected_to(conn) == "/admin/login"
-      assert get_session(conn, :admin) == nil
+    test "an unapproved user is redirected from /admin to /login", %{conn: conn} do
+      {:ok, user} = Accounts.create_user(%{email: "pending@gmail.com"})
+      conn = Plug.Test.init_test_session(conn, user_id: user.id)
+      conn = get(conn, "/admin")
+      assert redirected_to(conn) == "/login"
     end
   end
 end

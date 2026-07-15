@@ -79,7 +79,7 @@
               </a>
             <% end %>
           <% end %>
-          <%= if get_session(@conn, :admin) do %>
+          <%= if ResidencySchedule.Accounts.User.admin?(@conn.assigns[:current_user]) do %>
             <a
               href="/admin"
               class="px-3 py-1.5 rounded-md text-sm text-amber-600 hover:bg-amber-50 hover:text-amber-800 transition-colors"
@@ -155,7 +155,7 @@
                 </a>
               <% end %>
             <% end %>
-            <%= if get_session(@conn, :admin) do %>
+            <%= if ResidencySchedule.Accounts.User.admin?(@conn.assigns[:current_user]) do %>
               <a href="/admin" class="block px-4 py-2 text-sm text-amber-600 hover:bg-amber-50">
                 Admin
               </a>

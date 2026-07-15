@@ -7,8 +7,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   alias ResidencySchedule.ShiftOverrides
 
   @impl true
-  def mount(_params, session, socket) do
-    current_user = load_current_user(session)
+  def mount(_params, _session, socket) do
+    current_user = socket.assigns.current_user
 
     socket =
       assign(socket,
@@ -256,78 +256,85 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         <div id="calendar-swipe" phx-hook="CalendarSwipe" style="touch-action: pan-y">
           <%= case @view_mode do %>
             <% :month -> %>
-            <div
-              id="tour-calendar-grid"
-              class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm"
-            >
-              <.weekday_headers />
-              <%= for day <- calendar_days(@focus_date) do %>
-                <% rotations = visible_rotations(assigns, day) %>
-                <div
-                  phx-click="select_day"
-                  phx-value-date={Date.to_iso8601(day)}
-                  class={[
-                    "relative bg-white p-1 sm:p-2 h-14 sm:h-20 cursor-pointer border-0 transition-colors hover:bg-blue-50",
-                    if(day.month == @focus_date.month, do: "", else: "opacity-40")
-                  ]}
-                >
-                  <span class={[
-                    "text-sm font-medium",
-                    if(day == Date.utc_today(), do: "text-blue-600 font-bold", else: "text-gray-700")
-                  ]}>
-                    {day.day}
-                  </span>
-                  <div class="flex flex-wrap gap-0.5 mt-1">
-                    <%= for {type, _rots} <- Enum.take(group_by_type(rotations), 6) do %>
-                      <span
-                        class={"w-2 h-2 rounded-full #{dot_color(type)}"}
-                        title={Rotations.rotation_type_label(type)}
-                      >
-                      </span>
-                    <% end %>
+              <div
+                id="tour-calendar-grid"
+                class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm"
+              >
+                <.weekday_headers />
+                <%= for day <- calendar_days(@focus_date) do %>
+                  <% rotations = visible_rotations(assigns, day) %>
+                  <div
+                    phx-click="select_day"
+                    phx-value-date={Date.to_iso8601(day)}
+                    class={[
+                      "relative bg-white p-1 sm:p-2 h-14 sm:h-20 cursor-pointer border-0 transition-colors hover:bg-blue-50",
+                      if(day.month == @focus_date.month, do: "", else: "opacity-40")
+                    ]}
+                  >
+                    <span class={[
+                      "text-sm font-medium",
+                      if(day == Date.utc_today(),
+                        do: "text-blue-600 font-bold",
+                        else: "text-gray-700"
+                      )
+                    ]}>
+                      {day.day}
+                    </span>
+                    <div class="flex flex-wrap gap-0.5 mt-1">
+                      <%= for {type, _rots} <- Enum.take(group_by_type(rotations), 6) do %>
+                        <span
+                          class={"w-2 h-2 rounded-full #{dot_color(type)}"}
+                          title={Rotations.rotation_type_label(type)}
+                        >
+                        </span>
+                      <% end %>
+                    </div>
                   </div>
-                </div>
-              <% end %>
-            </div>
-
-          <% :week -> %>
-            <div
-              id="tour-calendar-grid"
-              class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm"
-            >
-              <.weekday_headers />
-              <%= for day <- week_days(@focus_date) do %>
-                <% groups = group_by_type(visible_rotations(assigns, day)) %>
-                <div
-                  phx-click="select_day"
-                  phx-value-date={Date.to_iso8601(day)}
-                  class="bg-white p-2 min-h-[8rem] cursor-pointer transition-colors hover:bg-blue-50"
-                >
-                  <span class={[
-                    "text-sm font-medium",
-                    if(day == Date.utc_today(), do: "text-blue-600 font-bold", else: "text-gray-700")
-                  ]}>
-                    {day.day}
-                  </span>
-                  <div class="mt-1 space-y-1">
-                    <%= for {type, rots} <- groups do %>
-                      <div class={"flex items-center justify-between gap-1 rounded px-1 py-0.5 text-[10px] leading-tight #{Rotations.rotation_type_color(type)}"}>
-                        <span class="truncate">{Rotations.rotation_type_label(type)}</span>
-                        <span class="font-mono opacity-80">{length(rots)}</span>
-                      </div>
-                    <% end %>
+                <% end %>
+              </div>
+            <% :week -> %>
+              <div
+                id="tour-calendar-grid"
+                class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm"
+              >
+                <.weekday_headers />
+                <%= for day <- week_days(@focus_date) do %>
+                  <% groups = group_by_type(visible_rotations(assigns, day)) %>
+                  <div
+                    phx-click="select_day"
+                    phx-value-date={Date.to_iso8601(day)}
+                    class="bg-white p-2 min-h-[8rem] cursor-pointer transition-colors hover:bg-blue-50"
+                  >
+                    <span class={[
+                      "text-sm font-medium",
+                      if(day == Date.utc_today(),
+                        do: "text-blue-600 font-bold",
+                        else: "text-gray-700"
+                      )
+                    ]}>
+                      {day.day}
+                    </span>
+                    <div class="mt-1 space-y-1">
+                      <%= for {type, rots} <- groups do %>
+                        <div class={"flex items-center justify-between gap-1 rounded px-1 py-0.5 text-[10px] leading-tight #{Rotations.rotation_type_color(type)}"}>
+                          <span class="truncate">{Rotations.rotation_type_label(type)}</span>
+                          <span class="font-mono opacity-80">{length(rots)}</span>
+                        </div>
+                      <% end %>
+                    </div>
                   </div>
-                </div>
-              <% end %>
-            </div>
-
-          <% :day -> %>
-            <div id="tour-calendar-grid" class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-              <h3 class="text-lg font-semibold text-gray-800 mb-4">
-                {Calendar.strftime(@focus_date, "%A, %B %-d, %Y")}
-              </h3>
-              <.detail_groups groups={day_detail_for(assigns, @focus_date)} />
-            </div>
+                <% end %>
+              </div>
+            <% :day -> %>
+              <div
+                id="tour-calendar-grid"
+                class="bg-white border border-gray-200 rounded-xl shadow-sm p-6"
+              >
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                  {Calendar.strftime(@focus_date, "%A, %B %-d, %Y")}
+                </h3>
+                <.detail_groups groups={day_detail_for(assigns, @focus_date)} />
+              </div>
           <% end %>
         </div>
 
@@ -692,7 +699,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   end
 
   defp filter_chip_class(selected?) do
-    base = "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors"
+    base =
+      "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors"
 
     if selected?,
       do: "#{base} bg-blue-600 text-white",
@@ -706,12 +714,5 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     Rotations.rotation_type_color(rotation_type)
     |> String.split()
     |> List.first()
-  end
-
-  defp load_current_user(session) do
-    case session["user_id"] do
-      nil -> nil
-      user_id -> ResidencySchedule.Accounts.get_user(user_id)
-    end
   end
 end
