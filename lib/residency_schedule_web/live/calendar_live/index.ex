@@ -190,6 +190,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       id="guided-tour"
       phx-hook="GuidedTour"
       data-tour-page="calendar"
+      data-tour-role={to_string(@current_user.role)}
       data-auto-start={to_string(@show_tour)}
       class="max-w-4xl mx-auto py-10 px-4"
     >

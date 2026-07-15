@@ -213,6 +213,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       id="guided-tour"
       phx-hook="GuidedTour"
       data-tour-page="resident"
+      data-tour-role={to_string(@current_user.role)}
       class="max-w-4xl mx-auto py-10 px-4"
     >
       <div class="mb-4">
@@ -247,7 +248,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             <% end %>
           </div>
           <%= if @is_home_resident do %>
-            <div class="inline-flex items-center gap-1 shrink-0">
+            <div id="tour-follow-home" class="inline-flex items-center gap-1 shrink-0">
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
                 ✓ {home_badge_label(@current_user)}
               </span>
@@ -264,7 +265,12 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
               </form>
             </div>
           <% else %>
-            <form action={"/set-home/#{@resident.id}"} method="post" class="inline shrink-0">
+            <form
+              id="tour-follow-home"
+              action={"/set-home/#{@resident.id}"}
+              method="post"
+              class="inline shrink-0"
+            >
               <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
               <button
                 type="submit"

@@ -224,6 +224,24 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
       assert html =~ ~s(data-auto-start="true")
     end
 
+    test "tour receives the resident role for a resident", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/")
+      assert html =~ ~s(data-tour-role="resident")
+    end
+
+    test "tour receives the user role for a follower account" do
+      {:ok, follower} =
+        ResidencySchedule.Accounts.create_user(%{
+          email: "partner-#{System.unique_integer()}@gmail.com"
+        })
+
+      {:ok, follower} = ResidencySchedule.Accounts.approve_user(follower)
+      conn = Plug.Test.init_test_session(build_conn(), user_id: follower.id)
+
+      {:ok, _view, html} = live(conn, "/")
+      assert html =~ ~s(data-tour-role="user")
+    end
+
     test "returning user with a completed tour does not auto-start", %{conn: conn, user: user} do
       ResidencySchedule.Accounts.complete_tour(user)
       {:ok, _view, html} = live(conn, "/")

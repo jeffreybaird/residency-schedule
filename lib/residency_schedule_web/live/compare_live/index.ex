@@ -115,6 +115,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
       id="guided-tour"
       phx-hook="GuidedTour"
       data-tour-page="compare"
+      data-tour-role={to_string(@current_user.role)}
       class="max-w-4xl mx-auto py-6 sm:py-10 px-3 sm:px-4"
     >
       <%!-- Non-sticky: title + schedule switcher --%>
