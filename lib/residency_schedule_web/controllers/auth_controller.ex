@@ -203,33 +203,6 @@ defmodule ResidencyScheduleWeb.AuthController do
     redirect(conn, to: "/residents/#{id}")
   end
 
-  # ── Admin login ────────────────────────────────────────────────────────────
-
-  def admin_show(conn, _params) do
-    render(conn, :admin_login)
-  end
-
-  def admin_create(conn, %{"password" => password}) do
-    admin_password = Application.fetch_env!(:residency_schedule, :delete_password)
-
-    if Plug.Crypto.secure_compare(password, admin_password) do
-      conn
-      |> put_session(:admin, true)
-      |> put_session(:authenticated, true)
-      |> redirect(to: "/admin")
-    else
-      conn
-      |> put_flash(:error, "Incorrect admin password.")
-      |> render(:admin_login)
-    end
-  end
-
-  def admin_delete(conn, _params) do
-    conn
-    |> delete_session(:admin)
-    |> redirect(to: "/admin/login")
-  end
-
   # ── Private helpers ────────────────────────────────────────────────────────
 
   defp log_in_user(conn, user) do
@@ -237,7 +210,6 @@ defmodule ResidencyScheduleWeb.AuthController do
       conn
       |> configure_session(renew: true)
       |> put_session(:user_id, user.id)
-      |> put_session(:authenticated, true)
 
     if user.approved do
       # Home is the calendar at "/". When a user has an assigned resident the

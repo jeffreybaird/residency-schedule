@@ -33,8 +33,7 @@ if config_env() == :prod do
     server: true
 
   config :residency_schedule,
-    access_password: System.fetch_env!("ACCESS_PASSWORD"),
-    delete_password: System.get_env("DELETE_PASSWORD", "admin")
+    access_password: System.fetch_env!("ACCESS_PASSWORD")
 
   # Resend for transactional email (magic links)
   resend_api_key = System.fetch_env!("RESEND_API_KEY")

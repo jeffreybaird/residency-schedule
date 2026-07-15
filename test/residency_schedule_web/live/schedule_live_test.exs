@@ -14,18 +14,19 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
   end
 
-  describe "admin session without resident user" do
-    setup do
-      conn =
-        build_conn()
-        |> Plug.Test.init_test_session(admin: true, authenticated: true)
-
-      {:ok, conn: conn}
+  describe "admin session" do
+    setup %{conn: conn} do
+      admin_authenticate_session(%{conn: conn})
     end
 
     test "allows access to schedule index", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/schedule")
       assert html =~ "No schedule uploaded yet"
+    end
+
+    test "passes the admin role to the guided tour", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/schedule")
+      assert html =~ ~s(data-tour-role="admin")
     end
   end
 
@@ -33,6 +34,11 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     test "shows upload prompt when no schedule exists", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/schedule")
       assert html =~ "No schedule uploaded yet"
+    end
+
+    test "passes the resident role to the guided tour", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/schedule")
+      assert html =~ ~s(data-tour-role="resident")
     end
   end
 
@@ -248,6 +254,66 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
   describe "build_unified_residents/3" do
     test "returns empty list for empty input" do
       assert Index.build_unified_residents([], %{}, ~D[2026-04-06]) == []
+    end
+  end
+
+  describe "schedule deletion confirmed with the admin's own password" do
+    setup %{conn: conn} do
+      Application.put_env(:residency_schedule, :current_date, ~D[2024-07-01])
+      on_exit(fn -> Application.delete_env(:residency_schedule, :current_date) end)
+
+      seed_schedule()
+
+      admin = create_admin("adminsecret99")
+      conn = Plug.Test.init_test_session(conn, user_id: admin.id)
+      {:ok, view, _html} = live(conn, "/schedule")
+      %{view: view, admin: admin}
+    end
+
+    test "deletes the schedule with the admin's account password", %{view: view} do
+      view |> element("button[phx-click='request_delete']") |> render_click()
+
+      html =
+        view
+        |> form("form[phx-submit='delete_schedule']", %{"password" => "adminsecret99"})
+        |> render_submit()
+
+      assert html =~ "No schedule uploaded yet"
+    end
+
+    test "rejects a wrong password", %{view: view} do
+      view |> element("button[phx-click='request_delete']") |> render_click()
+
+      html =
+        view
+        |> form("form[phx-submit='delete_schedule']", %{"password" => "not-the-password"})
+        |> render_submit()
+
+      assert html =~ "Incorrect password."
+    end
+  end
+
+  describe "schedule deletion when the admin has no password set" do
+    setup %{conn: conn} do
+      Application.put_env(:residency_schedule, :current_date, ~D[2024-07-01])
+      on_exit(fn -> Application.delete_env(:residency_schedule, :current_date) end)
+
+      seed_schedule()
+
+      %{conn: conn} = admin_authenticate_session(%{conn: conn})
+      {:ok, view, _html} = live(conn, "/schedule")
+      %{view: view}
+    end
+
+    test "refuses deletion and points at the Admin page", %{view: view} do
+      view |> element("button[phx-click='request_delete']") |> render_click()
+
+      html =
+        view
+        |> form("form[phx-submit='delete_schedule']", %{"password" => "anything"})
+        |> render_submit()
+
+      assert html =~ "Set a password for your account on the Admin page first."
     end
   end
 end

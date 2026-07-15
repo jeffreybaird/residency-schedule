@@ -105,6 +105,28 @@ defmodule ResidencySchedule.Accounts do
   end
 
   @doc """
+  Changes the user's own password. When the user already has a password, the
+  current one must be provided and match; when none is set yet, the current
+  password is ignored.
+
+  Returns `{:ok, user}`, `{:error, :invalid_current_password}`, or
+  `{:error, changeset}` when the new password fails validation.
+
+  Exempt from doctest — hits the database.
+  """
+  def change_password(user, current_password, new_password) do
+    if password_change_allowed?(user, current_password) do
+      set_password(user, new_password)
+    else
+      {:error, :invalid_current_password}
+    end
+  end
+
+  defp password_change_allowed?(user, current_password) do
+    not has_password?(user) or User.valid_password?(user, current_password)
+  end
+
+  @doc """
   Authenticates a user by email and password.
   Returns `{:ok, user}` or `{:error, :invalid_credentials}`.
 
@@ -152,6 +174,66 @@ defmodule ResidencySchedule.Accounts do
     |> Repo.update()
   end
 
+  # ── Roles ──────────────────────────────────────────────────────────────────
+
+  @doc """
+  Changes a user's role. Promoting to admin also approves the user so the
+  account can log in immediately.
+
+  Returns `{:ok, user}`, `{:error, :last_admin}` when demoting the only
+  remaining admin, or `{:error, changeset}` when the role change is invalid
+  (e.g. the resident role without a URMC email).
+
+  Exempt from doctest — hits the database.
+  """
+  def set_role(user, role) do
+    Repo.transaction(fn ->
+      if demoting_last_admin?(user, role) do
+        Repo.rollback(:last_admin)
+      else
+        user
+        |> User.role_changeset(%{role: role})
+        |> approve_on_admin_promotion(role)
+        |> Repo.update()
+        |> case do
+          {:ok, updated} -> updated
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end
+    end)
+  end
+
+  @doc """
+  Lists all admins ordered by email.
+
+  Exempt from doctest — hits the database.
+  """
+  def list_admins do
+    from(u in User, where: u.role == :admin, order_by: [asc: u.email])
+    |> Repo.all()
+  end
+
+  defp demoting_last_admin?(user, role) do
+    user.role == :admin and role != :admin and count_locked_admins() == 1
+  end
+
+  # Locks the admin rows FOR UPDATE so concurrent demotions serialize: a second
+  # demotion blocks here until the first commits, then re-reads the reduced set
+  # and correctly sees itself as the last admin. Must run inside a transaction
+  # (set_role wraps it) for the lock to be held until commit. Aggregates can't
+  # carry FOR UPDATE in Postgres, so we lock the rows and count them in Elixir.
+  defp count_locked_admins do
+    from(u in User, where: u.role == :admin, lock: "FOR UPDATE")
+    |> Repo.all()
+    |> length()
+  end
+
+  defp approve_on_admin_promotion(changeset, :admin) do
+    Ecto.Changeset.put_change(changeset, :approved, true)
+  end
+
+  defp approve_on_admin_promotion(changeset, _role), do: changeset
+
   # ── Approval ───────────────────────────────────────────────────────────────
 
   @doc """
@@ -196,11 +278,15 @@ defmodule ResidencySchedule.Accounts do
   end
 
   @doc """
-  Revokes approval from a user.
-  Returns `{:ok, user}` or `{:error, changeset}`.
+  Revokes approval from a user. Admins cannot be revoked — demote the admin
+  role first — so a revoked account can never be the only working admin.
+  Returns `{:ok, user}`, `{:error, :admin_cannot_be_revoked}`, or
+  `{:error, changeset}`.
 
   Exempt from doctest — hits the database.
   """
+  def revoke_user(%User{role: :admin}), do: {:error, :admin_cannot_be_revoked}
+
   def revoke_user(user) do
     user
     |> User.approval_changeset(%{approved: false})

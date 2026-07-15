@@ -10,8 +10,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   @non_shift_types ~w[vacation]
 
   @impl true
-  def mount(%{"id" => id}, session, socket) do
-    current_user = load_current_user(session)
+  def mount(%{"id" => id}, _session, socket) do
+    current_user = socket.assigns.current_user
     home_resident_id = current_user && current_user.home_resident_id
     resident = Residents.get_resident!(String.to_integer(id))
     today = ResidencyScheduleWeb.ScheduleLive.Index.current_date()
@@ -192,6 +192,20 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     {:noreply, assign(socket, shift_coworkers_modal: nil)}
   end
 
+  # Residents pin their own page ("Home"); user-role accounts follow someone
+  # else's schedule (e.g. a resident's partner), so the copy differs by role.
+  defp home_badge_label(%{role: :resident}), do: "Home"
+  defp home_badge_label(_user), do: "Following"
+
+  defp follow_button_label(%{role: :resident}), do: "Set as Home"
+  defp follow_button_label(_user), do: "Follow"
+
+  defp follow_button_title(%{role: :resident}),
+    do: "Pin this resident — adds a Home shortcut to the nav"
+
+  defp follow_button_title(_user),
+    do: "Follow this resident — their schedule opens by default and appears in the nav"
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -199,6 +213,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       id="guided-tour"
       phx-hook="GuidedTour"
       data-tour-page="resident"
+      data-tour-role={to_string(@current_user.role)}
       class="max-w-4xl mx-auto py-10 px-4"
     >
       <div class="mb-4">
@@ -233,9 +248,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             <% end %>
           </div>
           <%= if @is_home_resident do %>
-            <div class="inline-flex items-center gap-1 shrink-0">
+            <div id="tour-follow-home" class="inline-flex items-center gap-1 shrink-0">
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                ✓ Home
+                ✓ {home_badge_label(@current_user)}
               </span>
               <form action="/unset-home" method="post" class="inline">
                 <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
@@ -243,21 +258,26 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                 <button
                   type="submit"
                   class="px-2 py-1 rounded-full text-xs text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                  title="Remove Home — the nav link will no longer point here"
+                  title="Remove — the nav link will no longer point here"
                 >
                   ✕
                 </button>
               </form>
             </div>
           <% else %>
-            <form action={"/set-home/#{@resident.id}"} method="post" class="inline shrink-0">
+            <form
+              id="tour-follow-home"
+              action={"/set-home/#{@resident.id}"}
+              method="post"
+              class="inline shrink-0"
+            >
               <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
               <button
                 type="submit"
                 class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700 transition-colors"
-                title="Pin this resident — adds a Home shortcut to the nav"
+                title={follow_button_title(@current_user)}
               >
-                Set as Home
+                {follow_button_label(@current_user)}
               </button>
             </form>
           <% end %>
@@ -538,54 +558,54 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                         phx-value-start-date={Date.to_iso8601(entry.start_date)}
                         phx-value-end-date={Date.to_iso8601(entry.end_date)}
                         class={[
-                        entry_row_class(entry.rotation_type, past),
-                        if(covered, do: "opacity-60", else: ""),
-                        "cursor-pointer"
-                      ]}
-                    >
-                      <td class="px-4 py-2 align-top">
-                        <div class="flex flex-col items-start gap-0.5 text-left">
-                          <span
-                            title={label}
-                            class={[
-                              "inline-flex h-8 w-full max-w-[11rem] shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
-                              color,
-                              if(covered, do: "line-through opacity-70", else: "")
-                            ]}
-                          >
-                            {label}
-                          </span>
-                          <%= if covered do %>
-                            <span class="max-w-full text-xs text-gray-400 italic break-words">
-                              covered by {covered.name}
+                          entry_row_class(entry.rotation_type, past),
+                          if(covered, do: "opacity-60", else: ""),
+                          "cursor-pointer"
+                        ]}
+                      >
+                        <td class="px-4 py-2 align-top">
+                          <div class="flex flex-col items-start gap-0.5 text-left">
+                            <span
+                              title={label}
+                              class={[
+                                "inline-flex h-8 w-full max-w-[11rem] shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
+                                color,
+                                if(covered, do: "line-through opacity-70", else: "")
+                              ]}
+                            >
+                              {label}
                             </span>
-                          <% end %>
-                          <%= if is_coverage do %>
-                            <span class="max-w-full text-xs text-blue-500 italic break-words">
-                              covering {entry.original_resident.name}
-                            </span>
-                          <% end %>
-                        </div>
-                      </td>
-                      <td class={[
-                        "px-4 py-2 text-center",
-                        if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
-                      ]}>
-                        {Calendar.strftime(entry.start_date, "%b %-d, %Y")}
-                      </td>
-                      <td class={[
-                        "px-4 py-2 text-center",
-                        if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
-                      ]}>
-                        {Calendar.strftime(entry.end_date, "%b %-d, %Y")}
-                      </td>
-                      <td class={[
-                        "px-4 py-2 text-right tabular-nums",
-                        if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-500")
-                      ]}>
-                        {Date.diff(entry.end_date, entry.start_date) + 1}
-                      </td>
-                    </tr>
+                            <%= if covered do %>
+                              <span class="max-w-full text-xs text-gray-400 italic break-words">
+                                covered by {covered.name}
+                              </span>
+                            <% end %>
+                            <%= if is_coverage do %>
+                              <span class="max-w-full text-xs text-blue-500 italic break-words">
+                                covering {entry.original_resident.name}
+                              </span>
+                            <% end %>
+                          </div>
+                        </td>
+                        <td class={[
+                          "px-4 py-2 text-center",
+                          if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
+                        ]}>
+                          {Calendar.strftime(entry.start_date, "%b %-d, %Y")}
+                        </td>
+                        <td class={[
+                          "px-4 py-2 text-center",
+                          if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
+                        ]}>
+                          {Calendar.strftime(entry.end_date, "%b %-d, %Y")}
+                        </td>
+                        <td class={[
+                          "px-4 py-2 text-right tabular-nums",
+                          if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-500")
+                        ]}>
+                          {Date.diff(entry.end_date, entry.start_date) + 1}
+                        </td>
+                      </tr>
                     <% end %>
                   <% end %>
                 <% end %>
@@ -788,7 +808,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
   defp year_entries(schedule_resident) do
     rotations = Rotations.list_rotations_for_resident(schedule_resident.id)
-    off_slots = compute_off_slots(rotations, Rotations.list_schedule_slots(schedule_resident.schedule_id))
+
+    off_slots =
+      compute_off_slots(rotations, Rotations.list_schedule_slots(schedule_resident.schedule_id))
 
     entries =
       schedule_resident.id
@@ -1026,12 +1048,5 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       {type, days}
     end)
     |> Enum.sort_by(fn {type, _} -> Enum.find_index(@night_shift_types, &(&1 == type)) end)
-  end
-
-  defp load_current_user(session) do
-    case session["user_id"] do
-      nil -> nil
-      user_id -> ResidencySchedule.Accounts.get_user(user_id)
-    end
   end
 end

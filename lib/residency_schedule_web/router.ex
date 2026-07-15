@@ -15,7 +15,7 @@ defmodule ResidencyScheduleWeb.Router do
   end
 
   pipeline :authenticated do
-    plug ResidencyScheduleWeb.Plugs.RequireAuthOrAdmin
+    plug ResidencyScheduleWeb.Plugs.RequireAuth
   end
 
   pipeline :admin_authenticated do
@@ -37,24 +37,20 @@ defmodule ResidencyScheduleWeb.Router do
     get "/feed/:token/calendar.ics", IcalController, :feed
   end
 
-  # ── Admin auth routes (unauthenticated) ──────────────────────────────────
-
-  scope "/admin", ResidencyScheduleWeb do
-    pipe_through :browser
-    get "/login", AuthController, :admin_show
-    post "/login", AuthController, :admin_create
-    post "/logout", AuthController, :admin_delete
-  end
-
   # ── Authenticated site routes ─────────────────────────────────────────────
 
   scope "/", ResidencyScheduleWeb do
     pipe_through [:browser, :authenticated]
-    live "/", CalendarLive.Index, :index
-    live "/schedule", ScheduleLive.Index, :index
-    live "/residents/:id", ResidentLive.Show, :show
-    live "/calendar", CalendarLive.Index, :index
-    live "/compare", CompareLive.Index, :index
+
+    live_session :authenticated,
+      on_mount: [{ResidencyScheduleWeb.UserAuth, :ensure_authenticated}] do
+      live "/", CalendarLive.Index, :index
+      live "/schedule", ScheduleLive.Index, :index
+      live "/residents/:id", ResidentLive.Show, :show
+      live "/calendar", CalendarLive.Index, :index
+      live "/compare", CompareLive.Index, :index
+    end
+
     get "/residents/:id/calendar.ics", IcalController, :show
     post "/set-home/:resident_id", AuthController, :set_home
     post "/unset-home", AuthController, :unset_home
@@ -64,10 +60,13 @@ defmodule ResidencyScheduleWeb.Router do
 
   scope "/admin", ResidencyScheduleWeb do
     pipe_through [:browser, :admin_authenticated]
-    live "/", AdminLive.Index, :index
-    live "/upload", UploadLive.Index, :index
-    live "/build", BuilderLive.Index, :index
-    live "/edit", EditLive.Index, :index
+
+    live_session :admin, on_mount: [{ResidencyScheduleWeb.UserAuth, :ensure_admin}] do
+      live "/", AdminLive.Index, :index
+      live "/upload", UploadLive.Index, :index
+      live "/build", BuilderLive.Index, :index
+      live "/edit", EditLive.Index, :index
+    end
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

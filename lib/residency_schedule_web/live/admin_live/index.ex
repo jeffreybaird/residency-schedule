@@ -15,6 +15,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
        delete_confirm_id: nil,
        pending_users: Accounts.list_pending_users(),
        approved_users: Accounts.list_approved_users(),
+       role_error: nil,
        existing_overrides: ShiftOverrides.list_all_overrides(),
        override_rotation_type: nil,
        override_start_date: nil,
@@ -24,7 +25,11 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
        available_covering_residents: [],
        override_covering_resident_id: nil,
        override_error: nil,
-       override_success: nil
+       override_success: nil,
+       has_password: Accounts.has_password?(socket.assigns.current_user),
+       password_error: nil,
+       password_success: nil,
+       password_form_version: 0
      )}
   end
 
@@ -144,14 +149,110 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
   @impl true
   def handle_event("revoke_user", %{"id" => id}, socket) do
     user = Accounts.get_user!(String.to_integer(id))
-    Accounts.revoke_user(user)
 
-    {:noreply,
-     assign(socket,
-       pending_users: Accounts.list_pending_users(),
-       approved_users: Accounts.list_approved_users()
-     )}
+    case Accounts.revoke_user(user) do
+      {:ok, _user} ->
+        {:noreply,
+         assign(socket,
+           pending_users: Accounts.list_pending_users(),
+           approved_users: Accounts.list_approved_users(),
+           role_error: nil
+         )}
+
+      {:error, :admin_cannot_be_revoked} ->
+        {:noreply,
+         assign(socket, role_error: "Admins cannot be revoked — change their role first.")}
+
+      {:error, _changeset} ->
+        {:noreply, assign(socket, role_error: "Could not revoke this user.")}
+    end
   end
+
+  @impl true
+  def handle_event("set_role", %{"user_id" => user_id, "role" => role_param}, socket) do
+    user = Accounts.get_user!(String.to_integer(user_id))
+
+    case set_role_from_param(user, role_param) do
+      {:ok, _user} ->
+        {:noreply,
+         assign(socket,
+           pending_users: Accounts.list_pending_users(),
+           approved_users: Accounts.list_approved_users(),
+           role_error: nil
+         )}
+
+      {:error, message} ->
+        {:noreply, assign(socket, role_error: message)}
+    end
+  end
+
+  @impl true
+  def handle_event("change_password", params, socket) do
+    case change_password_from_form(params, socket.assigns.current_user) do
+      {:ok, updated_user} ->
+        {:noreply,
+         assign(socket,
+           current_user: updated_user,
+           has_password: true,
+           password_error: nil,
+           password_success: "Your password has been updated.",
+           password_form_version: socket.assigns.password_form_version + 1
+         )}
+
+      {:error, message} ->
+        {:noreply, assign(socket, password_error: message, password_success: nil)}
+    end
+  end
+
+  defp change_password_from_form(params, user) do
+    with :ok <-
+           validate_password_confirmation(params["new_password"], params["confirm_password"]),
+         {:ok, updated_user} <-
+           Accounts.change_password(
+             user,
+             params["current_password"] || "",
+             params["new_password"]
+           ) do
+      {:ok, updated_user}
+    else
+      {:error, :confirmation_mismatch} ->
+        {:error, "New passwords do not match."}
+
+      {:error, :invalid_current_password} ->
+        {:error, "Current password is incorrect."}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:error, changeset_error_message(changeset)}
+    end
+  end
+
+  defp validate_password_confirmation(password, password), do: :ok
+  defp validate_password_confirmation(_password, _confirm), do: {:error, :confirmation_mismatch}
+
+  defp changeset_error_message(changeset) do
+    changeset.errors
+    |> Enum.map_join(", ", fn {field, {message, _opts}} -> "#{field}: #{message}" end)
+  end
+
+  defp set_role_from_param(user, role_param) do
+    case parse_role(role_param) do
+      nil -> {:error, "Unknown role."}
+      role -> translate_set_role_result(Accounts.set_role(user, role))
+    end
+  end
+
+  defp parse_role("user"), do: :user
+  defp parse_role("resident"), do: :resident
+  defp parse_role("admin"), do: :admin
+  defp parse_role(_unknown), do: nil
+
+  defp translate_set_role_result({:ok, user}), do: {:ok, user}
+
+  defp translate_set_role_result({:error, :last_admin}),
+    do: {:error, "Cannot remove the last admin."}
+
+  defp translate_set_role_result({:error, %Ecto.Changeset{} = changeset}),
+    do: {:error, changeset_error_message(changeset)}
 
   defp nilify_empty(nil), do: nil
   defp nilify_empty(""), do: nil
@@ -293,19 +394,123 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
             <% else %>
               <ul class="space-y-2">
                 <%= for u <- @approved_users do %>
-                  <li class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 bg-white">
-                    <span class="text-sm text-gray-700">{u.email}</span>
-                    <button
-                      phx-click="revoke_user"
-                      phx-value-id={u.id}
-                      class="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
-                    >
-                      Revoke
-                    </button>
+                  <li class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 bg-white">
+                    <span class="text-sm text-gray-700 truncate">{u.email}</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <form phx-change="set_role" id={"role-form-#{u.id}"}>
+                        <input type="hidden" name="user_id" value={u.id} />
+                        <select
+                          name="role"
+                          class="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:border-blue-500 focus:outline-none"
+                        >
+                          <option value="user" selected={u.role == :user}>User</option>
+                          <option value="resident" selected={u.role == :resident}>Resident</option>
+                          <option value="admin" selected={u.role == :admin}>Admin</option>
+                        </select>
+                      </form>
+                      <button
+                        phx-click="revoke_user"
+                        phx-value-id={u.id}
+                        class="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
+                      >
+                        Revoke
+                      </button>
+                    </div>
                   </li>
                 <% end %>
               </ul>
             <% end %>
+            <%= if @role_error do %>
+              <p class="text-sm text-red-600 mt-2">{@role_error}</p>
+            <% end %>
+          </div>
+        </div>
+
+        <%!-- Account password card --%>
+        <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
+              My Account
+            </span>
+          </div>
+
+          <div class="px-4 py-4 space-y-4">
+            <div>
+              <p class="text-sm font-medium text-gray-800 mb-0.5">
+                {if @has_password, do: "Change My Password", else: "Set My Password"}
+              </p>
+              <p class="text-xs text-gray-500">
+                Used to log in as {@current_user.email} and to confirm schedule deletion.
+              </p>
+              <%= unless @has_password do %>
+                <p class="text-xs text-amber-600 mt-1">
+                  Your account has no password yet — you can only log in via email link
+                  and cannot confirm schedule deletions until you set one.
+                </p>
+              <% end %>
+            </div>
+
+            <form
+              id={"account-password-form-#{@password_form_version}"}
+              phx-submit="change_password"
+              class="space-y-3 max-w-sm"
+            >
+              <%= if @has_password do %>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">
+                    Current password
+                  </label>
+                  <input
+                    type="password"
+                    name="current_password"
+                    autocomplete="current-password"
+                    required
+                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+              <% end %>
+
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">
+                  New password
+                </label>
+                <input
+                  type="password"
+                  name="new_password"
+                  autocomplete="new-password"
+                  required
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                />
+                <p class="text-xs text-gray-400 mt-1">At least 8 characters.</p>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">
+                  Confirm new password
+                </label>
+                <input
+                  type="password"
+                  name="confirm_password"
+                  autocomplete="new-password"
+                  required
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <%= if @password_error do %>
+                <p class="text-sm text-red-600">{@password_error}</p>
+              <% end %>
+              <%= if @password_success do %>
+                <p class="text-sm text-green-600">{@password_success}</p>
+              <% end %>
+
+              <button
+                type="submit"
+                class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                {if @has_password, do: "Update Password", else: "Set Password"}
+              </button>
+            </form>
           </div>
         </div>
 

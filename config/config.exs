@@ -10,8 +10,7 @@ import Config
 config :residency_schedule,
   ecto_repos: [ResidencySchedule.Repo],
   generators: [timestamp_type: :utc_datetime],
-  access_password: "dev-password",
-  delete_password: "admin"
+  access_password: "dev-password"
 
 # Configure the endpoint
 config :residency_schedule, ResidencyScheduleWeb.Endpoint,

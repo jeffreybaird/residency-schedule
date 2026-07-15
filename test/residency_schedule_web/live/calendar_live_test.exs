@@ -185,7 +185,12 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
 
       {:ok, _} =
         ResidencySchedule.Rotations.insert_rotations(future.id, [
-          %{slot_index: 0, start_date: ~D[2026-07-06], end_date: ~D[2026-07-12], rotation_type: :rei}
+          %{
+            slot_index: 0,
+            start_date: ~D[2026-07-06],
+            end_date: ~D[2026-07-12],
+            rotation_type: :rei
+          }
         ])
 
       # Viewing 2023 must not offer the 2026-only resident...
@@ -217,6 +222,24 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
     test "new user sees the tour auto-start attribute", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/")
       assert html =~ ~s(data-auto-start="true")
+    end
+
+    test "tour receives the resident role for a resident", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/")
+      assert html =~ ~s(data-tour-role="resident")
+    end
+
+    test "tour receives the user role for a follower account" do
+      {:ok, follower} =
+        ResidencySchedule.Accounts.create_user(%{
+          email: "partner-#{System.unique_integer()}@gmail.com"
+        })
+
+      {:ok, follower} = ResidencySchedule.Accounts.approve_user(follower)
+      conn = Plug.Test.init_test_session(build_conn(), user_id: follower.id)
+
+      {:ok, _view, html} = live(conn, "/")
+      assert html =~ ~s(data-tour-role="user")
     end
 
     test "returning user with a completed tour does not auto-start", %{conn: conn, user: user} do

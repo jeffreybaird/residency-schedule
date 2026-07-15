@@ -15,7 +15,15 @@ const CALENDAR_STEPS = [
   {
     id: "calendar-overview",
     title: "Your Calendar",
-    text: "This is your home page \u2014 the schedule shown as a calendar. If you\u2019ve been assigned a resident, it opens filtered to your own shifts.",
+    text: (role) => {
+      if (role === "resident") {
+        return "This is your home page \u2014 the schedule shown as a calendar. Once you set your page as Home, it opens filtered to your own shifts.";
+      }
+      if (role === "user") {
+        return "This is your home page \u2014 the schedule shown as a calendar. Once you follow a resident (say, your partner), it opens filtered to their shifts.";
+      }
+      return "This is the home page \u2014 the schedule shown as a calendar.";
+    },
     buttons: ["next"],
   },
   {
@@ -29,7 +37,10 @@ const CALENDAR_STEPS = [
     id: "calendar-filters",
     attachTo: { element: "#tour-calendar-filters", on: "bottom" },
     title: "Filter the Calendar",
-    text: "Filter by resident or by rotation to focus on exactly what you need. Picking your own name shows just your schedule; clear it to see everyone.",
+    text: (role) =>
+      role === "resident"
+        ? "Filter by resident or by rotation to focus on exactly what you need. Picking your own name shows just your schedule; clear it to see everyone."
+        : "Filter by resident or by rotation to focus on exactly what you need. Picking one name shows just that resident’s schedule; clear it to see everyone.",
     buttons: ["back", "next"],
   },
   {
@@ -96,6 +107,17 @@ const RESIDENT_STEPS = [
     title: "Resident Detail Page",
     text: "This is a resident\u2019s personal schedule page. Everything about their year is here.",
     buttons: ["next"],
+  },
+  {
+    id: "resident-follow",
+    attachTo: { element: "#tour-follow-home", on: "bottom" },
+    roles: ["resident", "user"],
+    title: (role) => (role === "resident" ? "Set Your Home Page" : "Follow a Resident"),
+    text: (role) =>
+      role === "resident"
+        ? "When you\u2019re on your own page, click <strong>Set as Home</strong>. The nav gains a <strong>My page</strong> shortcut and your calendar opens on your schedule automatically."
+        : "Following a resident \u2014 say, your partner \u2014 adds a <strong>Following</strong> shortcut to the nav and opens your calendar on their schedule automatically. Click <strong>Follow</strong> on their page to set it up, and use the <strong>Download .ics</strong> link below to subscribe from your own calendar app.",
+    buttons: ["back", "next"],
   },
   {
     id: "resident-stats",
@@ -347,8 +369,12 @@ function buildButtons(keys, tour) {
 
 // ── Tour factory ─────────────────────────────────────────────────────────────
 
-function buildTour(page, startAtId) {
-  const steps = STEP_SETS[page] || SCHEDULE_STEPS;
+function buildTour(page, startAtId, role) {
+  // Steps may scope themselves to roles, and title/text may be functions of
+  // the role so the copy matches what the viewer actually sees.
+  const steps = (STEP_SETS[page] || SCHEDULE_STEPS).filter(
+    (s) => !s.roles || s.roles.includes(role),
+  );
 
   let effectiveSteps = steps;
   if (startAtId) {
@@ -371,8 +397,8 @@ function buildTour(page, startAtId) {
   for (const step of effectiveSteps) {
     tour.addStep({
       id: step.id,
-      title: step.title,
-      text: step.text,
+      title: typeof step.title === "function" ? step.title(role) : step.title,
+      text: typeof step.text === "function" ? step.text(role) : step.text,
       attachTo: step.attachTo,
       buttons: buildButtons(step.buttons || ["next"], tour),
     });

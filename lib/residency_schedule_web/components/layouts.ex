@@ -4,13 +4,17 @@ defmodule ResidencyScheduleWeb.Layouts do
   used by your application.
   """
   use ResidencyScheduleWeb, :html
-  import Plug.Conn, only: [get_session: 2]
 
   # Embed all files in layouts/* within this module.
   # The default root.html.heex file contains the HTML
   # skeleton of your application, namely HTML headers
   # and other static content.
   embed_templates "layouts/*"
+
+  # The home-resident link means "this is me" for residents but "a resident
+  # I follow" (e.g. a partner's schedule) for user-role accounts.
+  defp nav_home_label(%{role: :resident}), do: "My page"
+  defp nav_home_label(_user), do: "Following"
 
   @doc """
   Renders your app layout.

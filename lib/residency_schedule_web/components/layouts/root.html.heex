@@ -68,18 +68,18 @@
             <% my_page_path = "/residents/#{user.home_resident_id}" %>
             <%= if @conn.request_path == my_page_path do %>
               <span class="px-3 py-1.5 rounded-md text-sm text-green-700 bg-green-50 font-medium">
-                My page
+                {nav_home_label(user)}
               </span>
             <% else %>
               <a
                 href={my_page_path}
                 class="px-3 py-1.5 rounded-md text-sm text-green-700 hover:bg-green-50 transition-colors"
               >
-                My page
+                {nav_home_label(user)}
               </a>
             <% end %>
           <% end %>
-          <%= if get_session(@conn, :admin) do %>
+          <%= if ResidencySchedule.Accounts.User.admin?(@conn.assigns[:current_user]) do %>
             <a
               href="/admin"
               class="px-3 py-1.5 rounded-md text-sm text-amber-600 hover:bg-amber-50 hover:text-amber-800 transition-colors"
@@ -144,18 +144,18 @@
               <% my_page_path = "/residents/#{user.home_resident_id}" %>
               <%= if @conn.request_path == my_page_path do %>
                 <span class="block px-4 py-2 text-sm text-green-700 font-medium bg-green-50">
-                  My page
+                  {nav_home_label(user)}
                 </span>
               <% else %>
                 <a
                   href={my_page_path}
                   class="block px-4 py-2 text-sm text-green-700 hover:bg-green-50"
                 >
-                  My page
+                  {nav_home_label(user)}
                 </a>
               <% end %>
             <% end %>
-            <%= if get_session(@conn, :admin) do %>
+            <%= if ResidencySchedule.Accounts.User.admin?(@conn.assigns[:current_user]) do %>
               <a href="/admin" class="block px-4 py-2 text-sm text-amber-600 hover:bg-amber-50">
                 Admin
               </a>
