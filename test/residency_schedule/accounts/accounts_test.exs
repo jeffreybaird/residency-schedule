@@ -156,6 +156,14 @@ defmodule ResidencySchedule.AccountsTest do
       {:ok, revoked} = Accounts.revoke_user(user)
       assert revoked.approved == false
     end
+
+    test "revoke_user/1 refuses to revoke an admin" do
+      {:ok, user} = Accounts.create_user(%{email: "boss@gmail.com"})
+      {:ok, admin} = Accounts.set_role(user, :admin)
+
+      assert {:error, :admin_cannot_be_revoked} = Accounts.revoke_user(admin)
+      assert Accounts.get_user!(admin.id).approved == true
+    end
   end
 
   describe "tour" do
@@ -363,72 +371,6 @@ defmodule ResidencySchedule.AccountsTest do
 
     test "returns an empty list when there are no admins" do
       assert Accounts.list_admins() == []
-    end
-  end
-
-  describe "verify_admin_password/1" do
-    test "accepts the configured bootstrap password when no credential exists" do
-      assert Accounts.verify_admin_password("admin")
-    end
-
-    test "rejects a wrong password when no credential exists" do
-      refute Accounts.verify_admin_password("wrong")
-    end
-
-    test "checks the database credential once one is set" do
-      {:ok, _} = Accounts.change_admin_password("admin", "newsecret99")
-      assert Accounts.verify_admin_password("newsecret99")
-    end
-
-    test "rejects the bootstrap password once a credential is set" do
-      {:ok, _} = Accounts.change_admin_password("admin", "newsecret99")
-      refute Accounts.verify_admin_password("admin")
-    end
-  end
-
-  describe "change_admin_password/2" do
-    test "sets a new password when the current bootstrap password is correct" do
-      assert {:ok, credential} = Accounts.change_admin_password("admin", "newsecret99")
-      assert credential.password_hash != nil
-    end
-
-    test "rejects an incorrect current password" do
-      assert {:error, :invalid_current_password} =
-               Accounts.change_admin_password("nope", "newsecret99")
-    end
-
-    test "rejects a new password shorter than 8 characters" do
-      assert {:error, %Ecto.Changeset{} = changeset} =
-               Accounts.change_admin_password("admin", "short")
-
-      assert errors_on(changeset)[:password] != nil
-    end
-
-    test "verifies subsequent changes against the stored password, not the bootstrap one" do
-      {:ok, _} = Accounts.change_admin_password("admin", "firstsecret1")
-
-      assert {:error, :invalid_current_password} =
-               Accounts.change_admin_password("admin", "secondsecret2")
-
-      assert {:ok, _} = Accounts.change_admin_password("firstsecret1", "secondsecret2")
-      assert Accounts.verify_admin_password("secondsecret2")
-    end
-
-    test "updates the existing credential row rather than inserting a second" do
-      {:ok, first} = Accounts.change_admin_password("admin", "firstsecret1")
-      {:ok, second} = Accounts.change_admin_password("firstsecret1", "secondsecret2")
-      assert first.id == second.id
-    end
-  end
-
-  describe "admin_password_customized?/0" do
-    test "returns false before any password change" do
-      refute Accounts.admin_password_customized?()
-    end
-
-    test "returns true after a password change" do
-      {:ok, _} = Accounts.change_admin_password("admin", "newsecret99")
-      assert Accounts.admin_password_customized?()
     end
   end
 
