@@ -106,13 +106,17 @@ priv/repo/migrations/                  # Ecto migrations
 
 | Path | Access | Purpose |
 |---|---|---|
-| `/login`, `/auth/verify`, `/auth/set-password` | public | Password + magic-link login |
-| `/admin/login` | public | Admin login |
+| `/login`, `/auth/verify`, `/auth/set-password` | public | Password + magic-link login (all roles) |
 | `/` | authenticated | Gantt rotation grid |
 | `/residents/:id` | authenticated | Per-resident year view |
 | `/calendar`, `/compare` | authenticated | Monthly calendar, comparison |
 | `/residents/:id/calendar.ics`, `/feed/:token/calendar.ics` | authenticated / tokened | iCal subscription feeds |
-| `/admin`, `/admin/upload`, `/admin/build`, `/admin/edit` | admin | Approvals, CSV import, builder, editor |
+| `/admin`, `/admin/upload`, `/admin/build`, `/admin/edit` | admin role | Approvals, roles, CSV import, builder, editor |
+
+Accounts carry a **role**: `user` (default — any email, needs admin approval;
+can follow a resident's schedule), `resident` (URMC email, auto-approved), or
+`admin` (granted from the admin page, or bootstrapped with
+`bin/residency_schedule eval 'ResidencySchedule.Release.promote_admin("email")'`).
 
 > **Convention:** every public function carries a doctest, and every branch is
 > covered by an ExUnit test. See [`CLAUDE.md`](CLAUDE.md) for the full code-style

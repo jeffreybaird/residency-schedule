@@ -37,6 +37,16 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       assert html =~ "Set as Home"
     end
 
+    test "nav labels the home link My page for a resident", %{
+      conn: conn,
+      user: user,
+      resident: resident
+    } do
+      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(user, resident.id)
+      conn = get(conn, "/residents/#{resident.id}")
+      assert html_response(conn, 200) =~ "My page"
+    end
+
     test "shows Home badge when resident is home resident", %{conn: conn, user: user} do
       resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
 
@@ -210,6 +220,58 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
     end
   end
 
+  describe "resident page for a user-role follower" do
+    setup do
+      {:ok, follower} =
+        ResidencySchedule.Accounts.create_user(%{
+          email: "partner-#{System.unique_integer()}@gmail.com"
+        })
+
+      {:ok, follower} = ResidencySchedule.Accounts.approve_user(follower)
+      conn = Plug.Test.init_test_session(build_conn(), user_id: follower.id)
+
+      %{schedule_id: _sid} = seed_schedule()
+      resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
+      %{conn: conn, resident: resident, follower: follower}
+    end
+
+    test "shows a Follow button instead of Set as Home", %{conn: conn, resident: resident} do
+      {:ok, _view, html} = live(conn, "/residents/#{resident.id}")
+      assert html =~ "Follow"
+      refute html =~ "Set as Home"
+    end
+
+    test "renders the tour anchor and user role for the guided tour", %{
+      conn: conn,
+      resident: resident
+    } do
+      {:ok, _view, html} = live(conn, "/residents/#{resident.id}")
+      assert html =~ ~s(id="tour-follow-home")
+      assert html =~ ~s(data-tour-role="user")
+    end
+
+    test "shows a Following badge once followed", %{
+      conn: conn,
+      resident: resident,
+      follower: follower
+    } do
+      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(follower, resident.id)
+      {:ok, _view, html} = live(conn, "/residents/#{resident.id}")
+      assert html =~ "✓ Following"
+    end
+
+    test "nav labels the followed resident link Following", %{
+      conn: conn,
+      resident: resident,
+      follower: follower
+    } do
+      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(follower, resident.id)
+      conn = get(conn, "/residents/#{resident.id}")
+      assert html_response(conn, 200) =~ "Following"
+      refute html_response(conn, 200) =~ "My page"
+    end
+  end
+
   describe "multi-year career" do
     test "renders rotations from every academic year on one continuous page", %{conn: conn} do
       {:ok, s2023} = ResidencySchedule.Schedules.upsert_schedule(2023, "2023–2024")
@@ -233,12 +295,22 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
 
       {:ok, _} =
         Rotations.insert_rotations(sr_2023.id, [
-          %{slot_index: 0, start_date: ~D[2023-07-03], end_date: ~D[2023-07-09], rotation_type: :oncology}
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-03],
+            end_date: ~D[2023-07-09],
+            rotation_type: :oncology
+          }
         ])
 
       {:ok, _} =
         Rotations.insert_rotations(sr_2026.id, [
-          %{slot_index: 0, start_date: ~D[2026-07-06], end_date: ~D[2026-07-12], rotation_type: :rei}
+          %{
+            slot_index: 0,
+            start_date: ~D[2026-07-06],
+            end_date: ~D[2026-07-12],
+            rotation_type: :rei
+          }
         ])
 
       # Open the 2023 record; the page should still show the 2026 rotation,
@@ -268,8 +340,18 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
 
     test "today_anchor_id picks the current or next upcoming entry" do
       entries = [
-        %{rotation_type: "oncology", slot_index: 0, start_date: ~D[2024-07-01], end_date: ~D[2024-07-15]},
-        %{rotation_type: "elective", slot_index: 1, start_date: ~D[2024-08-01], end_date: ~D[2024-08-15]}
+        %{
+          rotation_type: "oncology",
+          slot_index: 0,
+          start_date: ~D[2024-07-01],
+          end_date: ~D[2024-07-15]
+        },
+        %{
+          rotation_type: "elective",
+          slot_index: 1,
+          start_date: ~D[2024-08-01],
+          end_date: ~D[2024-08-15]
+        }
       ]
 
       assert Show.today_anchor_id(entries, ~D[2024-07-20]) ==
@@ -278,7 +360,12 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
 
     test "today_anchor_id falls back to the first entry when today is past everything" do
       entries = [
-        %{rotation_type: "oncology", slot_index: 0, start_date: ~D[2024-07-01], end_date: ~D[2024-07-15]}
+        %{
+          rotation_type: "oncology",
+          slot_index: 0,
+          start_date: ~D[2024-07-01],
+          end_date: ~D[2024-07-15]
+        }
       ]
 
       assert Show.today_anchor_id(entries, ~D[2025-01-01]) ==

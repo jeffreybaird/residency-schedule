@@ -34,6 +34,7 @@ const Hooks = {}
 Hooks.GuidedTour = {
   mounted() {
     this._page = this.el.dataset.tourPage || "schedule"
+    this._role = this.el.dataset.tourRole || "user"
     this._startTour = () => this._run(this._page)
 
     // Check if we're resuming after a page navigation.
@@ -59,7 +60,7 @@ Hooks.GuidedTour = {
   },
 
   _run(page, startAtId) {
-    const tour = buildTour(page, startAtId)
+    const tour = buildTour(page, startAtId, this._role)
     tour.on("complete", () => {
       this.pushEvent("tour_completed", {})
     })

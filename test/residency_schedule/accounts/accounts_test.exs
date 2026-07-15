@@ -7,17 +7,19 @@ defmodule ResidencySchedule.AccountsTest do
   alias ResidencySchedule.Accounts.User
 
   describe "create_user/1" do
-    test "creates an approved user for URMC email and does not notify admin" do
+    test "creates an approved resident for URMC email and does not notify admin" do
       {:ok, user} = Accounts.create_user(%{email: "jane@urmc.rochester.edu"})
       assert user.email == "jane@urmc.rochester.edu"
+      assert user.role == :resident
       assert user.approved == true
 
       refute_email_sent(to: [{nil, "jeffreybaird@hey.com"}])
     end
 
-    test "creates an unapproved user for non-URMC email and notifies admin" do
+    test "creates an unapproved user-role account for non-URMC email and notifies admin" do
       {:ok, user} = Accounts.create_user(%{email: "jane@gmail.com"})
       assert user.email == "jane@gmail.com"
+      assert user.role == :user
       assert user.approved == false
 
       assert_email_sent(
@@ -154,6 +156,14 @@ defmodule ResidencySchedule.AccountsTest do
       {:ok, revoked} = Accounts.revoke_user(user)
       assert revoked.approved == false
     end
+
+    test "revoke_user/1 refuses to revoke an admin" do
+      {:ok, user} = Accounts.create_user(%{email: "boss@gmail.com"})
+      {:ok, admin} = Accounts.set_role(user, :admin)
+
+      assert {:error, :admin_cannot_be_revoked} = Accounts.revoke_user(admin)
+      assert Accounts.get_user!(admin.id).approved == true
+    end
   end
 
   describe "tour" do
@@ -246,6 +256,121 @@ defmodule ResidencySchedule.AccountsTest do
       expire_token(token_string)
 
       assert {:error, :invalid_or_expired} = Accounts.consume_magic_link_token(token_string)
+    end
+  end
+
+  describe "change_password/3" do
+    setup do
+      {:ok, user} = Accounts.create_user(%{email: "pw-change@urmc.rochester.edu"})
+      %{user: user}
+    end
+
+    test "sets a password when none exists, ignoring the current password", %{user: user} do
+      assert {:ok, updated} = Accounts.change_password(user, "", "brandnewpass1")
+      assert {:ok, _} = Accounts.authenticate_by_password(updated.email, "brandnewpass1")
+    end
+
+    test "changes the password when the current one matches", %{user: user} do
+      {:ok, user} = Accounts.set_password(user, "originalpass1")
+
+      assert {:ok, updated} = Accounts.change_password(user, "originalpass1", "brandnewpass1")
+      assert {:ok, _} = Accounts.authenticate_by_password(updated.email, "brandnewpass1")
+    end
+
+    test "rejects a wrong current password", %{user: user} do
+      {:ok, user} = Accounts.set_password(user, "originalpass1")
+
+      assert {:error, :invalid_current_password} =
+               Accounts.change_password(user, "wrongpass", "brandnewpass1")
+
+      assert {:ok, _} = Accounts.authenticate_by_password(user.email, "originalpass1")
+    end
+
+    test "rejects a new password shorter than 8 characters", %{user: user} do
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Accounts.change_password(user, "", "short")
+
+      assert errors_on(changeset)[:password] != nil
+    end
+
+    test "rejects an empty new password", %{user: user} do
+      assert {:error, %Ecto.Changeset{} = changeset} = Accounts.change_password(user, "", "")
+      assert errors_on(changeset)[:password] != nil
+    end
+  end
+
+  describe "set_role/2" do
+    test "promotes an unapproved user to admin and approves them" do
+      {:ok, user} = Accounts.create_user(%{email: "partner@gmail.com"})
+      refute user.approved
+
+      assert {:ok, admin} = Accounts.set_role(user, :admin)
+      assert admin.role == :admin
+      assert admin.approved == true
+    end
+
+    test "demotes a resident to the user role" do
+      {:ok, resident} = Accounts.create_user(%{email: "jane@urmc.rochester.edu"})
+      assert {:ok, user} = Accounts.set_role(resident, :user)
+      assert user.role == :user
+    end
+
+    test "promotes a URMC user back to resident" do
+      {:ok, resident} = Accounts.create_user(%{email: "jane@urmc.rochester.edu"})
+      {:ok, demoted} = Accounts.set_role(resident, :user)
+
+      assert {:ok, promoted} = Accounts.set_role(demoted, :resident)
+      assert promoted.role == :resident
+    end
+
+    test "rejects the resident role for a non-URMC email" do
+      {:ok, user} = Accounts.create_user(%{email: "partner@gmail.com"})
+
+      assert {:error, %Ecto.Changeset{} = changeset} = Accounts.set_role(user, :resident)
+      assert errors_on(changeset)[:role] != nil
+    end
+
+    test "refuses to demote the last admin" do
+      {:ok, user} = Accounts.create_user(%{email: "onlyadmin@gmail.com"})
+      {:ok, admin} = Accounts.set_role(user, :admin)
+
+      assert {:error, :last_admin} = Accounts.set_role(admin, :user)
+    end
+
+    test "allows demoting an admin when another admin remains" do
+      {:ok, first} = Accounts.create_user(%{email: "first-admin@gmail.com"})
+      {:ok, second} = Accounts.create_user(%{email: "second-admin@gmail.com"})
+      {:ok, first_admin} = Accounts.set_role(first, :admin)
+      {:ok, _second_admin} = Accounts.set_role(second, :admin)
+
+      assert {:ok, demoted} = Accounts.set_role(first_admin, :user)
+      assert demoted.role == :user
+    end
+
+    test "keeping the last admin as admin is allowed" do
+      {:ok, user} = Accounts.create_user(%{email: "onlyadmin@gmail.com"})
+      {:ok, admin} = Accounts.set_role(user, :admin)
+
+      assert {:ok, still_admin} = Accounts.set_role(admin, :admin)
+      assert still_admin.role == :admin
+    end
+  end
+
+  describe "list_admins/0" do
+    test "returns only admins ordered by email" do
+      {:ok, resident} = Accounts.create_user(%{email: "resident@urmc.rochester.edu"})
+      {:ok, b_user} = Accounts.create_user(%{email: "b-admin@gmail.com"})
+      {:ok, a_user} = Accounts.create_user(%{email: "a-admin@gmail.com"})
+      {:ok, _} = Accounts.set_role(b_user, :admin)
+      {:ok, _} = Accounts.set_role(a_user, :admin)
+
+      admins = Accounts.list_admins()
+      assert Enum.map(admins, & &1.email) == ["a-admin@gmail.com", "b-admin@gmail.com"]
+      refute resident.id in Enum.map(admins, & &1.id)
+    end
+
+    test "returns an empty list when there are no admins" do
+      assert Accounts.list_admins() == []
     end
   end
 

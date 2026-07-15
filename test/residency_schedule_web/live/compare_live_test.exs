@@ -29,6 +29,10 @@ defmodule ResidencyScheduleWeb.CompareLiveTest do
       assert html =~ "Compare"
     end
 
+    test "passes the resident role to the guided tour", %{html: html} do
+      assert html =~ ~s(data-tour-role="resident")
+    end
+
     test "renders resident A and resident B dropdowns", %{html: html} do
       assert html =~ "Resident A"
       assert html =~ "Resident B"
