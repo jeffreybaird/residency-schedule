@@ -187,14 +187,20 @@ defmodule ResidencySchedule.Accounts do
   Exempt from doctest — hits the database.
   """
   def set_role(user, role) do
-    if demoting_last_admin?(user, role) do
-      {:error, :last_admin}
-    else
-      user
-      |> User.role_changeset(%{role: role})
-      |> approve_on_admin_promotion(role)
-      |> Repo.update()
-    end
+    Repo.transaction(fn ->
+      if demoting_last_admin?(user, role) do
+        Repo.rollback(:last_admin)
+      else
+        user
+        |> User.role_changeset(%{role: role})
+        |> approve_on_admin_promotion(role)
+        |> Repo.update()
+        |> case do
+          {:ok, updated} -> updated
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end
+    end)
   end
 
   @doc """
@@ -208,12 +214,18 @@ defmodule ResidencySchedule.Accounts do
   end
 
   defp demoting_last_admin?(user, role) do
-    user.role == :admin and role != :admin and count_admins() == 1
+    user.role == :admin and role != :admin and count_locked_admins() == 1
   end
 
-  defp count_admins do
-    from(u in User, where: u.role == :admin)
-    |> Repo.aggregate(:count)
+  # Locks the admin rows FOR UPDATE so concurrent demotions serialize: a second
+  # demotion blocks here until the first commits, then re-reads the reduced set
+  # and correctly sees itself as the last admin. Must run inside a transaction
+  # (set_role wraps it) for the lock to be held until commit. Aggregates can't
+  # carry FOR UPDATE in Postgres, so we lock the rows and count them in Elixir.
+  defp count_locked_admins do
+    from(u in User, where: u.role == :admin, lock: "FOR UPDATE")
+    |> Repo.all()
+    |> length()
   end
 
   defp approve_on_admin_promotion(changeset, :admin) do

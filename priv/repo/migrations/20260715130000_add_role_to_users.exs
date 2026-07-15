@@ -13,15 +13,23 @@ defmodule ResidencySchedule.Repo.Migrations.AddRoleToUsers do
     # Backfill existing accounts: the three operator addresses (previously a
     # hardcoded auto-approve whitelist) become admins, URMC emails become
     # residents, and everything else keeps the default user role.
-    execute(
-      """
-      UPDATE users SET role = CASE
-        WHEN email IN (#{@operator_emails}) THEN 'admin'
-        WHEN email LIKE '%@urmc.rochester.edu' THEN 'resident'
-        ELSE 'user'
-      END
-      """,
-      "UPDATE users SET role = 'user'"
-    )
+    execute(backfill_up_sql(), backfill_down_sql())
   end
+
+  @doc """
+  The backfill classification, exposed so its behavior can be tested directly
+  against the real SQL rather than a copy. `email` is a citext column, so both
+  the `IN` list and `LIKE` are case-insensitive.
+  """
+  def backfill_up_sql do
+    """
+    UPDATE users SET role = CASE
+      WHEN email IN (#{@operator_emails}) THEN 'admin'
+      WHEN email LIKE '%@urmc.rochester.edu' THEN 'resident'
+      ELSE 'user'
+    END
+    """
+  end
+
+  def backfill_down_sql, do: "UPDATE users SET role = 'user'"
 end
