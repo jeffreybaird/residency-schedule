@@ -5,6 +5,7 @@ defmodule ResidencySchedule.Accounts.User do
   schema "users" do
     field :email, :string
     field :password_hash, :string
+    field :role, Ecto.Enum, values: [:user, :resident, :admin], default: :user
     field :approved, :boolean, default: false
     field :tour_completed, :boolean, default: false
 
@@ -13,21 +14,17 @@ defmodule ResidencySchedule.Accounts.User do
     timestamps(type: :utc_datetime)
   end
 
-  @whitelisted_emails [
-    "brendablennon@gmail.com",
-    "clarelennonbaird@gmail.com",
-    "jlbaird87@gmail.com"
-  ]
-
   @doc """
-  Changeset for creating a user via magic link signup.
+  Changeset for creating a user via magic link signup. URMC emails register
+  as auto-approved residents; every other email registers with the default
+  user role, pending admin approval.
 
       iex> cs = ResidencySchedule.Accounts.User.registration_changeset(
       ...>   %ResidencySchedule.Accounts.User{},
       ...>   %{email: "test@urmc.rochester.edu"}
       ...> )
-      iex> cs.valid?
-      true
+      iex> {cs.valid?, Ecto.Changeset.get_field(cs, :role)}
+      {true, :resident}
   """
   def registration_changeset(user, attrs) do
     user
@@ -35,8 +32,38 @@ defmodule ResidencySchedule.Accounts.User do
     |> validate_required([:email])
     |> validate_format(:email, ~r/^[^\s]+@[^\s]+\.[^\s]+$/, message: "must be a valid email")
     |> unique_constraint(:email)
-    |> maybe_auto_approve()
+    |> assign_role_from_email()
   end
+
+  @doc """
+  Changeset for changing a user's role. The resident role requires a URMC
+  email address.
+
+      iex> cs = ResidencySchedule.Accounts.User.role_changeset(
+      ...>   %ResidencySchedule.Accounts.User{email: "partner@gmail.com", role: :user},
+      ...>   %{role: :admin}
+      ...> )
+      iex> cs.valid?
+      true
+  """
+  def role_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:role])
+    |> validate_required([:role])
+    |> validate_resident_has_urmc_email()
+  end
+
+  @doc """
+  Returns true when the user has the admin role.
+
+      iex> ResidencySchedule.Accounts.User.admin?(%ResidencySchedule.Accounts.User{role: :admin})
+      true
+
+      iex> ResidencySchedule.Accounts.User.admin?(%ResidencySchedule.Accounts.User{role: :resident})
+      false
+  """
+  def admin?(%__MODULE__{role: :admin}), do: true
+  def admin?(_user), do: false
 
   @doc """
   Changeset for setting or updating a password.
@@ -130,19 +157,29 @@ defmodule ResidencySchedule.Accounts.User do
     Bcrypt.verify_pass(password, hash)
   end
 
-  defp maybe_auto_approve(changeset) do
+  defp assign_role_from_email(changeset) do
     case get_change(changeset, :email) do
       nil ->
         changeset
 
       email ->
-        if whitelisted_email?(email), do: put_change(changeset, :approved, true), else: changeset
+        if urmc_email?(email) do
+          changeset
+          |> put_change(:role, :resident)
+          |> put_change(:approved, true)
+        else
+          changeset
+        end
     end
   end
 
-  defp whitelisted_email?(email) do
-    @whitelisted_emails
-    |> Enum.member?(String.downcase(email)) || urmc_email?(email)
+  defp validate_resident_has_urmc_email(changeset) do
+    if get_change(changeset, :role) == :resident and
+         not urmc_email?(get_field(changeset, :email) || "") do
+      add_error(changeset, :role, "resident role requires a URMC email address")
+    else
+      changeset
+    end
   end
 
   defp put_password_hash(changeset, %{password: password}) when byte_size(password) > 0 do
