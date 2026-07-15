@@ -23,12 +23,22 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
       {:ok, _view, html} = live(conn, "/schedule")
       assert html =~ "No schedule uploaded yet"
     end
+
+    test "passes the admin role to the guided tour", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/schedule")
+      assert html =~ ~s(data-tour-role="admin")
+    end
   end
 
   describe "empty state" do
     test "shows upload prompt when no schedule exists", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/schedule")
       assert html =~ "No schedule uploaded yet"
+    end
+
+    test "passes the resident role to the guided tour", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/schedule")
+      assert html =~ ~s(data-tour-role="resident")
     end
   end
 

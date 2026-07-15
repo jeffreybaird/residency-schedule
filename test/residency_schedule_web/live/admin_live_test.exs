@@ -232,6 +232,21 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
       assert ResidencySchedule.Accounts.get_user!(second_admin.id).role == :user
     end
 
+    test "shows an error for an unrecognized role value", %{conn: conn} do
+      {:ok, member} =
+        ResidencySchedule.Accounts.create_user(%{email: "member@urmc.rochester.edu"})
+
+      {:ok, view, _html} = live(conn, "/admin")
+
+      html =
+        view
+        |> form("#role-form-#{member.id}")
+        |> render_change(%{"role" => "superuser"})
+
+      assert html =~ "Unknown role."
+      assert ResidencySchedule.Accounts.get_user!(member.id).role == :resident
+    end
+
     test "revoking an admin shows an error instead of locking them out", %{
       conn: conn,
       admin: admin
