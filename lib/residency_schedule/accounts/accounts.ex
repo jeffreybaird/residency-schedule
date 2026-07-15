@@ -153,6 +153,54 @@ defmodule ResidencySchedule.Accounts do
     |> Repo.update()
   end
 
+  # ── Roles ──────────────────────────────────────────────────────────────────
+
+  @doc """
+  Changes a user's role. Promoting to admin also approves the user so the
+  account can log in immediately.
+
+  Returns `{:ok, user}`, `{:error, :last_admin}` when demoting the only
+  remaining admin, or `{:error, changeset}` when the role change is invalid
+  (e.g. the resident role without a URMC email).
+
+  Exempt from doctest — hits the database.
+  """
+  def set_role(user, role) do
+    if demoting_last_admin?(user, role) do
+      {:error, :last_admin}
+    else
+      user
+      |> User.role_changeset(%{role: role})
+      |> approve_on_admin_promotion(role)
+      |> Repo.update()
+    end
+  end
+
+  @doc """
+  Lists all admins ordered by email.
+
+  Exempt from doctest — hits the database.
+  """
+  def list_admins do
+    from(u in User, where: u.role == :admin, order_by: [asc: u.email])
+    |> Repo.all()
+  end
+
+  defp demoting_last_admin?(user, role) do
+    user.role == :admin and role != :admin and count_admins() == 1
+  end
+
+  defp count_admins do
+    from(u in User, where: u.role == :admin)
+    |> Repo.aggregate(:count)
+  end
+
+  defp approve_on_admin_promotion(changeset, :admin) do
+    Ecto.Changeset.put_change(changeset, :approved, true)
+  end
+
+  defp approve_on_admin_promotion(changeset, _role), do: changeset
+
   # ── Approval ───────────────────────────────────────────────────────────────
 
   @doc """
