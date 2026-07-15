@@ -251,6 +251,46 @@ defmodule ResidencySchedule.AccountsTest do
     end
   end
 
+  describe "change_password/3" do
+    setup do
+      {:ok, user} = Accounts.create_user(%{email: "pw-change@urmc.rochester.edu"})
+      %{user: user}
+    end
+
+    test "sets a password when none exists, ignoring the current password", %{user: user} do
+      assert {:ok, updated} = Accounts.change_password(user, "", "brandnewpass1")
+      assert {:ok, _} = Accounts.authenticate_by_password(updated.email, "brandnewpass1")
+    end
+
+    test "changes the password when the current one matches", %{user: user} do
+      {:ok, user} = Accounts.set_password(user, "originalpass1")
+
+      assert {:ok, updated} = Accounts.change_password(user, "originalpass1", "brandnewpass1")
+      assert {:ok, _} = Accounts.authenticate_by_password(updated.email, "brandnewpass1")
+    end
+
+    test "rejects a wrong current password", %{user: user} do
+      {:ok, user} = Accounts.set_password(user, "originalpass1")
+
+      assert {:error, :invalid_current_password} =
+               Accounts.change_password(user, "wrongpass", "brandnewpass1")
+
+      assert {:ok, _} = Accounts.authenticate_by_password(user.email, "originalpass1")
+    end
+
+    test "rejects a new password shorter than 8 characters", %{user: user} do
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Accounts.change_password(user, "", "short")
+
+      assert errors_on(changeset)[:password] != nil
+    end
+
+    test "rejects an empty new password", %{user: user} do
+      assert {:error, %Ecto.Changeset{} = changeset} = Accounts.change_password(user, "", "")
+      assert errors_on(changeset)[:password] != nil
+    end
+  end
+
   describe "set_role/2" do
     test "promotes an unapproved user to admin and approves them" do
       {:ok, user} = Accounts.create_user(%{email: "partner@gmail.com"})

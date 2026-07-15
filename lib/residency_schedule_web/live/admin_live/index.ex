@@ -25,7 +25,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
        override_covering_resident_id: nil,
        override_error: nil,
        override_success: nil,
-       admin_password_customized: Accounts.admin_password_customized?(),
+       has_password: Accounts.has_password?(socket.assigns.current_user),
        password_error: nil,
        password_success: nil,
        password_form_version: 0
@@ -158,14 +158,15 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
   end
 
   @impl true
-  def handle_event("change_admin_password", params, socket) do
-    case change_admin_password_from_form(params) do
-      {:ok, _credential} ->
+  def handle_event("change_password", params, socket) do
+    case change_password_from_form(params, socket.assigns.current_user) do
+      {:ok, updated_user} ->
         {:noreply,
          assign(socket,
-           admin_password_customized: true,
+           current_user: updated_user,
+           has_password: true,
            password_error: nil,
-           password_success: "Admin password updated.",
+           password_success: "Your password has been updated.",
            password_form_version: socket.assigns.password_form_version + 1
          )}
 
@@ -174,14 +175,16 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
     end
   end
 
-  defp change_admin_password_from_form(%{
-         "current_password" => current,
-         "new_password" => new_password,
-         "confirm_password" => confirm
-       }) do
-    with :ok <- validate_password_confirmation(new_password, confirm),
-         {:ok, credential} <- Accounts.change_admin_password(current, new_password) do
-      {:ok, credential}
+  defp change_password_from_form(params, user) do
+    with :ok <-
+           validate_password_confirmation(params["new_password"], params["confirm_password"]),
+         {:ok, updated_user} <-
+           Accounts.change_password(
+             user,
+             params["current_password"] || "",
+             params["new_password"]
+           ) do
+      {:ok, updated_user}
     else
       {:error, :confirmation_mismatch} ->
         {:error, "New passwords do not match."}
@@ -358,44 +361,49 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
           </div>
         </div>
 
-        <%!-- Admin password card --%>
+        <%!-- Account password card --%>
         <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
           <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
             <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
-              Admin Password
+              My Account
             </span>
           </div>
 
           <div class="px-4 py-4 space-y-4">
             <div>
-              <p class="text-sm font-medium text-gray-800 mb-0.5">Change Admin Password</p>
-              <p class="text-xs text-gray-500">
-                Used for admin login and for confirming schedule deletion.
+              <p class="text-sm font-medium text-gray-800 mb-0.5">
+                {if @has_password, do: "Change My Password", else: "Set My Password"}
               </p>
-              <%= unless @admin_password_customized do %>
+              <p class="text-xs text-gray-500">
+                Used to log in as {@current_user.email} and to confirm schedule deletion.
+              </p>
+              <%= unless @has_password do %>
                 <p class="text-xs text-amber-600 mt-1">
-                  The default admin password is still in use — set your own below.
+                  Your account has no password yet — you can only log in via email link
+                  and cannot confirm schedule deletions until you set one.
                 </p>
               <% end %>
             </div>
 
             <form
-              id={"admin-password-form-#{@password_form_version}"}
-              phx-submit="change_admin_password"
+              id={"account-password-form-#{@password_form_version}"}
+              phx-submit="change_password"
               class="space-y-3 max-w-sm"
             >
-              <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">
-                  Current password
-                </label>
-                <input
-                  type="password"
-                  name="current_password"
-                  autocomplete="current-password"
-                  required
-                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
+              <%= if @has_password do %>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">
+                    Current password
+                  </label>
+                  <input
+                    type="password"
+                    name="current_password"
+                    autocomplete="current-password"
+                    required
+                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+              <% end %>
 
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">
@@ -435,7 +443,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                 type="submit"
                 class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Update Password
+                {if @has_password, do: "Update Password", else: "Set Password"}
               </button>
             </form>
           </div>

@@ -233,12 +233,22 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
 
       {:ok, _} =
         Rotations.insert_rotations(sr_2023.id, [
-          %{slot_index: 0, start_date: ~D[2023-07-03], end_date: ~D[2023-07-09], rotation_type: :oncology}
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-03],
+            end_date: ~D[2023-07-09],
+            rotation_type: :oncology
+          }
         ])
 
       {:ok, _} =
         Rotations.insert_rotations(sr_2026.id, [
-          %{slot_index: 0, start_date: ~D[2026-07-06], end_date: ~D[2026-07-12], rotation_type: :rei}
+          %{
+            slot_index: 0,
+            start_date: ~D[2026-07-06],
+            end_date: ~D[2026-07-12],
+            rotation_type: :rei
+          }
         ])
 
       # Open the 2023 record; the page should still show the 2026 rotation,
@@ -268,8 +278,18 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
 
     test "today_anchor_id picks the current or next upcoming entry" do
       entries = [
-        %{rotation_type: "oncology", slot_index: 0, start_date: ~D[2024-07-01], end_date: ~D[2024-07-15]},
-        %{rotation_type: "elective", slot_index: 1, start_date: ~D[2024-08-01], end_date: ~D[2024-08-15]}
+        %{
+          rotation_type: "oncology",
+          slot_index: 0,
+          start_date: ~D[2024-07-01],
+          end_date: ~D[2024-07-15]
+        },
+        %{
+          rotation_type: "elective",
+          slot_index: 1,
+          start_date: ~D[2024-08-01],
+          end_date: ~D[2024-08-15]
+        }
       ]
 
       assert Show.today_anchor_id(entries, ~D[2024-07-20]) ==
@@ -278,7 +298,12 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
 
     test "today_anchor_id falls back to the first entry when today is past everything" do
       entries = [
-        %{rotation_type: "oncology", slot_index: 0, start_date: ~D[2024-07-01], end_date: ~D[2024-07-15]}
+        %{
+          rotation_type: "oncology",
+          slot_index: 0,
+          start_date: ~D[2024-07-01],
+          end_date: ~D[2024-07-15]
+        }
       ]
 
       assert Show.today_anchor_id(entries, ~D[2025-01-01]) ==

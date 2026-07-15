@@ -6,9 +6,9 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
   alias ResidencySchedule.Rotations
 
   @impl true
-  def mount(_params, session, socket) do
+  def mount(_params, _session, socket) do
     schedule = Schedules.latest_schedule()
-    current_user = load_current_user(session)
+    current_user = socket.assigns.current_user
 
     socket =
       if schedule do
@@ -424,11 +424,4 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
 
   defp parse_id(""), do: nil
   defp parse_id(id), do: String.to_integer(id)
-
-  defp load_current_user(session) do
-    case session["user_id"] do
-      nil -> nil
-      user_id -> ResidencySchedule.Accounts.get_user(user_id)
-    end
-  end
 end

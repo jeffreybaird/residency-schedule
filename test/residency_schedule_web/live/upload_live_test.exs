@@ -3,15 +3,15 @@ defmodule ResidencyScheduleWeb.UploadLiveTest do
   import Phoenix.LiveViewTest
 
   describe "unauthenticated access" do
-    test "redirects to /admin/login when no admin session", %{conn: conn} do
+    test "redirects to /login when not logged in", %{conn: conn} do
       conn = get(conn, "/admin/upload")
-      assert redirected_to(conn) == "/admin/login"
+      assert redirected_to(conn) == "/login"
     end
   end
 
   describe "upload page" do
     setup %{conn: conn} do
-      conn = Plug.Test.init_test_session(conn, authenticated: true, admin: true)
+      %{conn: conn} = admin_authenticate_session(%{conn: conn})
       {:ok, view, html} = live(conn, "/admin/upload")
       %{view: view, html: html}
     end

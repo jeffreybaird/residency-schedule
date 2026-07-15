@@ -10,8 +10,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   @non_shift_types ~w[vacation]
 
   @impl true
-  def mount(%{"id" => id}, session, socket) do
-    current_user = load_current_user(session)
+  def mount(%{"id" => id}, _session, socket) do
+    current_user = socket.assigns.current_user
     home_resident_id = current_user && current_user.home_resident_id
     resident = Residents.get_resident!(String.to_integer(id))
     today = ResidencyScheduleWeb.ScheduleLive.Index.current_date()
@@ -538,54 +538,54 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                         phx-value-start-date={Date.to_iso8601(entry.start_date)}
                         phx-value-end-date={Date.to_iso8601(entry.end_date)}
                         class={[
-                        entry_row_class(entry.rotation_type, past),
-                        if(covered, do: "opacity-60", else: ""),
-                        "cursor-pointer"
-                      ]}
-                    >
-                      <td class="px-4 py-2 align-top">
-                        <div class="flex flex-col items-start gap-0.5 text-left">
-                          <span
-                            title={label}
-                            class={[
-                              "inline-flex h-8 w-full max-w-[11rem] shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
-                              color,
-                              if(covered, do: "line-through opacity-70", else: "")
-                            ]}
-                          >
-                            {label}
-                          </span>
-                          <%= if covered do %>
-                            <span class="max-w-full text-xs text-gray-400 italic break-words">
-                              covered by {covered.name}
+                          entry_row_class(entry.rotation_type, past),
+                          if(covered, do: "opacity-60", else: ""),
+                          "cursor-pointer"
+                        ]}
+                      >
+                        <td class="px-4 py-2 align-top">
+                          <div class="flex flex-col items-start gap-0.5 text-left">
+                            <span
+                              title={label}
+                              class={[
+                                "inline-flex h-8 w-full max-w-[11rem] shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
+                                color,
+                                if(covered, do: "line-through opacity-70", else: "")
+                              ]}
+                            >
+                              {label}
                             </span>
-                          <% end %>
-                          <%= if is_coverage do %>
-                            <span class="max-w-full text-xs text-blue-500 italic break-words">
-                              covering {entry.original_resident.name}
-                            </span>
-                          <% end %>
-                        </div>
-                      </td>
-                      <td class={[
-                        "px-4 py-2 text-center",
-                        if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
-                      ]}>
-                        {Calendar.strftime(entry.start_date, "%b %-d, %Y")}
-                      </td>
-                      <td class={[
-                        "px-4 py-2 text-center",
-                        if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
-                      ]}>
-                        {Calendar.strftime(entry.end_date, "%b %-d, %Y")}
-                      </td>
-                      <td class={[
-                        "px-4 py-2 text-right tabular-nums",
-                        if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-500")
-                      ]}>
-                        {Date.diff(entry.end_date, entry.start_date) + 1}
-                      </td>
-                    </tr>
+                            <%= if covered do %>
+                              <span class="max-w-full text-xs text-gray-400 italic break-words">
+                                covered by {covered.name}
+                              </span>
+                            <% end %>
+                            <%= if is_coverage do %>
+                              <span class="max-w-full text-xs text-blue-500 italic break-words">
+                                covering {entry.original_resident.name}
+                              </span>
+                            <% end %>
+                          </div>
+                        </td>
+                        <td class={[
+                          "px-4 py-2 text-center",
+                          if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
+                        ]}>
+                          {Calendar.strftime(entry.start_date, "%b %-d, %Y")}
+                        </td>
+                        <td class={[
+                          "px-4 py-2 text-center",
+                          if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
+                        ]}>
+                          {Calendar.strftime(entry.end_date, "%b %-d, %Y")}
+                        </td>
+                        <td class={[
+                          "px-4 py-2 text-right tabular-nums",
+                          if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-500")
+                        ]}>
+                          {Date.diff(entry.end_date, entry.start_date) + 1}
+                        </td>
+                      </tr>
                     <% end %>
                   <% end %>
                 <% end %>
@@ -788,7 +788,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
   defp year_entries(schedule_resident) do
     rotations = Rotations.list_rotations_for_resident(schedule_resident.id)
-    off_slots = compute_off_slots(rotations, Rotations.list_schedule_slots(schedule_resident.schedule_id))
+
+    off_slots =
+      compute_off_slots(rotations, Rotations.list_schedule_slots(schedule_resident.schedule_id))
 
     entries =
       schedule_resident.id
@@ -1026,12 +1028,5 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       {type, days}
     end)
     |> Enum.sort_by(fn {type, _} -> Enum.find_index(@night_shift_types, &(&1 == type)) end)
-  end
-
-  defp load_current_user(session) do
-    case session["user_id"] do
-      nil -> nil
-      user_id -> ResidencySchedule.Accounts.get_user(user_id)
-    end
   end
 end
