@@ -114,6 +114,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       id="guided-tour"
       phx-hook="GuidedTour"
       data-tour-page="schedule"
+      data-tour-role={to_string(@current_user.role)}
       class="min-h-screen bg-gray-50"
     >
       <%= if @schedules != [] do %>

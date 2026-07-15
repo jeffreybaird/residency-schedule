@@ -241,6 +241,15 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       refute html =~ "Set as Home"
     end
 
+    test "renders the tour anchor and user role for the guided tour", %{
+      conn: conn,
+      resident: resident
+    } do
+      {:ok, _view, html} = live(conn, "/residents/#{resident.id}")
+      assert html =~ ~s(id="tour-follow-home")
+      assert html =~ ~s(data-tour-role="user")
+    end
+
     test "shows a Following badge once followed", %{
       conn: conn,
       resident: resident,
