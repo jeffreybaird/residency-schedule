@@ -4,6 +4,7 @@ defmodule ResidencyScheduleWeb.Router do
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
+    plug ResidencyScheduleWeb.Plugs.TelemetryContext
     plug :fetch_live_flash
     plug :put_root_layout, html: {ResidencyScheduleWeb.Layouts, :root}
     plug :protect_from_forgery
@@ -43,7 +44,10 @@ defmodule ResidencyScheduleWeb.Router do
     pipe_through [:browser, :authenticated]
 
     live_session :authenticated,
-      on_mount: [{ResidencyScheduleWeb.UserAuth, :ensure_authenticated}] do
+      on_mount: [
+        {ResidencyScheduleWeb.TelemetryHooks, :telemetry_context},
+        {ResidencyScheduleWeb.UserAuth, :ensure_authenticated}
+      ] do
       live "/", CalendarLive.Index, :index
       live "/schedule", ScheduleLive.Index, :index
       live "/residents/:id", ResidentLive.Show, :show
@@ -61,7 +65,11 @@ defmodule ResidencyScheduleWeb.Router do
   scope "/admin", ResidencyScheduleWeb do
     pipe_through [:browser, :admin_authenticated]
 
-    live_session :admin, on_mount: [{ResidencyScheduleWeb.UserAuth, :ensure_admin}] do
+    live_session :admin,
+      on_mount: [
+        {ResidencyScheduleWeb.TelemetryHooks, :telemetry_context},
+        {ResidencyScheduleWeb.UserAuth, :ensure_admin}
+      ] do
       live "/", AdminLive.Index, :index
       live "/upload", UploadLive.Index, :index
       live "/build", BuilderLive.Index, :index

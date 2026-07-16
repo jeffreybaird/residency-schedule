@@ -11,7 +11,19 @@ defmodule ResidencySchedule.MixProject do
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      releases: releases()
+    ]
+  end
+
+  # The OTLP exporter must boot before the OpenTelemetry SDK so spans have
+  # somewhere to go, and the SDK is :temporary so a telemetry crash can
+  # never take the app down with it.
+  defp releases do
+    [
+      residency_schedule: [
+        applications: [opentelemetry_exporter: :permanent, opentelemetry: :temporary]
+      ]
     ]
   end
 
@@ -62,6 +74,14 @@ defmodule ResidencySchedule.MixProject do
       {:req, "~> 0.5"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
+      {:opentelemetry_api, "~> 1.4"},
+      {:opentelemetry, "~> 1.5"},
+      {:opentelemetry_exporter, "~> 1.8"},
+      {:opentelemetry_phoenix, "~> 2.0"},
+      {:opentelemetry_bandit, "~> 0.3"},
+      {:opentelemetry_ecto, "~> 1.2"},
+      {:opentelemetry_logger_metadata, "~> 0.1.0"},
+      {:logger_json, "~> 7.0"},
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},

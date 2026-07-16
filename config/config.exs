@@ -53,6 +53,14 @@ config :tailwind,
     cd: Path.expand("..", __DIR__)
   ]
 
+# OpenTelemetry — spans are collected everywhere but exported nowhere by
+# default. config/runtime.exs turns on the OTLP exporter in prod, where a
+# local Grafana Alloy agent forwards traces to Grafana Cloud Tempo.
+config :opentelemetry,
+  span_processor: :batch,
+  traces_exporter: :none,
+  resource: %{service: %{name: "residency_schedule", namespace: "residency"}}
+
 # Configure Elixir's Logger
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",

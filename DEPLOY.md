@@ -293,6 +293,150 @@ The academic year is derived automatically from the dates in the CSV file. You c
 
 ---
 
+## Part 6: Observability (Grafana Cloud via Alloy)
+
+The app is instrumented with OpenTelemetry:
+
+- **Traces** — every HTTP request, LiveView mount/`handle_params`/`handle_event`, and Ecto query becomes a span. Spans carry `session.id` (a UUID minted into the signed session cookie on first visit) and `enduser.id` (the logged-in user's id), so a single Tempo search lists everything one person did, in order.
+- **Logs** — in prod the app logs JSON to journald with top-level `trace`/`span` fields, powering trace ↔ log correlation in Grafana.
+
+The app exports OTLP to a local **Grafana Alloy** agent, which batches, retries, and forwards to Grafana Cloud. The app never talks to Grafana Cloud directly and holds no Grafana credentials. If Alloy is down or absent, exports fail quietly — the app itself is unaffected.
+
+```
+app ──OTLP/gRPC──▶ Alloy (localhost:4317) ──▶ Grafana Cloud Tempo (traces)
+app ──JSON──▶ journald ──▶ Alloy ──▶ Grafana Cloud Loki (logs)
+```
+
+### 6.1 Create a Grafana Cloud stack (one time)
+
+1. Sign up at https://grafana.com (free tier includes Tempo + Loki).
+2. In your stack, note from **Connections → Add new connection → OpenTelemetry (OTLP)**:
+   - the OTLP endpoint (e.g. `https://otlp-gateway-prod-us-east-0.grafana.net/otlp`)
+   - your stack's instance ID and a generated API token
+3. From the **Loki** data source details, note the Loki push URL, username (numeric), and reuse the same token (or generate a Loki-scoped one).
+
+### 6.2 Install Grafana Alloy on the droplet
+
+```bash
+sudo mkdir -p /etc/apt/keyrings/
+wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+sudo apt-get update && sudo apt-get install -y alloy
+```
+
+Add the Grafana Cloud credentials to Alloy's environment file — root-owned, never in the app repo or GitHub Secrets:
+
+```bash
+sudo tee -a /etc/default/alloy > /dev/null << 'EOF'
+GRAFANA_CLOUD_OTLP_ENDPOINT=https://otlp-gateway-<zone>.grafana.net/otlp
+GRAFANA_CLOUD_INSTANCE_ID=<your instance id>
+GRAFANA_CLOUD_API_TOKEN=<your token>
+GRAFANA_CLOUD_LOKI_URL=https://logs-<zone>.grafana.net/loki/api/v1/push
+GRAFANA_CLOUD_LOKI_USER=<numeric loki user>
+EOF
+sudo chmod 600 /etc/default/alloy
+```
+
+### 6.3 Configure Alloy
+
+```bash
+sudo tee /etc/alloy/config.alloy > /dev/null << 'EOF'
+// ── Traces: receive OTLP from the app, forward to Grafana Cloud ──────────
+otelcol.receiver.otlp "app" {
+  grpc {
+    endpoint = "127.0.0.1:4317"
+  }
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    traces = [otelcol.exporter.otlphttp.grafana_cloud.input]
+  }
+}
+
+otelcol.auth.basic "grafana_cloud" {
+  username = sys.env("GRAFANA_CLOUD_INSTANCE_ID")
+  password = sys.env("GRAFANA_CLOUD_API_TOKEN")
+}
+
+otelcol.exporter.otlphttp "grafana_cloud" {
+  client {
+    endpoint = sys.env("GRAFANA_CLOUD_OTLP_ENDPOINT")
+    auth     = otelcol.auth.basic.grafana_cloud.handler
+  }
+}
+
+// ── Logs: scrape the app's journald unit, push to Grafana Cloud Loki ─────
+loki.source.journal "app" {
+  matches       = "_SYSTEMD_UNIT=residency_schedule.service"
+  relabel_rules = loki.relabel.journal.rules
+  forward_to    = [loki.write.grafana_cloud.receiver]
+}
+
+loki.relabel "journal" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+}
+
+loki.write "grafana_cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_LOKI_USER")
+      password = sys.env("GRAFANA_CLOUD_API_TOKEN")
+    }
+  }
+
+  external_labels = {
+    service_name = "residency_schedule",
+  }
+}
+EOF
+
+sudo systemctl enable --now alloy
+sudo systemctl status alloy
+```
+
+### 6.4 Point the app at Alloy
+
+Add to `/home/deploy/residency_schedule/.env`:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production
+```
+
+Then restart: `sudo systemctl restart residency_schedule`.
+
+(The endpoint defaults to `http://localhost:4317` even without the env var; setting it explicitly keeps the wiring visible.)
+
+### 6.5 Verify
+
+1. Load a few pages of the app in a browser.
+2. In Grafana Cloud → **Explore** → the Tempo data source, run a TraceQL search: `{ resource.service.name = "residency_schedule" }`. You should see traces with nested Phoenix → LiveView → Ecto spans.
+3. Follow one person's journey: `{ span.session.id = "<uuid>" }` or `{ span.enduser.id = "<user id>" }`.
+4. In **Explore** → the Loki data source: `{unit="residency_schedule.service"} | json`. Log lines carry `trace`/`span` fields.
+5. In the Tempo data source settings, enable **Trace to logs** (Loki, match on trace ID) so a span click jumps to its log lines, and enable **derived fields** on Loki (regex the `trace_id` from the JSON) for the reverse jump.
+
+### 6.6 Following a user through the app
+
+- **One user's full history:** Tempo search `{ span.enduser.id = "42" }` — ordered traces are their journey; each `handle_event#<name>` span is one click.
+- **One anonymous visit (incl. pre-login):** `{ span.session.id = "<uuid>" }` — the session id is minted before login, so the login flow itself is included; after login the same session also carries `enduser.id`.
+- **Their logs:** Loki `{unit="residency_schedule.service"} | json | metadata_user_id="42"`.
+
+> **Privacy:** spans and logs carry only numeric user ids — never names or emails.
+
+---
+
 ## Maintenance
 
 ### Viewing logs

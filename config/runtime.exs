@@ -35,6 +35,23 @@ if config_env() == :prod do
   config :residency_schedule,
     access_password: System.fetch_env!("ACCESS_PASSWORD")
 
+  # OpenTelemetry — export traces over OTLP/gRPC to the local Grafana Alloy
+  # agent, which batches and forwards them to Grafana Cloud Tempo. The
+  # endpoint is optional with a localhost default so a missing Alloy install
+  # degrades to failed exports, never a failed boot.
+  config :opentelemetry, traces_exporter: :otlp
+
+  config :opentelemetry_exporter,
+    otlp_protocol: :grpc,
+    otlp_endpoint: System.get_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+
+  # Structured JSON logs to stdout → journald → Alloy → Grafana Cloud Loki.
+  # The Basic formatter lifts :otel_trace_id/:otel_span_id metadata (set by
+  # OpentelemetryLoggerMetadata) into top-level trace/span fields, which is
+  # what powers trace ↔ log correlation in Grafana.
+  config :logger, :default_handler,
+    formatter: LoggerJSON.Formatters.Basic.new(metadata: [:request_id, :user_id, :session_id])
+
   # Resend for transactional email (magic links)
   resend_api_key = System.fetch_env!("RESEND_API_KEY")
 

@@ -29,6 +29,15 @@ config :residency_schedule, ResidencySchedule.Mailer, adapter: Swoosh.Adapters.T
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false
 
+# OpenTelemetry in tests: keep the exporter off but use the synchronous
+# simple processor so tests can hot-swap in a pid exporter to capture spans
+# (see ResidencySchedule.OtelHelpers). Restarting the SDK app per test is
+# not an option — tracers are cached in persistent_term and keep pointing
+# at the previous processor pipeline after a restart.
+config :opentelemetry,
+  span_processor: :simple,
+  traces_exporter: :none
+
 # Print only warnings and errors during test
 config :logger, level: :warning
 
