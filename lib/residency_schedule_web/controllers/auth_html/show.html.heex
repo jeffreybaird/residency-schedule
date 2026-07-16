@@ -106,8 +106,7 @@
       <% :confirm_login -> %>
         <div class="text-center space-y-4">
           <p class="text-sm text-gray-700">
-            Click below to finish signing in as
-            <span class="font-medium">{@email}</span>.
+            Click below to finish signing in as <span class="font-medium">{@email}</span>.
           </p>
           <form method="post" action="/auth/verify">
             <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
