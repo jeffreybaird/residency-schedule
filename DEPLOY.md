@@ -315,81 +315,36 @@ app ──JSON──▶ journald ──▶ Alloy ──▶ Grafana Cloud Loki (l
    - your stack's instance ID and a generated API token
 3. From the **Loki** data source details, note the Loki push URL, username (numeric), and reuse the same token (or generate a Loki-scoped one).
 
-### 6.2 One-time server bootstrap (root, via the DigitalOcean web console)
+### 6.2 One-time root bootstrap (from GitHub, no login required)
 
-Everything else in this part runs from GitHub Actions — this is the only
-step that needs root on the droplet, and it can be done from the DigitalOcean
-**web console** (Droplet → Access → Launch Droplet Console), no SSH client
-required. It installs a root-owned provisioning script and a sudoers entry
-that lets the `deploy` user run exactly that script and nothing else.
+The `deploy` user's sudoers is deliberately narrow, so installing Alloy needs
+root once. That step also runs from GitHub Actions — you never log in to the
+droplet:
 
-Paste the following as root. The script body must match
-`deploy/setup_observability.sh` in the repo (canonical copy) — re-run this
-block if that file ever changes:
+1. Add a temporary GitHub Secret **`ROOT_SSH_KEY`** containing the private
+   SSH key you registered for root when creating the droplet (Part 1.1).
+2. Run the workflow in 6.4 with the **bootstrap** checkbox ticked.
+3. Optionally **delete the `ROOT_SSH_KEY` secret** afterwards — day-to-day
+   provisioning never uses it.
 
-```bash
-install -m 0755 /dev/stdin /usr/local/sbin/setup-observability << 'SCRIPT'
-#!/usr/bin/env bash
-set -euo pipefail
+The bootstrap job copies `deploy/setup_observability.sh` from the repo to
+`/usr/local/sbin/setup-observability` (root-owned) and writes
+`/etc/sudoers.d/deploy-observability`, allowing the `deploy` user to run
+exactly that one command. If `deploy/setup_observability.sh` ever changes,
+re-run with the bootstrap checkbox (re-adding `ROOT_SSH_KEY` if you deleted
+it).
 
-STAGING_DIR=/home/deploy/observability
-ENV_SRC="$STAGING_DIR/alloy.env"
-CONFIG_SRC="$STAGING_DIR/config.alloy"
-
-if [[ $EUID -ne 0 ]]; then
-  echo "must run as root (via sudo)" >&2
-  exit 1
-fi
-
-for f in "$ENV_SRC" "$CONFIG_SRC"; do
-  if [[ ! -f "$f" ]]; then
-    echo "missing $f — run the Provision Observability workflow, not this script directly" >&2
-    exit 1
-  fi
-done
-
-# Install Alloy from the Grafana apt repo (idempotent)
-if ! command -v alloy > /dev/null; then
-  mkdir -p /etc/apt/keyrings
-  if [[ ! -f /etc/apt/keyrings/grafana.gpg ]]; then
-    curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
-  fi
-  echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" \
-    > /etc/apt/sources.list.d/grafana.list
-  apt-get update -qq
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq alloy
-fi
-
-# Move staged credentials + config into place, root-owned. The staged
-# credential file is removed so secrets never linger in the deploy home.
-install -o root -g root -m 600 "$ENV_SRC" /etc/default/alloy
-install -o root -g root -m 644 "$CONFIG_SRC" /etc/alloy/config.alloy
-rm -f "$ENV_SRC"
-
-systemctl enable alloy
-systemctl restart alloy
-
-sleep 2
-if ! systemctl is-active --quiet alloy; then
-  echo "alloy failed to start:" >&2
-  journalctl -u alloy -n 20 --no-pager >&2
-  exit 1
-fi
-
-echo "Alloy provisioned and running."
-SCRIPT
-
-cat > /etc/sudoers.d/deploy-observability << 'EOF'
-deploy ALL=(ALL) NOPASSWD: /usr/local/sbin/setup-observability
-EOF
-chmod 440 /etc/sudoers.d/deploy-observability
-visudo -c
-```
-
-> **Why root-owned?** The workflow (holding only the `deploy` SSH key) stages
-> *data* — credentials and the Alloy config — but the *code* that runs as root
-> is fixed at bootstrap time. A compromised deploy key can re-run provisioning
-> but cannot change what provisioning does.
+> **Why root-owned?** The everyday provision job (holding only the `deploy`
+> SSH key) stages *data* — credentials and the Alloy config — but the *code*
+> that runs as root is fixed at bootstrap time. A compromised deploy key can
+> re-run provisioning but cannot change what provisioning does.
+>
+> **Root key in GitHub?** It grants GitHub Actions full droplet access while
+> the secret exists. If you prefer not to store it even briefly, the
+> equivalent bootstrap commands can be pasted into the DigitalOcean web
+> console instead: install the script with
+> `install -m 0755 <file> /usr/local/sbin/setup-observability` and add the
+> sudoers line shown in `.github/workflows/observability.yml`.
 
 ### 6.3 Add the Grafana credentials to GitHub Secrets
 
@@ -408,15 +363,19 @@ secret**. Add the five values from step 6.1:
 
 ### 6.4 Run the Provision Observability workflow
 
-**Actions → Provision Observability → Run workflow.** It stages
-`deploy/alloy/config.alloy` and a credentials file onto the droplet, then
-runs the root-owned script from 6.2, which installs Alloy (first run only),
-moves the files into `/etc/`, and restarts the service.
+**Actions → Provision Observability → Run workflow.** On the very first run,
+tick the **bootstrap** checkbox (with `ROOT_SSH_KEY` set, per 6.2). The
+provision job stages `deploy/alloy/config.alloy` and a credentials file onto
+the droplet, then runs the root-owned script from 6.2, which installs Alloy
+(first run only), moves the files into `/etc/`, and restarts the service.
 
-Re-run the workflow whenever:
+Re-run the workflow (bootstrap unticked) whenever:
 
 - a Grafana credential is rotated (update the GitHub Secret first), or
 - `deploy/alloy/config.alloy` changes.
+
+Re-run **with** the bootstrap checkbox only when
+`deploy/setup_observability.sh` itself changes.
 
 No app-side changes are needed: in prod the app already exports OTLP to
 `http://localhost:4317` by default (`config/runtime.exs`), which is where

@@ -3,17 +3,18 @@
 # move the staged credentials and config into root-owned locations, and
 # (re)start the service.
 #
-# This is the CANONICAL copy of the script that lives root-owned at
-# /usr/local/sbin/setup-observability on the droplet (installed by the
-# one-time bootstrap in DEPLOY.md Part 6). It runs as root via a sudoers
-# entry scoped to that path, and is invoked by the "Provision
-# Observability" GitHub Actions workflow after it stages:
+# Lives root-owned at /usr/local/sbin/setup-observability on the droplet,
+# installed by the bootstrap job of the "Provision Observability" GitHub
+# Actions workflow (which uses the ROOT_SSH_KEY secret). It runs as root
+# via a sudoers entry scoped to that path, invoked by the same workflow's
+# provision job after it stages:
 #
 #   /home/deploy/observability/alloy.env    — credentials, from GH Secrets
 #   /home/deploy/observability/config.alloy — copy of deploy/alloy/config.alloy
 #
-# If this file changes, re-run the DEPLOY.md bootstrap to refresh the
-# root-owned copy — the workflow deliberately cannot modify it.
+# If this file changes, re-run the workflow with the bootstrap checkbox to
+# refresh the root-owned copy — the deploy identity deliberately cannot
+# modify it.
 set -euo pipefail
 
 STAGING_DIR=/home/deploy/observability

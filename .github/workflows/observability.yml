@@ -1,21 +1,70 @@
 name: Provision Observability
 
-# Installs/updates Grafana Alloy on the droplet without an SSH session:
-# stages the Alloy config (from the repo) and credentials (from GitHub
-# Actions Secrets) into /home/deploy/observability, then runs the
-# root-owned provisioning script via its dedicated sudoers entry.
+# Installs/updates Grafana Alloy on the droplet without ever logging in:
 #
-# Run it from the Actions tab: after first setting up Grafana Cloud
-# secrets, again whenever a secret is rotated, and after changing
-# deploy/alloy/config.alloy. One-time server bootstrap (root-owned script
-# + sudoers entry) is documented in DEPLOY.md Part 6.
+#   bootstrap job (opt-in checkbox, requires ROOT_SSH_KEY secret) — installs
+#   deploy/setup_observability.sh root-owned at /usr/local/sbin/ and adds a
+#   sudoers entry so the deploy user may run exactly that command. Run it
+#   once, and again only if deploy/setup_observability.sh changes. The
+#   ROOT_SSH_KEY secret can be deleted between bootstrap runs.
+#
+#   provision job — stages the Alloy config (from the repo) and credentials
+#   (from GitHub Actions Secrets) into /home/deploy/observability using the
+#   regular deploy identity, then runs the root-owned script via sudo.
+#   Re-run whenever a Grafana secret is rotated or
+#   deploy/alloy/config.alloy changes.
 
 on:
   workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: "Also run the one-time root bootstrap (requires ROOT_SSH_KEY secret)"
+        type: boolean
+        default: false
 
 jobs:
+  bootstrap:
+    name: Bootstrap root provisioning script
+    if: ${{ inputs.bootstrap }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload provisioning script
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.ROOT_SSH_KEY }}
+          source: "deploy/setup_observability.sh"
+          target: "/root/observability-bootstrap"
+          strip_components: 1
+
+      - name: Install script root-owned and add scoped sudoers entry
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.ROOT_SSH_KEY }}
+          script: |
+            set -e
+            install -o root -g root -m 0755 \
+              /root/observability-bootstrap/setup_observability.sh \
+              /usr/local/sbin/setup-observability
+            rm -rf /root/observability-bootstrap
+
+            echo "deploy ALL=(ALL) NOPASSWD: /usr/local/sbin/setup-observability" \
+              > /etc/sudoers.d/deploy-observability
+            chmod 440 /etc/sudoers.d/deploy-observability
+            visudo -c
+
   provision:
     name: Provision Grafana Alloy
+    needs: bootstrap
+    # Run whether or not the bootstrap job was requested, but never after a
+    # failed bootstrap.
+    if: ${{ always() && (needs.bootstrap.result == 'success' || needs.bootstrap.result == 'skipped') }}
     runs-on: ubuntu-latest
 
     steps:
