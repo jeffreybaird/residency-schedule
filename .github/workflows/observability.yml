@@ -1,0 +1,65 @@
+name: Provision Observability
+
+# Installs/updates Grafana Alloy on the droplet without an SSH session:
+# stages the Alloy config (from the repo) and credentials (from GitHub
+# Actions Secrets) into /home/deploy/observability, then runs the
+# root-owned provisioning script via its dedicated sudoers entry.
+#
+# Run it from the Actions tab: after first setting up Grafana Cloud
+# secrets, again whenever a secret is rotated, and after changing
+# deploy/alloy/config.alloy. One-time server bootstrap (root-owned script
+# + sudoers entry) is documented in DEPLOY.md Part 6.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  provision:
+    name: Provision Grafana Alloy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage Alloy config on droplet
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "deploy/alloy/config.alloy"
+          target: "/home/deploy/observability"
+          strip_components: 2
+
+      - name: Stage credentials and run provisioning script
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GRAFANA_CLOUD_OTLP_ENDPOINT: ${{ secrets.GRAFANA_CLOUD_OTLP_ENDPOINT }}
+          GRAFANA_CLOUD_INSTANCE_ID: ${{ secrets.GRAFANA_CLOUD_INSTANCE_ID }}
+          GRAFANA_CLOUD_API_TOKEN: ${{ secrets.GRAFANA_CLOUD_API_TOKEN }}
+          GRAFANA_CLOUD_LOKI_URL: ${{ secrets.GRAFANA_CLOUD_LOKI_URL }}
+          GRAFANA_CLOUD_LOKI_USER: ${{ secrets.GRAFANA_CLOUD_LOKI_USER }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: GRAFANA_CLOUD_OTLP_ENDPOINT,GRAFANA_CLOUD_INSTANCE_ID,GRAFANA_CLOUD_API_TOKEN,GRAFANA_CLOUD_LOKI_URL,GRAFANA_CLOUD_LOKI_USER
+          script: |
+            set -e
+            umask 077
+            mkdir -p /home/deploy/observability
+
+            # The alloy package's systemd unit reads this file; CONFIG_FILE
+            # and CUSTOM_ARGS must be present or the service won't start.
+            cat > /home/deploy/observability/alloy.env << EOF
+            CONFIG_FILE="/etc/alloy/config.alloy"
+            CUSTOM_ARGS=""
+            RESTART_ON_UPGRADE=true
+            GRAFANA_CLOUD_OTLP_ENDPOINT=${GRAFANA_CLOUD_OTLP_ENDPOINT}
+            GRAFANA_CLOUD_INSTANCE_ID=${GRAFANA_CLOUD_INSTANCE_ID}
+            GRAFANA_CLOUD_API_TOKEN=${GRAFANA_CLOUD_API_TOKEN}
+            GRAFANA_CLOUD_LOKI_URL=${GRAFANA_CLOUD_LOKI_URL}
+            GRAFANA_CLOUD_LOKI_USER=${GRAFANA_CLOUD_LOKI_USER}
+            EOF
+
+            sudo /usr/local/sbin/setup-observability

@@ -1,0 +1,67 @@
+// Grafana Alloy configuration for the residency_schedule droplet.
+//
+// Deployed to /etc/alloy/config.alloy by the "Provision Observability"
+// GitHub Actions workflow (.github/workflows/observability.yml), which
+// stages this file and runs deploy/setup_observability.sh as root.
+// Credentials come from /etc/default/alloy (root-owned, chmod 600),
+// written by the same workflow from GitHub Actions Secrets.
+
+// ── Traces: receive OTLP from the app, forward to Grafana Cloud ──────────
+otelcol.receiver.otlp "app" {
+  grpc {
+    endpoint = "127.0.0.1:4317"
+  }
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    traces = [otelcol.exporter.otlphttp.grafana_cloud.input]
+  }
+}
+
+otelcol.auth.basic "grafana_cloud" {
+  username = sys.env("GRAFANA_CLOUD_INSTANCE_ID")
+  password = sys.env("GRAFANA_CLOUD_API_TOKEN")
+}
+
+otelcol.exporter.otlphttp "grafana_cloud" {
+  client {
+    endpoint = sys.env("GRAFANA_CLOUD_OTLP_ENDPOINT")
+    auth     = otelcol.auth.basic.grafana_cloud.handler
+  }
+}
+
+// ── Logs: scrape the app's journald unit, push to Grafana Cloud Loki ─────
+loki.source.journal "app" {
+  matches       = "_SYSTEMD_UNIT=residency_schedule.service"
+  relabel_rules = loki.relabel.journal.rules
+  forward_to    = [loki.write.grafana_cloud.receiver]
+}
+
+loki.relabel "journal" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+}
+
+loki.write "grafana_cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_LOKI_USER")
+      password = sys.env("GRAFANA_CLOUD_API_TOKEN")
+    }
+  }
+
+  external_labels = {
+    service_name = "residency_schedule",
+  }
+}

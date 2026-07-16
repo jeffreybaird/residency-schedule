@@ -315,109 +315,113 @@ app ──JSON──▶ journald ──▶ Alloy ──▶ Grafana Cloud Loki (l
    - your stack's instance ID and a generated API token
 3. From the **Loki** data source details, note the Loki push URL, username (numeric), and reuse the same token (or generate a Loki-scoped one).
 
-### 6.2 Install Grafana Alloy on the droplet
+### 6.2 One-time server bootstrap (root, via the DigitalOcean web console)
+
+Everything else in this part runs from GitHub Actions — this is the only
+step that needs root on the droplet, and it can be done from the DigitalOcean
+**web console** (Droplet → Access → Launch Droplet Console), no SSH client
+required. It installs a root-owned provisioning script and a sudoers entry
+that lets the `deploy` user run exactly that script and nothing else.
+
+Paste the following as root. The script body must match
+`deploy/setup_observability.sh` in the repo (canonical copy) — re-run this
+block if that file ever changes:
 
 ```bash
-sudo mkdir -p /etc/apt/keyrings/
-wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
-echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
-sudo apt-get update && sudo apt-get install -y alloy
-```
+install -m 0755 /dev/stdin /usr/local/sbin/setup-observability << 'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
 
-Add the Grafana Cloud credentials to Alloy's environment file — root-owned, never in the app repo or GitHub Secrets:
+STAGING_DIR=/home/deploy/observability
+ENV_SRC="$STAGING_DIR/alloy.env"
+CONFIG_SRC="$STAGING_DIR/config.alloy"
 
-```bash
-sudo tee -a /etc/default/alloy > /dev/null << 'EOF'
-GRAFANA_CLOUD_OTLP_ENDPOINT=https://otlp-gateway-<zone>.grafana.net/otlp
-GRAFANA_CLOUD_INSTANCE_ID=<your instance id>
-GRAFANA_CLOUD_API_TOKEN=<your token>
-GRAFANA_CLOUD_LOKI_URL=https://logs-<zone>.grafana.net/loki/api/v1/push
-GRAFANA_CLOUD_LOKI_USER=<numeric loki user>
+if [[ $EUID -ne 0 ]]; then
+  echo "must run as root (via sudo)" >&2
+  exit 1
+fi
+
+for f in "$ENV_SRC" "$CONFIG_SRC"; do
+  if [[ ! -f "$f" ]]; then
+    echo "missing $f — run the Provision Observability workflow, not this script directly" >&2
+    exit 1
+  fi
+done
+
+# Install Alloy from the Grafana apt repo (idempotent)
+if ! command -v alloy > /dev/null; then
+  mkdir -p /etc/apt/keyrings
+  if [[ ! -f /etc/apt/keyrings/grafana.gpg ]]; then
+    curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
+  fi
+  echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" \
+    > /etc/apt/sources.list.d/grafana.list
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq alloy
+fi
+
+# Move staged credentials + config into place, root-owned. The staged
+# credential file is removed so secrets never linger in the deploy home.
+install -o root -g root -m 600 "$ENV_SRC" /etc/default/alloy
+install -o root -g root -m 644 "$CONFIG_SRC" /etc/alloy/config.alloy
+rm -f "$ENV_SRC"
+
+systemctl enable alloy
+systemctl restart alloy
+
+sleep 2
+if ! systemctl is-active --quiet alloy; then
+  echo "alloy failed to start:" >&2
+  journalctl -u alloy -n 20 --no-pager >&2
+  exit 1
+fi
+
+echo "Alloy provisioned and running."
+SCRIPT
+
+cat > /etc/sudoers.d/deploy-observability << 'EOF'
+deploy ALL=(ALL) NOPASSWD: /usr/local/sbin/setup-observability
 EOF
-sudo chmod 600 /etc/default/alloy
+chmod 440 /etc/sudoers.d/deploy-observability
+visudo -c
 ```
 
-### 6.3 Configure Alloy
+> **Why root-owned?** The workflow (holding only the `deploy` SSH key) stages
+> *data* — credentials and the Alloy config — but the *code* that runs as root
+> is fixed at bootstrap time. A compromised deploy key can re-run provisioning
+> but cannot change what provisioning does.
 
-```bash
-sudo tee /etc/alloy/config.alloy > /dev/null << 'EOF'
-// ── Traces: receive OTLP from the app, forward to Grafana Cloud ──────────
-otelcol.receiver.otlp "app" {
-  grpc {
-    endpoint = "127.0.0.1:4317"
-  }
+### 6.3 Add the Grafana credentials to GitHub Secrets
 
-  output {
-    traces = [otelcol.processor.batch.default.input]
-  }
-}
+In the repo: **Settings → Secrets and variables → Actions → New repository
+secret**. Add the five values from step 6.1:
 
-otelcol.processor.batch "default" {
-  output {
-    traces = [otelcol.exporter.otlphttp.grafana_cloud.input]
-  }
-}
+| Secret | Example |
+|---|---|
+| `GRAFANA_CLOUD_OTLP_ENDPOINT` | `https://otlp-gateway-prod-us-east-0.grafana.net/otlp` |
+| `GRAFANA_CLOUD_INSTANCE_ID` | `123456` |
+| `GRAFANA_CLOUD_API_TOKEN` | `glc_...` |
+| `GRAFANA_CLOUD_LOKI_URL` | `https://logs-prod-006.grafana.net/loki/api/v1/push` |
+| `GRAFANA_CLOUD_LOKI_USER` | `654321` |
 
-otelcol.auth.basic "grafana_cloud" {
-  username = sys.env("GRAFANA_CLOUD_INSTANCE_ID")
-  password = sys.env("GRAFANA_CLOUD_API_TOKEN")
-}
+(`DEPLOY_HOST` and `DEPLOY_SSH_KEY` already exist from Part 2.)
 
-otelcol.exporter.otlphttp "grafana_cloud" {
-  client {
-    endpoint = sys.env("GRAFANA_CLOUD_OTLP_ENDPOINT")
-    auth     = otelcol.auth.basic.grafana_cloud.handler
-  }
-}
+### 6.4 Run the Provision Observability workflow
 
-// ── Logs: scrape the app's journald unit, push to Grafana Cloud Loki ─────
-loki.source.journal "app" {
-  matches       = "_SYSTEMD_UNIT=residency_schedule.service"
-  relabel_rules = loki.relabel.journal.rules
-  forward_to    = [loki.write.grafana_cloud.receiver]
-}
+**Actions → Provision Observability → Run workflow.** It stages
+`deploy/alloy/config.alloy` and a credentials file onto the droplet, then
+runs the root-owned script from 6.2, which installs Alloy (first run only),
+moves the files into `/etc/`, and restarts the service.
 
-loki.relabel "journal" {
-  forward_to = []
+Re-run the workflow whenever:
 
-  rule {
-    source_labels = ["__journal__systemd_unit"]
-    target_label  = "unit"
-  }
-}
+- a Grafana credential is rotated (update the GitHub Secret first), or
+- `deploy/alloy/config.alloy` changes.
 
-loki.write "grafana_cloud" {
-  endpoint {
-    url = sys.env("GRAFANA_CLOUD_LOKI_URL")
-
-    basic_auth {
-      username = sys.env("GRAFANA_CLOUD_LOKI_USER")
-      password = sys.env("GRAFANA_CLOUD_API_TOKEN")
-    }
-  }
-
-  external_labels = {
-    service_name = "residency_schedule",
-  }
-}
-EOF
-
-sudo systemctl enable --now alloy
-sudo systemctl status alloy
-```
-
-### 6.4 Point the app at Alloy
-
-Add to `/home/deploy/residency_schedule/.env`:
-
-```bash
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production
-```
-
-Then restart: `sudo systemctl restart residency_schedule`.
-
-(The endpoint defaults to `http://localhost:4317` even without the env var; setting it explicitly keeps the wiring visible.)
+No app-side changes are needed: in prod the app already exports OTLP to
+`http://localhost:4317` by default (`config/runtime.exs`), which is where
+Alloy listens. `OTEL_EXPORTER_OTLP_ENDPOINT` in the app's `.env` is only
+needed to override that default.
 
 ### 6.5 Verify
 
