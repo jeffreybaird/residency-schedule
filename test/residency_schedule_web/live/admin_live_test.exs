@@ -263,6 +263,45 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
     end
   end
 
+  describe "pending user approval" do
+    setup %{conn: conn} do
+      %{conn: conn} = admin_authenticate_session(%{conn: conn})
+      %{conn: conn}
+    end
+
+    test "shows Approve and Deny buttons for a pending user", %{conn: conn} do
+      {:ok, pending} = ResidencySchedule.Accounts.create_user(%{email: "pending@gmail.com"})
+
+      {:ok, view, html} = live(conn, "/admin")
+
+      assert html =~ "Pending Approval"
+      assert html =~ "pending@gmail.com"
+      assert has_element?(view, "button[phx-click='approve_user'][phx-value-id='#{pending.id}']")
+      assert has_element?(view, "button[phx-click='deny_user'][phx-value-id='#{pending.id}']")
+    end
+
+    test "denying a pending user removes them from the pending list but keeps the record", %{
+      conn: conn
+    } do
+      {:ok, pending} = ResidencySchedule.Accounts.create_user(%{email: "pending@gmail.com"})
+
+      {:ok, view, _html} = live(conn, "/admin")
+
+      html =
+        view
+        |> element("button[phx-click='deny_user'][phx-value-id='#{pending.id}']")
+        |> render_click()
+
+      refute html =~ "pending@gmail.com"
+      assert ResidencySchedule.Accounts.get_user!(pending.id).denied == true
+    end
+
+    test "links to the separate denied-users page", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/admin")
+      assert has_element?(view, "a[href='/admin/denied']")
+    end
+  end
+
   describe "account password card without a password set" do
     setup %{conn: conn} do
       %{conn: conn, user: admin} = admin_authenticate_session(%{conn: conn})

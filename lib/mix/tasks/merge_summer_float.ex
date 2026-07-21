@@ -43,8 +43,16 @@ defmodule Mix.Tasks.MergeSummerFloat do
   defp report_conflicts(conflicts) do
     Mix.shell().info("#{length(conflicts)} overlap conflict(s) (summer-float value kept):")
 
-    Enum.each(conflicts, fn %{position_code: code, name: name, date: date, base: base, addon: addon} ->
-      Mix.shell().info("  #{code} #{name} #{Date.to_iso8601(date)}: 2025-2026=#{base} -> float=#{addon}")
+    Enum.each(conflicts, fn %{
+                              position_code: code,
+                              name: name,
+                              date: date,
+                              base: base,
+                              addon: addon
+                            } ->
+      Mix.shell().info(
+        "  #{code} #{name} #{Date.to_iso8601(date)}: 2025-2026=#{base} -> float=#{addon}"
+      )
     end)
   end
 end
