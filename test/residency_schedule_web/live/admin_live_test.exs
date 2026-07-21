@@ -280,7 +280,9 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
       assert has_element?(view, "button[phx-click='deny_user'][phx-value-id='#{pending.id}']")
     end
 
-    test "denying a pending user removes them", %{conn: conn} do
+    test "denying a pending user removes them from the pending list but keeps the record", %{
+      conn: conn
+    } do
       {:ok, pending} = ResidencySchedule.Accounts.create_user(%{email: "pending@gmail.com"})
 
       {:ok, view, _html} = live(conn, "/admin")
@@ -291,7 +293,12 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
         |> render_click()
 
       refute html =~ "pending@gmail.com"
-      assert ResidencySchedule.Accounts.get_user(pending.id) == nil
+      assert ResidencySchedule.Accounts.get_user!(pending.id).denied == true
+    end
+
+    test "links to the separate denied-users page", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/admin")
+      assert has_element?(view, "a[href='/admin/denied']")
     end
   end
 

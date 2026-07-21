@@ -7,6 +7,7 @@ defmodule ResidencySchedule.Accounts.User do
     field :password_hash, :string
     field :role, Ecto.Enum, values: [:user, :resident, :admin], default: :user
     field :approved, :boolean, default: false
+    field :denied, :boolean, default: false
     field :tour_completed, :boolean, default: false
 
     belongs_to :home_resident, ResidencySchedule.Residents.ScheduleResident
@@ -109,6 +110,23 @@ defmodule ResidencySchedule.Accounts.User do
   def approval_changeset(user, attrs) do
     user
     |> cast(attrs, [:approved])
+  end
+
+  @doc """
+  Changeset for denying a pending user or reinstating a denied one. Setting
+  `denied` to true soft-rejects the account; setting it to false returns the
+  account to the pending state so the user can try again.
+
+      iex> cs = ResidencySchedule.Accounts.User.denial_changeset(
+      ...>   %ResidencySchedule.Accounts.User{},
+      ...>   %{denied: true}
+      ...> )
+      iex> {cs.valid?, Ecto.Changeset.get_field(cs, :denied)}
+      {true, true}
+  """
+  def denial_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:denied])
   end
 
   @doc """
