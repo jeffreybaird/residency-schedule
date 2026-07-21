@@ -164,6 +164,31 @@ defmodule ResidencySchedule.AccountsTest do
       assert {:error, :admin_cannot_be_revoked} = Accounts.revoke_user(admin)
       assert Accounts.get_user!(admin.id).approved == true
     end
+
+    test "deny_user/1 deletes a pending user" do
+      {:ok, user} = Accounts.create_user(%{email: "deny@gmail.com"})
+      refute user.approved
+
+      assert {:ok, _deleted} = Accounts.deny_user(user)
+      assert Accounts.get_user(user.id) == nil
+      assert Accounts.list_pending_users() == []
+    end
+
+    test "deny_user/1 frees the email to sign up again" do
+      {:ok, user} = Accounts.create_user(%{email: "reapply@gmail.com"})
+      {:ok, _deleted} = Accounts.deny_user(user)
+
+      assert {:ok, reapplied} = Accounts.create_user(%{email: "reapply@gmail.com"})
+      assert reapplied.id != user.id
+    end
+
+    test "deny_user/1 refuses to deny an already-approved user" do
+      {:ok, user} = Accounts.create_user(%{email: "approved-member@urmc.rochester.edu"})
+      assert user.approved
+
+      assert {:error, :already_approved} = Accounts.deny_user(user)
+      assert Accounts.get_user!(user.id).id == user.id
+    end
   end
 
   describe "tour" do

@@ -147,6 +147,28 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
   end
 
   @impl true
+  def handle_event("deny_user", %{"id" => id}, socket) do
+    user = Accounts.get_user!(String.to_integer(id))
+
+    case Accounts.deny_user(user) do
+      {:ok, _user} ->
+        {:noreply,
+         assign(socket,
+           pending_users: Accounts.list_pending_users(),
+           approved_users: Accounts.list_approved_users(),
+           role_error: nil
+         )}
+
+      {:error, :already_approved} ->
+        {:noreply,
+         assign(socket, role_error: "This user is already approved — revoke them instead.")}
+
+      {:error, _changeset} ->
+        {:noreply, assign(socket, role_error: "Could not deny this user.")}
+    end
+  end
+
+  @impl true
   def handle_event("revoke_user", %{"id" => id}, socket) do
     user = Accounts.get_user!(String.to_integer(id))
 
@@ -372,13 +394,22 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                         {Calendar.strftime(u.inserted_at, "%b %-d, %Y")}
                       </span>
                     </div>
-                    <button
-                      phx-click="approve_user"
-                      phx-value-id={u.id}
-                      class="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 transition-colors"
-                    >
-                      Approve
-                    </button>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button
+                        phx-click="approve_user"
+                        phx-value-id={u.id}
+                        class="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 transition-colors"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        phx-click="deny_user"
+                        phx-value-id={u.id}
+                        class="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
+                      >
+                        Deny
+                      </button>
+                    </div>
                   </li>
                 <% end %>
               </ul>

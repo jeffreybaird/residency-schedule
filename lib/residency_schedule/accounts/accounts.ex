@@ -278,6 +278,20 @@ defmodule ResidencySchedule.Accounts do
   end
 
   @doc """
+  Denies a pending user's approval request by deleting the account, so the
+  same email is free to sign up again later. Only pending (unapproved) users
+  can be denied; approved users must be revoked instead.
+
+  Returns `{:ok, user}`, `{:error, :already_approved}`, or
+  `{:error, changeset}`.
+
+  Exempt from doctest — hits the database.
+  """
+  def deny_user(%User{approved: true}), do: {:error, :already_approved}
+
+  def deny_user(%User{} = user), do: Repo.delete(user)
+
+  @doc """
   Revokes approval from a user. Admins cannot be revoked — demote the admin
   role first — so a revoked account can never be the only working admin.
   Returns `{:ok, user}`, `{:error, :admin_cannot_be_revoked}`, or
