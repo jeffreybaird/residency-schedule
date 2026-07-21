@@ -211,13 +211,18 @@ defmodule ResidencyScheduleWeb.AuthController do
       |> configure_session(renew: true)
       |> put_session(:user_id, user.id)
 
-    if user.approved do
-      # Home is the calendar at "/". When a user has an assigned resident the
-      # calendar opens filtered to them; the resident detail page stays reachable
-      # via the "My page" nav link.
-      redirect(conn, to: "/")
-    else
-      render(conn, :show, step: :pending_approval, email: user.email)
+    cond do
+      user.approved ->
+        # Home is the calendar at "/". When a user has an assigned resident the
+        # calendar opens filtered to them; the resident detail page stays reachable
+        # via the "My page" nav link.
+        redirect(conn, to: "/")
+
+      user.denied ->
+        render(conn, :show, step: :denied, email: user.email)
+
+      true ->
+        render(conn, :show, step: :pending_approval, email: user.email)
     end
   end
 end

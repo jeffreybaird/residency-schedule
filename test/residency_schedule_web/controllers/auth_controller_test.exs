@@ -242,6 +242,19 @@ defmodule ResidencyScheduleWeb.AuthControllerTest do
 
       assert html_response(conn, 200) =~ "pending approval"
     end
+
+    test "denied user sees the denial notice after logging in", %{conn: conn} do
+      {:ok, user} = Accounts.create_user(%{email: "denied@gmail.com"})
+      {:ok, denied} = Accounts.deny_user(user)
+      {:ok, _updated} = Accounts.set_password(denied, "testpassword123")
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(login_user_id: denied.id)
+        |> post("/login/password", %{"password" => "testpassword123"})
+
+      assert html_response(conn, 200) =~ "was not approved"
+    end
   end
 
   # ── Session persistence ──────────────────────────────────────────────────

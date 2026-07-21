@@ -106,8 +106,7 @@
       <% :confirm_login -> %>
         <div class="text-center space-y-4">
           <p class="text-sm text-gray-700">
-            Click below to finish signing in as
-            <span class="font-medium">{@email}</span>.
+            Click below to finish signing in as <span class="font-medium">{@email}</span>.
           </p>
           <form method="post" action="/auth/verify">
             <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
@@ -166,6 +165,22 @@
           </p>
           <p class="text-xs text-gray-400">
             You'll be able to access the schedule once an administrator approves your account.
+          </p>
+        </div>
+        <div class="mt-4 text-center">
+          <a href="/login" class="text-sm text-gray-400 hover:text-gray-600">
+            ← Back to login
+          </a>
+        </div>
+      <% :denied -> %>
+        <div class="text-center space-y-3">
+          <div class="text-4xl">🚫</div>
+          <p class="text-sm text-gray-700">
+            Your access request for <span class="font-medium">{@email}</span> was not approved.
+          </p>
+          <p class="text-xs text-gray-400">
+            If you believe this was a mistake, reply to the email we sent you and an
+            administrator can take another look.
           </p>
         </div>
         <div class="mt-4 text-center">

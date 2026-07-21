@@ -49,7 +49,15 @@ defmodule ResidencySchedule.Importer.ScheduleMerger do
     base_ranges = base_ranges(base_start, base_end)
     addon_by_code = index_by_code(addon)
 
-    case build_rows(base, keep_indices, addon_indices, addon_start, addon_end, addon_events, addon_by_code) do
+    case build_rows(
+           base,
+           keep_indices,
+           addon_indices,
+           addon_start,
+           addon_end,
+           addon_events,
+           addon_by_code
+         ) do
       {:ok, rows} ->
         conflicts = collect_conflicts(base, base_ranges, addon_dates, addon_by_code)
         {:ok, %{csv: Csv.encode(rows), conflicts: conflicts}}
@@ -93,7 +101,14 @@ defmodule ResidencySchedule.Importer.ScheduleMerger do
     base_ranges = base_ranges(base_start, base_end)
     addon_by_code = index_by_code(addon)
 
-    case build_prepended_rows(base, new_indices, addon_start, addon_end, addon_events, addon_by_code) do
+    case build_prepended_rows(
+           base,
+           new_indices,
+           addon_start,
+           addon_end,
+           addon_events,
+           addon_by_code
+         ) do
       {:ok, rows} ->
         conflicts = collect_conflicts(base, base_ranges, overlap, addon_by_code)
         {:ok, %{csv: Csv.encode(rows), conflicts: conflicts}}
@@ -107,11 +122,26 @@ defmodule ResidencySchedule.Importer.ScheduleMerger do
 
   # --- Row assembly ---
 
-  defp build_prepended_rows(base, new_indices, addon_start, addon_end, addon_events, addon_by_code) do
+  defp build_prepended_rows(
+         base,
+         new_indices,
+         addon_start,
+         addon_end,
+         addon_events,
+         addon_by_code
+       ) do
     base
     |> Enum.with_index()
     |> Enum.map(fn {row, index} ->
-      case tail_cells(index, row, new_indices, addon_start, addon_end, addon_events, addon_by_code) do
+      case tail_cells(
+             index,
+             row,
+             new_indices,
+             addon_start,
+             addon_end,
+             addon_events,
+             addon_by_code
+           ) do
         {:error, reason} -> {:error, reason}
         cells -> {:ok, Enum.take(row, 2) ++ cells ++ Enum.drop(row, 2)}
       end
@@ -119,12 +149,22 @@ defmodule ResidencySchedule.Importer.ScheduleMerger do
     |> collect()
   end
 
-  defp build_rows(base, keep_indices, addon_indices, addon_start, addon_end, addon_events, addon_by_code) do
+  defp build_rows(
+         base,
+         keep_indices,
+         addon_indices,
+         addon_start,
+         addon_end,
+         addon_events,
+         addon_by_code
+       ) do
     base
     |> Enum.with_index()
     |> Enum.map(fn {row, index} ->
       kept = slice(row, keep_indices)
-      tail = tail_cells(index, row, addon_indices, addon_start, addon_end, addon_events, addon_by_code)
+
+      tail =
+        tail_cells(index, row, addon_indices, addon_start, addon_end, addon_events, addon_by_code)
 
       case tail do
         {:error, reason} -> {:error, reason}
@@ -134,9 +174,14 @@ defmodule ResidencySchedule.Importer.ScheduleMerger do
     |> collect()
   end
 
-  defp tail_cells(0, _row, indices, addon_start, _end, _events, _by_code), do: slice(addon_start, indices)
-  defp tail_cells(1, _row, indices, _start, addon_end, _events, _by_code), do: slice(addon_end, indices)
-  defp tail_cells(2, _row, indices, _start, _end, addon_events, _by_code), do: slice(addon_events, indices)
+  defp tail_cells(0, _row, indices, addon_start, _end, _events, _by_code),
+    do: slice(addon_start, indices)
+
+  defp tail_cells(1, _row, indices, _start, addon_end, _events, _by_code),
+    do: slice(addon_end, indices)
+
+  defp tail_cells(2, _row, indices, _start, _end, addon_events, _by_code),
+    do: slice(addon_events, indices)
 
   defp tail_cells(_index, row, indices, _start, _end, _events, addon_by_code) do
     code = List.first(row, "")
@@ -195,7 +240,12 @@ defmodule ResidencySchedule.Importer.ScheduleMerger do
   # --- Column helpers ---
 
   defp keep_indices(base_start, cutoff) do
-    drop = base_start |> date_columns() |> Enum.filter(&on_or_after?(&1, cutoff)) |> Enum.map(&elem(&1, 0))
+    drop =
+      base_start
+      |> date_columns()
+      |> Enum.filter(&on_or_after?(&1, cutoff))
+      |> Enum.map(&elem(&1, 0))
+
     Enum.to_list(0..(length(base_start) - 1)) -- drop
   end
 
