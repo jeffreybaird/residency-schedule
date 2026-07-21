@@ -199,7 +199,12 @@ defmodule ResidencySchedule.ResidentsTest do
 
       {:ok, _} =
         ResidencySchedule.Rotations.insert_rotations(on_service.id, [
-          %{slot_index: 0, start_date: ~D[2023-07-03], end_date: ~D[2023-07-09], rotation_type: :oncology}
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-03],
+            end_date: ~D[2023-07-09],
+            rotation_type: :oncology
+          }
         ])
 
       {:ok, s2026} = Schedules.upsert_schedule(2026, "2026–2027")
@@ -214,7 +219,12 @@ defmodule ResidencySchedule.ResidentsTest do
 
       {:ok, _} =
         ResidencySchedule.Rotations.insert_rotations(future.id, [
-          %{slot_index: 0, start_date: ~D[2026-07-06], end_date: ~D[2026-07-12], rotation_type: :rei}
+          %{
+            slot_index: 0,
+            start_date: ~D[2026-07-06],
+            end_date: ~D[2026-07-12],
+            rotation_type: :rei
+          }
         ])
 
       names_2023 = Residents.list_resident_filter_options_for_year(2023) |> Enum.map(& &1.name)

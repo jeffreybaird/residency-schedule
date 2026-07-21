@@ -63,7 +63,15 @@ defmodule ResidencySchedule.Importer.SummerFloatSplitter do
 
     with :ok <- ensure_block_count(blocks),
          {:ok, early} <-
-           build_file(blocks, @early_groups, early_year, early_dates, start_row, end_row, events_row),
+           build_file(
+             blocks,
+             @early_groups,
+             early_year,
+             early_dates,
+             start_row,
+             end_row,
+             events_row
+           ),
          {:ok, late} <-
            build_file(blocks, @late_groups, late_year, late_dates, start_row, end_row, events_row) do
       {:ok, %{early: early, late: late}}

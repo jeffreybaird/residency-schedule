@@ -31,6 +31,33 @@ defmodule ResidencySchedule.MailerTest do
     end
   end
 
+  describe "send_denial_email/2" do
+    test "sends a denial notification to the user" do
+      user = %{email: "denied@gmail.com"}
+      base_url = "https://example.com"
+
+      assert {:ok, _} = Mailer.send_denial_email(user, base_url)
+
+      assert_email_sent(
+        to: [{nil, "denied@gmail.com"}],
+        subject: "Update on your access request — Residency Schedule"
+      )
+    end
+
+    test "explains the request was not approved and how to appeal" do
+      user = %{email: "denied@gmail.com"}
+      base_url = "https://schedule.example.com"
+
+      {:ok, _} = Mailer.send_denial_email(user, base_url)
+
+      assert_email_sent(fn email ->
+        assert email.text_body =~ "not approved"
+        assert email.text_body =~ "reply to this email"
+        assert email.html_body =~ "not approved"
+      end)
+    end
+  end
+
   describe "send_approval_request_email/2" do
     test "sends a notification to the admin" do
       user = %{email: "newuser@gmail.com", inserted_at: ~U[2026-04-07 14:30:00Z]}

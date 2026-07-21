@@ -454,6 +454,12 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
             <%= if @role_error do %>
               <p class="text-sm text-red-600 mt-2">{@role_error}</p>
             <% end %>
+
+            <div class="mt-3 pt-3 border-t border-gray-100">
+              <.link navigate="/admin/denied" class="text-xs text-gray-400 hover:text-gray-600">
+                Manage denied users →
+              </.link>
+            </div>
           </div>
         </div>
 

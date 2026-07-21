@@ -63,6 +63,7 @@ defmodule ResidencyScheduleWeb.Router do
 
     live_session :admin, on_mount: [{ResidencyScheduleWeb.UserAuth, :ensure_admin}] do
       live "/", AdminLive.Index, :index
+      live "/denied", AdminLive.Denied, :index
       live "/upload", UploadLive.Index, :index
       live "/build", BuilderLive.Index, :index
       live "/edit", EditLive.Index, :index

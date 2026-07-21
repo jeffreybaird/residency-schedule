@@ -165,21 +165,29 @@ defmodule ResidencySchedule.AccountsTest do
       assert Accounts.get_user!(admin.id).approved == true
     end
 
-    test "deny_user/1 deletes a pending user" do
+    test "deny_user/1 soft-rejects a pending user and emails them" do
       {:ok, user} = Accounts.create_user(%{email: "deny@gmail.com"})
       refute user.approved
 
-      assert {:ok, _deleted} = Accounts.deny_user(user)
-      assert Accounts.get_user(user.id) == nil
-      assert Accounts.list_pending_users() == []
+      # Drain the admin notification from create_user
+      assert_email_sent(to: [{nil, "jeffreybaird@hey.com"}])
+
+      assert {:ok, denied} = Accounts.deny_user(user)
+      assert denied.denied == true
+      assert denied.approved == false
+
+      assert_email_sent(
+        to: denied.email,
+        subject: "Update on your access request — Residency Schedule"
+      )
     end
 
-    test "deny_user/1 frees the email to sign up again" do
-      {:ok, user} = Accounts.create_user(%{email: "reapply@gmail.com"})
-      {:ok, _deleted} = Accounts.deny_user(user)
+    test "deny_user/1 removes the user from the pending list but keeps the record" do
+      {:ok, user} = Accounts.create_user(%{email: "deny2@gmail.com"})
+      {:ok, _denied} = Accounts.deny_user(user)
 
-      assert {:ok, reapplied} = Accounts.create_user(%{email: "reapply@gmail.com"})
-      assert reapplied.id != user.id
+      assert Accounts.list_pending_users() == []
+      assert Accounts.get_user!(user.id).denied == true
     end
 
     test "deny_user/1 refuses to deny an already-approved user" do
@@ -187,7 +195,30 @@ defmodule ResidencySchedule.AccountsTest do
       assert user.approved
 
       assert {:error, :already_approved} = Accounts.deny_user(user)
-      assert Accounts.get_user!(user.id).id == user.id
+      assert Accounts.get_user!(user.id).denied == false
+    end
+
+    test "list_denied_users/0 returns only denied users" do
+      {:ok, pending} = Accounts.create_user(%{email: "still-pending@gmail.com"})
+      {:ok, to_deny} = Accounts.create_user(%{email: "denied-one@gmail.com"})
+      {:ok, denied} = Accounts.deny_user(to_deny)
+
+      denied_users = Accounts.list_denied_users()
+      assert Enum.map(denied_users, & &1.id) == [denied.id]
+      refute pending.id in Enum.map(denied_users, & &1.id)
+    end
+
+    test "reinstate_user/1 returns a denied user to the pending state" do
+      {:ok, user} = Accounts.create_user(%{email: "reinstate@gmail.com"})
+      {:ok, denied} = Accounts.deny_user(user)
+      assert denied.denied == true
+
+      assert {:ok, reinstated} = Accounts.reinstate_user(denied)
+      assert reinstated.denied == false
+      assert reinstated.approved == false
+
+      assert Enum.map(Accounts.list_pending_users(), & &1.id) == [user.id]
+      assert Accounts.list_denied_users() == []
     end
   end
 
