@@ -26,21 +26,42 @@ if config_env() == :prod do
 
   secret_key_base = System.fetch_env!("SECRET_KEY_BASE")
 
+  # Bind loopback by default. Nginx proxies from the same host, so nothing needs
+  # to reach the endpoint directly — and binding 0.0.0.0 published the app to the
+  # internet on its raw port, where a `Host: localhost` request slipped past the
+  # force_ssl exclusion in config/prod.exs and served the app over plaintext.
+  # Set HTTP_IP=0.0.0.0 to restore the old behaviour if a proxy ever runs off-host.
+  http_ip =
+    "HTTP_IP"
+    |> System.get_env("127.0.0.1")
+    |> String.split(".")
+    |> Enum.map(&String.to_integer/1)
+    |> List.to_tuple()
+
   config :residency_schedule, ResidencyScheduleWeb.Endpoint,
-    http: [ip: {0, 0, 0, 0}, port: 4000],
+    http: [ip: http_ip, port: String.to_integer(System.get_env("PORT", "4000"))],
     secret_key_base: secret_key_base,
     url: [host: System.fetch_env!("PHX_HOST"), scheme: "https", port: 443],
     server: true
 
+  # Public demo deployments serve synthetic data with no login. Resident auth
+  # and transactional email are both off, so their secrets are not required.
+  demo_mode = System.get_env("DEMO_MODE", "false") == "true"
+
   config :residency_schedule,
-    access_password: System.fetch_env!("ACCESS_PASSWORD")
+    demo_mode: demo_mode,
+    access_password:
+      if(demo_mode,
+        do: System.get_env("ACCESS_PASSWORD", ""),
+        else: System.fetch_env!("ACCESS_PASSWORD")
+      )
 
   # Resend for transactional email (magic links)
-  resend_api_key = System.fetch_env!("RESEND_API_KEY")
+  unless demo_mode do
+    config :residency_schedule, ResidencySchedule.Mailer,
+      adapter: Swoosh.Adapters.Resend,
+      api_key: System.fetch_env!("RESEND_API_KEY")
 
-  config :residency_schedule, ResidencySchedule.Mailer,
-    adapter: Swoosh.Adapters.Resend,
-    api_key: resend_api_key
-
-  config :swoosh, :api_client, Swoosh.ApiClient.Req
+    config :swoosh, :api_client, Swoosh.ApiClient.Req
+  end
 end
