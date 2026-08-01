@@ -16,7 +16,7 @@
 set -euo pipefail
 
 DOMAIN="residency-schedule.jeffreybaird.com"
-PORT=4001
+PORT=4002
 INSTALL_DIR="/home/deploy/residency_schedule_demo"
 SERVICE="residency_schedule_demo"
 DB_NAME="residency_schedule_demo"
