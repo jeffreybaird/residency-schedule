@@ -617,7 +617,7 @@ instance that lost the race, not an obvious crash.
 The demo's `.env` therefore sets a distinct node name:
 
 ```
-RELEASE_NODE=residency_schedule_demo
+RELEASE_NODE=residency_schedule_demo@127.0.0.1
 RELEASE_DISTRIBUTION=name
 ```
 
