@@ -56,6 +56,39 @@ defmodule ResidencySchedule.Release do
     end
   end
 
+  @doc """
+  Imports the synthetic demo schedule shipped in `priv/demo/demo_schedule.csv`.
+
+  Called by the deploy script on demo deployments only. Re-running it replaces
+  the demo academic year in place, so it is safe on every deploy.
+
+  Doctest omitted: this writes to the database; see the integration test.
+  """
+  def seed_demo do
+    load_app()
+    [repo] = repos()
+
+    {:ok, result, _apps} = Ecto.Migrator.with_repo(repo, fn _repo -> import_demo_csv() end)
+
+    result
+  end
+
+  @doc """
+  Returns the absolute path to the demo CSV inside the release.
+
+      iex> ResidencySchedule.Release.demo_csv_path() =~ "demo_schedule.csv"
+      true
+  """
+  def demo_csv_path do
+    Application.app_dir(@app, "priv/demo/demo_schedule.csv")
+  end
+
+  defp import_demo_csv do
+    demo_csv_path()
+    |> File.read!()
+    |> ResidencySchedule.Importer.ScheduleImporter.import_csv()
+  end
+
   defp repos do
     Application.fetch_env!(@app, :ecto_repos)
   end
