@@ -28,7 +28,9 @@ defmodule ResidencyScheduleWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import ResidencyScheduleWeb.ConnCase
-      import ResidencySchedule.DataCase, only: [seed_schedule: 0, seed_schedule: 1]
+
+      import ResidencySchedule.DataCase,
+        only: [seed_schedule: 0, seed_schedule: 1, set_demo_mode: 1]
     end
   end
 
@@ -79,18 +81,5 @@ defmodule ResidencyScheduleWeb.ConnCase do
     else
       admin
     end
-  end
-
-  @doc """
-  Toggles the `:demo_mode` application flag for the duration of one test,
-  restoring the previous value on exit.
-  """
-  def set_demo_mode(enabled) do
-    previous = Application.get_env(:residency_schedule, :demo_mode, false)
-    Application.put_env(:residency_schedule, :demo_mode, enabled)
-
-    ExUnit.Callbacks.on_exit(fn ->
-      Application.put_env(:residency_schedule, :demo_mode, previous)
-    end)
   end
 end

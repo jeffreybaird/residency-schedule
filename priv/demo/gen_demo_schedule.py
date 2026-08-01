@@ -7,9 +7,10 @@ parser understands (see CsvParser @rotation_abbreviations).
 import csv
 from datetime import date, timedelta
 
-# 2030 sits outside NameNormalizer's {year, position} map, so the synthetic
-# names below survive import instead of being rewritten to canonical ones.
-START = date(2030, 7, 1)  # a Monday
+# The current academic year, so the demo renders on the calendar view rather
+# than sitting in an empty future. NameNormalizer maps this year to real
+# resident names, so demo mode bypasses it and keeps the invented names below.
+START = date(2026, 6, 29)  # a Monday
 WEEKS = 52
 
 # Invented names, four per class.
