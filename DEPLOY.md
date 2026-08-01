@@ -309,7 +309,12 @@ names on academic year 2030–2031. Nothing in it derives from real program data
 > `python3 priv/demo/gen_demo_schedule.py` if you change it, and keep the year
 > outside the mapped range.
 
-The demo runs at **residency-schedule.jeffreybaird.com** on port 4001.
+The demo runs at **residency-schedule.jeffreybaird.com** on port 4002.
+
+> **Port allocation on this droplet.** 4000 is production residency-schedule,
+> 4001 is the Sudoku Race container (`docker-compose.yml` in that repo publishes
+> `127.0.0.1:4001`), and 4002 is this demo. Check what is already listening
+> before assigning a port to anything new: `ss -tlnp | grep 40`.
 
 ### 6.0 Run the provisioning script
 
@@ -380,7 +385,7 @@ chown deploy:deploy /home/deploy/residency_schedule_demo
 
 cat > /home/deploy/residency_schedule_demo/.env << 'EOF'
 DEMO_MODE=true
-PORT=4001
+PORT=4002
 DATABASE_URL=ecto://rs_demo:demo-db-password@localhost:5432/residency_schedule_demo
 SECRET_KEY_BASE=<generate a SEPARATE one with: mix phx.gen.secret>
 PHX_HOST=residency-schedule.jeffreybaird.com
@@ -400,7 +405,7 @@ Notes on these values:
 - No admin password is configured. Admin access is a **user role**, and the demo
   database has no user accounts at all, so `/admin/*` is unreachable by
   construction. Never run `Release.promote_admin/1` against the demo database.
-- `PORT=4001` keeps the demo off production's port 4000.
+- `PORT=4002` keeps the demo off production's port 4000.
 
 ### 6.3 Demo systemd unit
 
@@ -435,7 +440,7 @@ production in step 1.4.
 
 ### 6.4 Nginx vhost and certificate
 
-Add a server block for `residency-schedule.jeffreybaird.com` proxying to `127.0.0.1:4001`,
+Add a server block for `residency-schedule.jeffreybaird.com` proxying to `127.0.0.1:4002`,
 mirroring the production block from step 1.9, then:
 
 ```bash
