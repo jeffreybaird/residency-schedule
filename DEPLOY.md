@@ -597,3 +597,33 @@ ufw deny 4002/tcp
 ufw enable
 ufw status verbose
 ```
+
+---
+
+## Appendix: Running two instances of the same release
+
+Production and the demo are the same release, so they default to the same Erlang
+node name (`residency_schedule@<hostname>`). Only one can register it with EPMD —
+whichever starts second exits immediately with:
+
+```
+Protocol 'inet_tcp': the name residency_schedule@<host> seems to be in use by
+another Erlang node
+```
+
+systemd then restarts it on a loop, so the symptom is a 502 from nginx for the
+instance that lost the race, not an obvious crash.
+
+The demo's `.env` therefore sets a distinct node name:
+
+```
+RELEASE_NODE=residency_schedule_demo@127.0.0.1
+RELEASE_DISTRIBUTION=name
+```
+
+Anything else sharing this droplet with another copy of the release needs the
+same treatment. To check which node names are registered:
+
+```bash
+epmd -names
+```

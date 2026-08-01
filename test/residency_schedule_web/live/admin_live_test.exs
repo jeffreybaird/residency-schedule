@@ -63,21 +63,34 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
 
     test "request_delete shows confirmation UI", %{view: view} do
       schedule = List.first(ResidencySchedule.Schedules.list_schedules())
-      html = view |> element("button[phx-value-id='#{schedule.id}']") |> render_click()
+
+      html =
+        view
+        |> element("button[phx-click='request_delete'][phx-value-id='#{schedule.id}']")
+        |> render_click()
+
       assert html =~ "Confirm"
       assert html =~ "Cancel"
     end
 
     test "cancel_delete hides confirmation UI", %{view: view} do
       schedule = List.first(ResidencySchedule.Schedules.list_schedules())
-      view |> element("button[phx-value-id='#{schedule.id}']") |> render_click()
+
+      view
+      |> element("button[phx-click='request_delete'][phx-value-id='#{schedule.id}']")
+      |> render_click()
+
       view |> element("button[phx-click='cancel_delete']") |> render_click()
       refute has_element?(view, "button[phx-click='confirm_delete']")
     end
 
     test "confirm_delete removes the schedule", %{view: view} do
       schedule = List.first(ResidencySchedule.Schedules.list_schedules())
-      view |> element("button[phx-value-id='#{schedule.id}']") |> render_click()
+
+      view
+      |> element("button[phx-click='request_delete'][phx-value-id='#{schedule.id}']")
+      |> render_click()
+
       html = view |> element("button[phx-click='confirm_delete']") |> render_click()
       refute html =~ "Delete a Schedule"
     end
