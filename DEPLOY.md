@@ -564,3 +564,36 @@ systemctl reload nginx      # reload after config changes
 ```
 
 Verify the `Connection: upgrade` header is present — it is required for Phoenix LiveView WebSocket connections.
+
+---
+
+## Appendix: Endpoint bind address
+
+The endpoint binds `127.0.0.1` by default. Nginx proxies from the same host, so
+nothing needs to reach it directly.
+
+It previously bound `0.0.0.0`, which published the app to the internet on its raw
+port. That mattered because `config/prod.exs` excludes the hosts `localhost` and
+`127.0.0.1` from `force_ssl`, and the `Host` header is supplied by the client — so
+a request to `http://<droplet-ip>:4000/` carrying `Host: localhost` skipped the
+HTTPS redirect and was served the real application over plaintext.
+
+Before deploying this change, confirm nginx proxies over loopback:
+
+```bash
+nginx -T 2>/dev/null | grep proxy_pass
+# expect http://localhost:4000 (or 127.0.0.1:4000), not the droplet's public IP
+```
+
+If a proxy ever runs on a different host, set `HTTP_IP=0.0.0.0` in that
+instance's `.env` and restrict the port at the firewall instead.
+
+Belt and braces — the raw ports should not be open regardless:
+
+```bash
+ufw allow 22,80,443/tcp
+ufw deny 4000/tcp
+ufw deny 4002/tcp
+ufw enable
+ufw status verbose
+```
