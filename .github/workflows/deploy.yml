@@ -56,9 +56,26 @@ jobs:
           MIX_ENV: test
 
   deploy:
-    name: Deploy
+    name: Deploy (${{ matrix.target }})
     runs-on: ubuntu-latest
     needs: test
+
+    # Both targets build the same release; only the destination, systemd unit,
+    # and post-migrate seeding differ. A demo failure must not abort prod.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: prod
+            host_secret: DEPLOY_HOST
+            install_dir: /home/deploy/residency_schedule
+            service: residency_schedule
+            seed_demo: false
+          - target: demo
+            host_secret: DEMO_DEPLOY_HOST
+            install_dir: /home/deploy/residency_schedule_demo
+            service: residency_schedule_demo
+            seed_demo: true
 
     steps:
       - uses: actions/checkout@v4
@@ -86,52 +103,65 @@ jobs:
           SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
           PHX_HOST: ${{ secrets.PHX_HOST }}
           # ACCESS_PASSWORD is NOT needed here — runtime.exs runs at boot, not
-          # at compile time. It lives only in /home/deploy/residency_schedule/.env
+          # at compile time. It lives only in the target's .env
 
       - name: Upload release to droplet
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
+          host: ${{ secrets[matrix.host_secret] }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           source: "_build/prod/rel/residency_schedule"
-          target: "/home/deploy/residency_schedule_new"
+          target: "${{ matrix.install_dir }}_new"
           strip_components: 4
 
       - name: Swap release and restart
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          INSTALL_DIR: ${{ matrix.install_dir }}
+          SERVICE: ${{ matrix.service }}
+          SEED_DEMO: ${{ matrix.seed_demo }}
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
+          host: ${{ secrets[matrix.host_secret] }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: INSTALL_DIR,SERVICE,SEED_DEMO
           script: |
             set -e
 
             # Run migrations before swapping (uses server .env for real DB creds)
             # set -a exports all sourced variables to child processes
-            set -a; source /home/deploy/residency_schedule/.env; set +a
-            /home/deploy/residency_schedule_new/bin/residency_schedule eval \
+            set -a; source "$INSTALL_DIR/.env"; set +a
+            "${INSTALL_DIR}_new/bin/residency_schedule" eval \
               "ResidencySchedule.Release.migrate()"
+
+            # Demo deployments reload their synthetic fixture every deploy, so
+            # anything a visitor changed is discarded.
+            if [ "$SEED_DEMO" = "true" ]; then
+              "${INSTALL_DIR}_new/bin/residency_schedule" eval \
+                "ResidencySchedule.Release.seed_demo()"
+            fi
 
             # Carry the .env into the new release before swapping — it lives
             # inside the deployment dir and must not be lost during rotation.
-            cp /home/deploy/residency_schedule/.env /home/deploy/residency_schedule_new/.env
+            cp "$INSTALL_DIR/.env" "${INSTALL_DIR}_new/.env"
 
             # Atomic swap — remove any stale _old dir first so mv doesn't
             # move into a subdirectory instead of renaming.
-            rm -rf /home/deploy/residency_schedule_old
-            mv /home/deploy/residency_schedule /home/deploy/residency_schedule_old
-            mv /home/deploy/residency_schedule_new /home/deploy/residency_schedule
+            rm -rf "${INSTALL_DIR}_old"
+            mv "$INSTALL_DIR" "${INSTALL_DIR}_old"
+            mv "${INSTALL_DIR}_new" "$INSTALL_DIR"
 
             # Restart service
-            sudo systemctl restart residency_schedule
+            sudo systemctl restart "$SERVICE"
 
             # Health check — if it fails, roll back automatically
             sleep 3
-            systemctl is-active residency_schedule || (
-              mv /home/deploy/residency_schedule_old /home/deploy/residency_schedule
-              sudo systemctl restart residency_schedule
+            systemctl is-active "$SERVICE" || (
+              mv "$INSTALL_DIR" "${INSTALL_DIR}_failed"
+              mv "${INSTALL_DIR}_old" "$INSTALL_DIR"
+              sudo systemctl restart "$SERVICE"
               echo "Deploy failed — rolled back" && exit 1
             )
 
-            rm -rf /home/deploy/residency_schedule_old
+            rm -rf "${INSTALL_DIR}_old"

@@ -30,6 +30,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
      assign(socket,
        delete_confirm_id: nil,
        delete_error: nil,
+       demo_mode: ResidencySchedule.demo_mode?(),
        is_admin: Accounts.User.admin?(socket.assigns.current_user),
        today: today,
        viewed_aca_year: current_academic_year(today)
@@ -70,6 +71,11 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   @impl true
+  def handle_event("request_delete", _params, %{assigns: %{demo_mode: true}} = socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("request_delete", %{"id" => id}, socket) do
     {:noreply, assign(socket, delete_confirm_id: String.to_integer(id), delete_error: nil)}
   end
@@ -77,6 +83,11 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   @impl true
   def handle_event("cancel_delete", _params, socket) do
     {:noreply, assign(socket, delete_confirm_id: nil, delete_error: nil)}
+  end
+
+  @impl true
+  def handle_event("delete_schedule", _params, %{assigns: %{demo_mode: true}} = socket) do
+    {:noreply, assign(socket, delete_error: "Deleting is disabled in the demo.")}
   end
 
   @impl true
