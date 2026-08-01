@@ -33,6 +33,19 @@ defmodule ResidencySchedule.DataCase do
   end
 
   @doc """
+  Toggles the `:demo_mode` application flag for the duration of one test,
+  restoring the previous value on exit.
+  """
+  def set_demo_mode(enabled) do
+    previous = Application.get_env(:residency_schedule, :demo_mode, false)
+    Application.put_env(:residency_schedule, :demo_mode, enabled)
+
+    ExUnit.Callbacks.on_exit(fn ->
+      Application.put_env(:residency_schedule, :demo_mode, previous)
+    end)
+  end
+
+  @doc """
   Sets up the sandbox based on the test tags.
   """
   def setup_sandbox(tags) do

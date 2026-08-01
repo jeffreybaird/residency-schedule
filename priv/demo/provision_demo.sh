@@ -229,7 +229,7 @@ cat << EOF
   4. Deploy — merge the demo PR to main. The demo job builds, migrates,
      seeds the synthetic fixture, and starts $SERVICE.
 
-  5. Verify — the demo should load with no login and show year 2030-2031:
+  5. Verify — the demo should load with no login and show the current academic year with invented names:
 
        curl -sI https://$DOMAIN | head -1
        systemctl status $SERVICE

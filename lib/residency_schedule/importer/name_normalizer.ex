@@ -252,6 +252,11 @@ defmodule ResidencySchedule.Importer.NameNormalizer do
   Returns the canonical name for a resident given their academic year start and
   position code. Falls back to the trimmed raw name if no mapping is found.
 
+  Demo deployments keep the raw name from the CSV. The demo fixture covers the
+  current academic year so it renders on the calendar, which is inside the range
+  this map covers — without the bypass, its invented names would be rewritten to
+  the real residents' names.
+
       iex> ResidencySchedule.Importer.NameNormalizer.normalize(2023, "R1-1", "Quinn Halden")
       "Carson"
 
@@ -262,7 +267,11 @@ defmodule ResidencySchedule.Importer.NameNormalizer do
       "Unknown Name"
   """
   def normalize(academic_year, position_code, raw_name) do
-    Map.get(@canonical_names, {academic_year, position_code}, String.trim(raw_name))
+    if ResidencySchedule.demo_mode?() do
+      String.trim(raw_name)
+    else
+      Map.get(@canonical_names, {academic_year, position_code}, String.trim(raw_name))
+    end
   end
 
   @doc """
