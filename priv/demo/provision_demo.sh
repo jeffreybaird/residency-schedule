@@ -104,9 +104,14 @@ else
   # session cookie minted by the public demo be replayed against the real app.
   # No admin password is set — admin is a user role, and the demo database has
   # no user accounts, so /admin/* is unreachable by construction.
+  # RELEASE_NODE must differ from production's. Both instances are the same
+  # release, so without this they claim the same Erlang node name and whichever
+  # starts second dies with "name ... seems to be in use by another Erlang node".
   cat > "$ENV_FILE" << EOF
 DEMO_MODE=true
 PORT=$PORT
+RELEASE_NODE=$SERVICE
+RELEASE_DISTRIBUTION=name
 DATABASE_URL=ecto://$DB_ROLE:$DB_PASSWORD@localhost:5432/$DB_NAME
 SECRET_KEY_BASE=$(openssl rand -base64 64 | tr -d '\n')
 PHX_HOST=$DOMAIN
