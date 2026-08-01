@@ -14,6 +14,9 @@ defmodule ResidencySchedule.DemoSeedTest do
 
   describe "demo schedule fixture" do
     setup do
+      # Demo mode is what preserves the invented names: the fixture covers the
+      # current academic year, which NameNormalizer maps to real residents.
+      set_demo_mode(true)
       csv = File.read!(Release.demo_csv_path())
       {:ok, result, warnings} = ScheduleImporter.import_csv(csv)
       %{result: result, warnings: warnings}
@@ -38,8 +41,21 @@ defmodule ResidencySchedule.DemoSeedTest do
       refute "Paige R" in names
     end
 
-    test "lands in an academic year with no real program data" do
-      assert Schedules.get_by_year!(2030).label == "2030–2031"
+    test "covers the current academic year so it renders on the calendar" do
+      assert Schedules.get_by_year!(2026).label == "2026–2027"
+    end
+
+    test "canonical names are restored once demo mode is off" do
+      set_demo_mode(false)
+      csv = File.read!(Release.demo_csv_path())
+      {:ok, result, _warnings} = ScheduleImporter.import_csv(csv)
+
+      names =
+        result.schedule_id
+        |> Residents.list_residents_for_schedule()
+        |> Enum.map(& &1.name)
+
+      refute "Wren Halloway" in names
     end
 
     test "re-importing replaces the demo year without duplicating residents" do

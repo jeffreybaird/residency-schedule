@@ -300,14 +300,16 @@ own database, its own systemd unit, its own port, its own domain. It runs with
 `DEMO_MODE=true`, which removes the login wall and refuses every write.
 
 Its data is the synthetic fixture at `priv/demo/demo_schedule.csv` — invented
-names on academic year 2030–2031. Nothing in it derives from real program data.
+names on the current academic year. Nothing in it derives from real program data.
 `Release.seed_demo/0` reloads it on every deploy, so the demo self-heals.
 
-> **Why 2030:** `NameNormalizer` rewrites resident names to canonical forms for
-> academic years 2023–2026. A demo fixture inside that range would have its
-> invented names silently replaced with real ones. Regenerate the fixture with
-> `python3 priv/demo/gen_demo_schedule.py` if you change it, and keep the year
-> outside the mapped range.
+> **Why the names survive:** `NameNormalizer` rewrites resident names to
+> canonical forms for academic years 2023–2026, and the fixture deliberately
+> covers the current year so it renders on the calendar rather than sitting in
+> an empty future. `normalize/3` therefore skips canonicalization entirely when
+> `DEMO_MODE=true`. If a demo ever imports with `DEMO_MODE` unset, its invented
+> names will be silently replaced with the real residents' names. Regenerate the
+> fixture with `python3 priv/demo/gen_demo_schedule.py`.
 
 The demo runs at **residency-schedule.jeffreybaird.com** on port 4002.
 
