@@ -293,6 +293,178 @@ The academic year is derived automatically from the dates in the CSV file. You c
 
 ---
 
+## Part 6: The public demo deployment
+
+The demo is a **second instance of the same release** on the same droplet: its
+own database, its own systemd unit, its own port, its own domain. It runs with
+`DEMO_MODE=true`, which removes the login wall and refuses every write.
+
+Its data is the synthetic fixture at `priv/demo/demo_schedule.csv` — invented
+names on academic year 2030–2031. Nothing in it derives from real program data.
+`Release.seed_demo/0` reloads it on every deploy, so the demo self-heals.
+
+> **Why 2030:** `NameNormalizer` rewrites resident names to canonical forms for
+> academic years 2023–2026. A demo fixture inside that range would have its
+> invented names silently replaced with real ones. Regenerate the fixture with
+> `python3 priv/demo/gen_demo_schedule.py` if you change it, and keep the year
+> outside the mapped range.
+
+The demo runs at **residency-schedule.jeffreybaird.com** on port 4001.
+
+### 6.0 Run the provisioning script
+
+`priv/demo/provision_demo.sh` performs steps 6.1 through 6.4 in one pass. It is
+idempotent, and it never touches production's `.env`, systemd unit, nginx block,
+or database — production keeps serving throughout.
+
+```bash
+# Copy it to the droplet, read it, then run as root
+scp priv/demo/provision_demo.sh deploy@<droplet-ip>:/tmp/
+ssh deploy@<droplet-ip>
+less /tmp/provision_demo.sh
+sudo bash /tmp/provision_demo.sh
+```
+
+It generates the demo's database password and `SECRET_KEY_BASE`, writes them to
+`/home/deploy/residency_schedule_demo/.env` with mode 600, and **aborts** if the
+demo role turns out to be able to reach the production database. It prints the remaining manual steps (DNS, certbot, the
+`DEMO_DEPLOY_HOST` secret) when it finishes.
+
+The rest of this section explains what the script does, and is the reference if
+you would rather do it by hand.
+
+### 6.1 Scoped database roles
+
+The demo app must not be able to reach the production database. Give each
+instance a non-superuser role that owns only its own database, so a mistyped
+`DATABASE_URL` fails to connect instead of quietly writing to the wrong place.
+
+```bash
+sudo -u postgres psql << 'EOF'
+-- One role per instance, neither of them superuser.
+CREATE ROLE rs_prod LOGIN PASSWORD 'prod-db-password';
+CREATE ROLE rs_demo LOGIN PASSWORD 'demo-db-password';
+
+CREATE DATABASE residency_schedule_demo OWNER rs_demo;
+ALTER DATABASE residency_schedule_prod OWNER TO rs_prod;
+
+-- Neither role may touch the other's database.
+REVOKE ALL ON DATABASE residency_schedule_prod FROM rs_demo, PUBLIC;
+REVOKE ALL ON DATABASE residency_schedule_demo FROM rs_prod, PUBLIC;
+EOF
+```
+
+Then update the **production** `.env` to stop using the superuser:
+
+```
+DATABASE_URL=ecto://rs_prod:prod-db-password@localhost:5432/residency_schedule_prod
+```
+
+Verify the isolation holds before trusting it:
+
+```bash
+# Should succeed
+PGPASSWORD=demo-db-password psql -U rs_demo -h localhost -d residency_schedule_demo -c '\conninfo'
+
+# Should FAIL with "permission denied for database"
+PGPASSWORD=demo-db-password psql -U rs_demo -h localhost -d residency_schedule_prod -c '\conninfo'
+```
+
+If that second command succeeds, stop and fix the grants — the demo is not isolated.
+
+### 6.2 Demo deployment directory and environment
+
+```bash
+mkdir -p /home/deploy/residency_schedule_demo
+chown deploy:deploy /home/deploy/residency_schedule_demo
+
+cat > /home/deploy/residency_schedule_demo/.env << 'EOF'
+DEMO_MODE=true
+PORT=4001
+DATABASE_URL=ecto://rs_demo:demo-db-password@localhost:5432/residency_schedule_demo
+SECRET_KEY_BASE=<generate a SEPARATE one with: mix phx.gen.secret>
+PHX_HOST=residency-schedule.jeffreybaird.com
+POOL_SIZE=5
+EOF
+
+chmod 600 /home/deploy/residency_schedule_demo/.env
+chown deploy:deploy /home/deploy/residency_schedule_demo/.env
+```
+
+Notes on these values:
+
+- `SECRET_KEY_BASE` **must differ from production.** Sharing it would let a
+  session cookie minted by the public demo be replayed against the real app.
+- `ACCESS_PASSWORD` and `RESEND_API_KEY` are **not required** in demo mode —
+  resident auth and magic-link email are both off.
+- No admin password is configured. Admin access is a **user role**, and the demo
+  database has no user accounts at all, so `/admin/*` is unreachable by
+  construction. Never run `Release.promote_admin/1` against the demo database.
+- `PORT=4001` keeps the demo off production's port 4000.
+
+### 6.3 Demo systemd unit
+
+```bash
+cat > /etc/systemd/system/residency_schedule_demo.service << 'EOF'
+[Unit]
+Description=Residency Schedule Public Demo
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/home/deploy/residency_schedule_demo
+EnvironmentFile=/home/deploy/residency_schedule_demo/.env
+ExecStart=/home/deploy/residency_schedule_demo/bin/residency_schedule start
+ExecStop=/home/deploy/residency_schedule_demo/bin/residency_schedule stop
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable residency_schedule_demo
+```
+
+Grant the deploy user restart rights for the new unit the same way you did for
+production in step 1.4.
+
+### 6.4 Nginx vhost and certificate
+
+Add a server block for `residency-schedule.jeffreybaird.com` proxying to `127.0.0.1:4001`,
+mirroring the production block from step 1.9, then:
+
+```bash
+certbot --nginx -d residency-schedule.jeffreybaird.com
+```
+
+### 6.5 GitHub Secret
+
+The deploy workflow builds one release and ships it to both targets. Add:
+
+- `DEMO_DEPLOY_HOST` — the droplet IP or hostname (same box as production)
+
+`DEPLOY_SSH_KEY` is shared between targets. The demo job has
+`fail-fast: false`, so a broken demo deploy cannot abort the production one.
+
+### 6.6 Resource headroom
+
+Two BEAM releases plus PostgreSQL on a 2 GB droplet is tight. Check before and
+after enabling the demo:
+
+```bash
+free -m
+systemctl status residency_schedule residency_schedule_demo
+```
+
+If memory is short, lower `POOL_SIZE` in the demo `.env` before adding swap.
+
+---
+
 ## Maintenance
 
 ### Viewing logs

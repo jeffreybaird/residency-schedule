@@ -355,8 +355,13 @@ defmodule ResidencySchedule.Accounts do
   Marks the user's guided tour as completed.
   Returns `{:ok, user}` or `{:error, changeset}`.
 
+  An unpersisted user — the demo visitor — has no row to update, so it is
+  returned unchanged rather than raising.
+
   Exempt from doctest — hits the database.
   """
+  def complete_tour(%User{id: nil} = user), do: {:ok, user}
+
   def complete_tour(user) do
     user
     |> User.tour_changeset(%{tour_completed: true})

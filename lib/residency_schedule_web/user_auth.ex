@@ -23,9 +23,13 @@ defmodule ResidencyScheduleWeb.UserAuth do
   Exempt from doctest — loads the user from the database.
   """
   def on_mount(:ensure_authenticated, _params, session, socket) do
-    case load_approved_user(session) do
-      %User{} = user -> {:cont, assign(socket, :current_user, user)}
-      nil -> {:halt, redirect(socket, to: "/login")}
+    if ResidencySchedule.demo_mode?() do
+      {:cont, assign(socket, :current_user, ResidencySchedule.demo_user())}
+    else
+      case load_approved_user(session) do
+        %User{} = user -> {:cont, assign(socket, :current_user, user)}
+        nil -> {:halt, redirect(socket, to: "/login")}
+      end
     end
   end
 
