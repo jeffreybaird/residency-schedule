@@ -85,6 +85,13 @@ defmodule ResidencyScheduleWeb.DemoModeTest do
       refute html =~ ~s(phx-submit="delete_schedule")
     end
 
+    test "the walkthrough auto-starts for a demo visitor" do
+      {:ok, _view, html} = live(build_conn(), "/")
+
+      assert html =~ ~s(data-auto-start="true")
+      assert html =~ ~s(data-demo-mode="true")
+    end
+
     test "tour_completed does not raise on the unpersisted demo user" do
       {:ok, view, _html} = live(build_conn(), "/schedule")
 

@@ -31,5 +31,9 @@ defmodule ResidencyScheduleTest do
     test "is unpersisted, so no write path can update a real row" do
       assert ResidencySchedule.demo_user().id == nil
     end
+
+    test "has not completed the tour, so every visitor is offered it" do
+      refute ResidencySchedule.demo_user().tour_completed
+    end
   end
 end
