@@ -30,11 +30,19 @@ defmodule ResidencySchedule do
   one is never persisted and carries the `:resident` role, so every admin
   check and every write path refuses it exactly as it would a real resident.
 
+  `tour_completed` is always `false`: the user is shared by every visitor and
+  never written back, so the server cannot remember who has seen the tour. It
+  offers the tour on every mount and the browser suppresses it after dismissal
+  via localStorage.
+
       iex> ResidencySchedule.demo_user().role
       :resident
 
       iex> ResidencySchedule.demo_user().id
       nil
+
+      iex> ResidencySchedule.demo_user().tour_completed
+      false
   """
   def demo_user do
     %User{
@@ -42,7 +50,7 @@ defmodule ResidencySchedule do
       email: "demo@example.invalid",
       role: :resident,
       approved: true,
-      tour_completed: true
+      tour_completed: false
     }
   end
 end
