@@ -699,6 +699,42 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
+  Lists every coworker of a schedule resident who shares at least one service
+  day with them, each as `%{resident: ScheduleResident, shared_shifts: count}`,
+  sorted from most shared days to least (ties broken by residency year then
+  schedule number).
+
+  Coworkers are the other residents in the same schedule. Shared days use the
+  same effective co-service rules as `list_effective_co_service_days/2`, so each
+  count matches the compare page for that pair.
+
+  Exempt from doctest — hits the database. See `RotationsTest`.
+  """
+  def list_coworker_shared_shift_counts(schedule_resident_id) do
+    schedule_id = Residents.get_resident!(schedule_resident_id).schedule_id
+
+    schedule_id
+    |> Residents.list_residents_for_schedule()
+    |> Enum.reject(&(&1.id == schedule_resident_id))
+    |> Enum.map(&build_coworker_shared_count(schedule_resident_id, &1))
+    |> Enum.reject(&(&1.shared_shifts == 0))
+    |> Enum.sort_by(&coworker_shared_count_sort_key/1)
+  end
+
+  defp build_coworker_shared_count(schedule_resident_id, coworker) do
+    shared_shifts =
+      schedule_resident_id
+      |> list_effective_co_service_days(coworker.id)
+      |> length()
+
+    %{resident: coworker, shared_shifts: shared_shifts}
+  end
+
+  defp coworker_shared_count_sort_key(%{resident: coworker, shared_shifts: shared_shifts}) do
+    {-shared_shifts, coworker.residency_year, coworker.schedule_number}
+  end
+
+  @doc """
   Inserts a batch of rotation records for a schedule resident.
   Returns `{:ok, count}` or `{:error, reason}`.
   """

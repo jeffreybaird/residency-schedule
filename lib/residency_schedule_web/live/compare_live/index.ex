@@ -55,6 +55,11 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
   end
 
   @impl true
+  def handle_params(params, _uri, socket) do
+    {:noreply, apply_pair_params(socket, params)}
+  end
+
+  @impl true
   def handle_event("select_schedule", %{"id" => id}, socket) do
     schedule = Schedules.get_schedule!(String.to_integer(id))
     residents = Residents.list_residents_for_schedule(schedule.id)
@@ -360,6 +365,34 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
       <% end %>
     </div>
     """
+  end
+
+  # Deep-links from the resident coworkers tab arrive as `?a=<id>&b=<id>` where
+  # both ids are schedule residents in one schedule. Switch to that schedule and
+  # preselect the pair so the comparison loads immediately.
+  defp apply_pair_params(socket, %{"a" => a, "b" => b}) do
+    with {a_id, ""} <- Integer.parse(a),
+         {b_id, ""} <- Integer.parse(b),
+         {:ok, schedule} <- fetch_resident_schedule(a_id) do
+      socket
+      |> assign(
+        schedule: schedule,
+        residents: Residents.list_residents_for_schedule(schedule.id),
+        resident_a_id: a_id,
+        resident_b_id: b_id
+      )
+      |> maybe_load_comparison()
+    else
+      _ -> socket
+    end
+  end
+
+  defp apply_pair_params(socket, _params), do: socket
+
+  defp fetch_resident_schedule(schedule_resident_id) do
+    {:ok, Residents.get_resident!(schedule_resident_id).schedule}
+  rescue
+    Ecto.NoResultsError -> :error
   end
 
   defp maybe_load_comparison(%{assigns: %{resident_a_id: nil}} = socket), do: socket

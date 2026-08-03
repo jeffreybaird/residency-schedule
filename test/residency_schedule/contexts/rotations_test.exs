@@ -654,4 +654,69 @@ defmodule ResidencySchedule.RotationsTest do
       assert is_list(days)
     end
   end
+
+  describe "list_coworker_shared_shift_counts/1" do
+    setup %{schedule: sched} do
+      # rc shares all five oncology days with ra; rd shares three of them.
+      {:ok, rc} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R3-1",
+          residency_year: 3,
+          schedule_number: 1,
+          name: "Pat"
+        })
+
+      {:ok, rd} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R2-1",
+          residency_year: 2,
+          schedule_number: 1,
+          name: "Morgan"
+        })
+
+      {:ok, _} =
+        Rotations.insert_rotations(rc.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-03],
+            end_date: ~D[2023-07-07],
+            rotation_type: :oncology
+          }
+        ])
+
+      {:ok, _} =
+        Rotations.insert_rotations(rd.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-05],
+            end_date: ~D[2023-07-07],
+            rotation_type: :oncology
+          }
+        ])
+
+      %{rc: rc, rd: rd}
+    end
+
+    test "returns coworkers sorted by shared shifts, most to least", %{ra: ra, rc: rc, rd: rd} do
+      result = Rotations.list_coworker_shared_shift_counts(ra.id)
+
+      assert Enum.map(result, & &1.resident.id) == [rc.id, rd.id]
+      assert Enum.map(result, & &1.shared_shifts) == [5, 3]
+    end
+
+    test "excludes the resident themselves", %{ra: ra} do
+      result = Rotations.list_coworker_shared_shift_counts(ra.id)
+      refute Enum.any?(result, &(&1.resident.id == ra.id))
+    end
+
+    test "excludes coworkers with no shared shifts", %{ra: ra, rb: rb} do
+      result = Rotations.list_coworker_shared_shift_counts(ra.id)
+      refute Enum.any?(result, &(&1.resident.id == rb.id))
+    end
+
+    test "each count matches the compare page's co-service day count", %{ra: ra, rc: rc} do
+      [top | _] = Rotations.list_coworker_shared_shift_counts(ra.id)
+      assert top.shared_shifts == length(Rotations.list_effective_co_service_days(ra.id, rc.id))
+    end
+  end
 end
