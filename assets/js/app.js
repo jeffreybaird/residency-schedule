@@ -41,7 +41,10 @@ Hooks.GuidedTour = {
   mounted() {
     this._page = this.el.dataset.tourPage || "schedule"
     this._role = this.el.dataset.tourRole || "user"
-    this._demo = this.el.dataset.demoMode === "true"
+    // Read from the layout, not this element: the tour ends on /compare, and a
+    // per-page attribute that only the calendar carried left the "seen" flag
+    // unwritten there, restarting the tour on the redirect home.
+    this._demo = document.querySelector('meta[name="demo-mode"]')?.content === "true"
     this._startTour = () => this._run(this._page)
 
     // Check if we're resuming after a page navigation.
@@ -88,8 +91,13 @@ Hooks.GuidedTour = {
     }
   },
 
+  // Server-rendered so demo and production tours never diverge from the nav.
+  _brand() {
+    return document.querySelector('meta[name="brand-name"]')?.content || "Residency Schedule"
+  },
+
   _run(page, startAtId) {
-    const tour = buildTour(page, startAtId, this._role)
+    const tour = buildTour(page, startAtId, this._role, this._brand())
     tour.on("complete", () => {
       this._markDemoTourSeen()
       this.pushEvent("tour_completed", {})
