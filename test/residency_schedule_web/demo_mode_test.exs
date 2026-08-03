@@ -83,6 +83,50 @@ defmodule ResidencyScheduleWeb.DemoModeTest do
     end
   end
 
+  describe "demo flag on tour pages" do
+    # The tour's last step lives on /compare and redirects home. When only the
+    # calendar advertised demo mode, the walkthrough could not record itself as
+    # seen from /compare, so the redirect restarted it from step one. Every page
+    # that hosts the tour has to carry the flag.
+    test "reaches every page the tour runs on" do
+      set_demo_mode(true)
+      seed_schedule()
+      schedule = hd(ResidencySchedule.Schedules.list_schedules())
+      resident = hd(ResidencySchedule.Residents.list_residents_for_schedule(schedule.id))
+
+      for path <- ["/", "/schedule", "/compare", "/residents/#{resident.id}"] do
+        {:ok, _view, html} = live(build_conn(), path)
+
+        assert html =~ ~s(name="demo-mode" content="true"),
+               "#{path} does not tell the tour it is running in demo mode"
+
+        assert html =~ ~s(phx-hook="GuidedTour"), "#{path} no longer hosts the tour"
+      end
+    end
+  end
+
+  describe "branding in demo mode" do
+    test "never names the program anywhere on the page" do
+      set_demo_mode(true)
+      seed_schedule()
+
+      {:ok, _view, html} = live(build_conn(), "/")
+
+      refute html =~ "URMC"
+      assert html =~ "Residency Schedule"
+    end
+
+    test "keeps the program name on the real deployment", %{conn: conn} do
+      set_demo_mode(false)
+      seed_schedule()
+      %{conn: conn} = authenticate_session(%{conn: conn})
+
+      {:ok, _view, html} = live(conn, "/")
+
+      assert html =~ "URMC OBGYN"
+    end
+  end
+
   describe "writes refused in demo mode" do
     setup do
       set_demo_mode(true)
@@ -113,7 +157,7 @@ defmodule ResidencyScheduleWeb.DemoModeTest do
       {:ok, _view, html} = live(build_conn(), "/")
 
       assert html =~ ~s(data-auto-start="true")
-      assert html =~ ~s(data-demo-mode="true")
+      assert html =~ ~s(name="demo-mode" content="true")
     end
 
     test "tour_completed does not raise on the unpersisted demo user" do

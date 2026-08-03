@@ -20,7 +20,6 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         filter_panel: nil,
         selected_date: nil,
         current_user: current_user,
-        demo_mode: ResidencySchedule.demo_mode?(),
         show_tour: show_tour?(current_user)
       )
 
@@ -193,7 +192,6 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       data-tour-page="calendar"
       data-tour-role={to_string(@current_user.role)}
       data-auto-start={to_string(@show_tour)}
-      data-demo-mode={to_string(@demo_mode)}
       class="max-w-4xl mx-auto py-10 px-4"
     >
       <div id="calendar-prefs" phx-hook="CalendarPrefs" class="hidden"></div>

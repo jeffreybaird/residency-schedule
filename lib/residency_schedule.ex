@@ -23,6 +23,20 @@ defmodule ResidencySchedule do
   end
 
   @doc """
+  Returns the product name shown in the title bar, the nav, and the tour.
+
+  The demo is public and its data is invented, so it must not carry the
+  program's name — a stranger landing on it should never read it as URMC's
+  real call schedule.
+
+      iex> ResidencySchedule.brand_name()
+      "URMC OBGYN"
+  """
+  def brand_name do
+    if demo_mode?(), do: "Residency Schedule", else: "URMC OBGYN"
+  end
+
+  @doc """
   Returns the stand-in user assigned to anonymous demo visitors.
 
   The auth layer assigns `:current_user` on every request and the templates
