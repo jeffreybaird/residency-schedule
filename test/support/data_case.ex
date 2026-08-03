@@ -61,8 +61,8 @@ defmodule ResidencySchedule.DataCase do
   def seed_schedule(year \\ 2023) do
     fixture =
       if year == 2023,
-        do: "test/fixtures/sample_schedule.csv",
-        else: "test/fixtures/sample_schedule_2026.csv"
+        do: "test/fixtures/sample.csv",
+        else: "test/fixtures/sample_2026.csv"
 
     csv = File.read!(fixture)
     {:ok, result, _warnings} = ResidencySchedule.Importer.ScheduleImporter.import_csv(csv)

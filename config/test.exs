@@ -5,6 +5,8 @@ import Config
 # The MIX_TEST_PARTITION environment variable can be used
 # to provide built-in test partitioning in CI environment.
 # Run `mix help test` for more information.
+config :residency_schedule, roster_path: "test/fixtures/roster.csv"
+
 config :residency_schedule, ResidencySchedule.Repo,
   username: "postgres",
   password: "postgres",

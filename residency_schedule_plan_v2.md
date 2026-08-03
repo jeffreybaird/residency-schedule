@@ -27,7 +27,7 @@ Row 3+ →  resident rows OR separator rows
 Last 2 rows → legend/summary table (skip)
 ```
 
-**Resident row:** `["R4-1", "Alexis", "ONC", "HWD", "ONC", "", ...]`
+**Resident row:** `["R4-1", "Briar", "ONC", "HWD", "ONC", "", ...]`
 
 **Separator row between year groups:** col A is blank, col B is blank, occasional annotation
 cells like `"HWN"` — detected by col A being empty.
@@ -64,11 +64,11 @@ end
 ```
 
 ### 2. Trailing whitespace in names
-Several names have trailing spaces: `"Kathryn "`, `"Danielle "`, `"Chima "`, etc.
+Several names have trailing spaces: `"Greta "`, `"Marlowe "`, `"Nkem "`, etc.
 Always `String.trim/1` the name field.
 
 ### 3. Backtick artifact in R2-1
-`R2-1` (Chima) has a backtick `` ` `` as one cell value. Treat any unrecognized
+`R2-1` (Nkem) has a backtick `` ` `` as one cell value. Treat any unrecognized
 abbreviation as a parse warning (collect and report), not a hard failure.
 
 ---
@@ -674,7 +674,7 @@ Obstetrics – Strong
   • John Smith (R4)
   • Maria Lopez (R1)
 Vacation
-  • Alex Kim (R3)
+  • Rio Kim (R3)
 ```
 
 Use `phx-click-away` on the popover to dismiss it.

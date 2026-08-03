@@ -195,7 +195,7 @@ defmodule ResidencySchedule.IcalTest do
     end
 
     test "segments with covered_by set are excluded" do
-      covering_resident = %{name: "Emily"}
+      covering_resident = %{name: "Nora"}
 
       seg_free = %{
         rotation_type: "ambulatory",
@@ -211,7 +211,7 @@ defmodule ResidencySchedule.IcalTest do
         covered_by: covering_resident
       }
 
-      result = Ical.build_from_segments([seg_free, seg_covered], "Clare")
+      result = Ical.build_from_segments([seg_free, seg_covered], "Isolde")
       # Free segment appears
       assert result =~ "DTSTART:20260301T060000"
       # Covered segment does not appear
@@ -219,7 +219,7 @@ defmodule ResidencySchedule.IcalTest do
     end
 
     test "coverage segments (is_coverage: true) are included" do
-      original_resident = %{name: "Clare"}
+      original_resident = %{name: "Isolde"}
 
       seg = %{
         rotation_type: "night_float",
@@ -230,7 +230,7 @@ defmodule ResidencySchedule.IcalTest do
         original_resident: original_resident
       }
 
-      result = Ical.build_from_segments([seg], "Emily")
+      result = Ical.build_from_segments([seg], "Nora")
       assert result =~ "DTSTART:20260307T180000"
     end
   end

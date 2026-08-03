@@ -6,25 +6,25 @@ defmodule ResidencySchedule.IcalOverridesTest do
   setup do
     {:ok, sched} = Schedules.upsert_schedule(2023, "2023–2024")
 
-    {:ok, clare} =
+    {:ok, isolde} =
       Residents.insert_resident(sched.id, %{
         position_code: "R4-1",
         residency_year: 4,
         schedule_number: 1,
-        name: "Clare"
+        name: "Isolde"
       })
 
-    {:ok, emily} =
+    {:ok, nora} =
       Residents.insert_resident(sched.id, %{
         position_code: "R2-1",
         residency_year: 2,
         schedule_number: 1,
-        name: "Emily"
+        name: "Nora"
       })
 
-    # Clare: Night Float Jul 1–14
+    # Isolde: Night Float Jul 1–14
     {:ok, _} =
-      Rotations.insert_rotations(clare.id, [
+      Rotations.insert_rotations(isolde.id, [
         %{
           slot_index: 0,
           start_date: ~D[2023-07-01],
@@ -33,9 +33,9 @@ defmodule ResidencySchedule.IcalOverridesTest do
         }
       ])
 
-    # Emily: Elective Jul 1–14
+    # Nora: Elective Jul 1–14
     {:ok, _} =
-      Rotations.insert_rotations(emily.id, [
+      Rotations.insert_rotations(nora.id, [
         %{
           slot_index: 0,
           start_date: ~D[2023-07-01],
@@ -44,58 +44,58 @@ defmodule ResidencySchedule.IcalOverridesTest do
         }
       ])
 
-    clares_rotation = Rotations.list_rotations_for_resident(clare.id) |> hd()
+    clares_rotation = Rotations.list_rotations_for_resident(isolde.id) |> hd()
 
-    %{sched: sched, clare: clare, emily: emily, rotation: clares_rotation}
+    %{sched: sched, isolde: isolde, nora: nora, rotation: clares_rotation}
   end
 
   describe "build/1" do
     test "covered period is excluded from original resident's iCal", %{
-      clare: clare,
-      emily: emily,
+      isolde: isolde,
+      nora: nora,
       rotation: rot
     } do
       {:ok, _} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,
-          covering_schedule_resident_id: emily.id,
+          covering_schedule_resident_id: nora.id,
           override_start_date: ~D[2023-07-08],
           override_end_date: ~D[2023-07-14]
         })
 
-      result = Ical.build(clare)
+      result = Ical.build(isolde)
 
-      # Jul 1–7 (free): Clare is working, these nights should appear
+      # Jul 1–7 (free): Isolde is working, these nights should appear
       assert result =~ "20230630T180000"
-      # Jul 8–14 (covered by Emily): should NOT appear for Clare
+      # Jul 8–14 (covered by Nora): should NOT appear for Isolde
       refute result =~ "20230707T180000"
     end
 
     test "covering resident's own shift is removed for covered dates", %{
-      clare: _clare,
-      emily: emily,
+      isolde: _clare,
+      nora: nora,
       rotation: rot
     } do
       {:ok, _} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,
-          covering_schedule_resident_id: emily.id,
+          covering_schedule_resident_id: nora.id,
           override_start_date: ~D[2023-07-08],
           override_end_date: ~D[2023-07-14]
         })
 
-      result = Ical.build(emily)
+      result = Ical.build(nora)
 
-      # Emily's Elective Jul 1–7 should appear (she's working)
+      # Nora's Elective Jul 1–7 should appear (she's working)
       assert result =~ "DTSTART:20230701T060000"
-      # Emily's Elective Jul 8–14 should NOT appear (she's covering Clare, not on Elective)
+      # Nora's Elective Jul 8–14 should NOT appear (she's covering Isolde, not on Elective)
       refute result =~ "DTSTART:20230808T060000"
-      # Emily's Night Float coverage Jul 8–14 SHOULD appear
+      # Nora's Night Float coverage Jul 8–14 SHOULD appear
       assert result =~ "20230707T180000"
     end
 
-    test "produces valid VCALENDAR with no overrides", %{clare: clare} do
-      result = Ical.build(clare)
+    test "produces valid VCALENDAR with no overrides", %{isolde: isolde} do
+      result = Ical.build(isolde)
       assert result =~ "BEGIN:VCALENDAR"
       assert result =~ "END:VCALENDAR"
     end

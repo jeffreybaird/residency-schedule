@@ -282,7 +282,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
           position_code: "R3-1",
           residency_year: 3,
           schedule_number: 1,
-          name: "Alexis"
+          name: "Briar"
         })
 
       {:ok, sr_2026} =
@@ -290,7 +290,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
           position_code: "R4-1",
           residency_year: 4,
           schedule_number: 1,
-          name: "Alexis"
+          name: "Briar"
         })
 
       {:ok, _} =

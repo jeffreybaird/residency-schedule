@@ -13,7 +13,7 @@ defmodule ResidencySchedule.Residents.Resident do
   @doc """
   Changeset for creating or updating a resident (person).
 
-      iex> changeset = ResidencySchedule.Residents.Resident.changeset(%ResidencySchedule.Residents.Resident{}, %{name: "Alexis"})
+      iex> changeset = ResidencySchedule.Residents.Resident.changeset(%ResidencySchedule.Residents.Resident{}, %{name: "Briar"})
       iex> changeset.valid?
       true
   """

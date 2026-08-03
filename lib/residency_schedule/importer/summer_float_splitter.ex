@@ -36,10 +36,6 @@ defmodule ResidencySchedule.Importer.SummerFloatSplitter do
   @early_groups [{0, 4}, {1, 3}, {2, 2}, {3, 1}]
   @late_groups [{1, 4}, {2, 3}, {3, 2}, {4, 1}]
 
-  # Float resident names that differ from the canonical first-name form used by
-  # `NameNormalizer` and cannot be matched by a shared first token.
-  @aliases %{"anne" => "annie", "evdokiya" => "zhenya", "evdokia" => "zhenya"}
-
   @doc """
   Splits a summer-float CSV binary into `%{early: binary, late: binary}`.
 
@@ -47,8 +43,8 @@ defmodule ResidencySchedule.Importer.SummerFloatSplitter do
   day, `2026-06-17`; the following day is the first date in the late file.
 
       iex> {:ok, %{early: early}} =
-      ...>   ResidencySchedule.Importer.SummerFloatSplitter.split(File.read!("test/fixtures/summer_float_sample.csv"))
-      iex> early |> String.split("\\n") |> Enum.member?("R3-1,Clare,OB,OFF,OFF,GYN,GYN,OFF")
+      ...>   ResidencySchedule.Importer.SummerFloatSplitter.split(File.read!("test/fixtures/summer_float.csv"))
+      iex> early |> String.split("\\n") |> Enum.member?("R3-1,Isolde,OB,OFF,OFF,GYN,GYN,OFF")
       true
   """
   def split(binary, cutoff \\ @cutoff) do
@@ -147,7 +143,7 @@ defmodule ResidencySchedule.Importer.SummerFloatSplitter do
 
   defp aliased_name(name) do
     normalized = normalize_name(name)
-    Map.get(@aliases, normalized, normalized)
+    Map.get(NameNormalizer.aliases(), normalized, normalized)
   end
 
   defp first_token(name) do

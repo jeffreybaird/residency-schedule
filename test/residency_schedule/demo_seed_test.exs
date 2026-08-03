@@ -39,7 +39,7 @@ defmodule ResidencySchedule.DemoSeedTest do
         |> Enum.map(& &1.name)
 
       assert "Wren Halloway" in names
-      refute "Paige R" in names
+      refute "Juno R" in names
     end
 
     test "covers the current academic year so it renders on the calendar" do

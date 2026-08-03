@@ -11,7 +11,7 @@ defmodule ResidencyScheduleWeb.IcalFeedTest do
         position_code: "R4-1",
         residency_year: 4,
         schedule_number: 1,
-        name: "Clare"
+        name: "Isolde"
       })
 
     {:ok, _} =
@@ -35,7 +35,7 @@ defmodule ResidencyScheduleWeb.IcalFeedTest do
       conn = get(conn, "/feed/#{resident.calendar_token}/calendar.ics")
       assert response_content_type(conn, :ics) =~ "text/calendar"
       assert response(conn, 200) =~ "BEGIN:VCALENDAR"
-      assert response(conn, 200) =~ "Clare"
+      assert response(conn, 200) =~ "Isolde"
     end
 
     test "raises for an invalid token", %{conn: conn} do

@@ -6,7 +6,7 @@ defmodule ResidencySchedule.Importer.SummerFloatSplitterTest do
 
   doctest SummerFloatSplitter
 
-  @fixture File.read!("test/fixtures/summer_float_sample.csv")
+  @fixture File.read!("test/fixtures/summer_float.csv")
 
   defp split, do: SummerFloatSplitter.split(@fixture)
 
@@ -50,45 +50,45 @@ defmodule ResidencySchedule.Importer.SummerFloatSplitterTest do
   describe "split/2 seniority shift" do
     test "graduating R4s are the early R4s and are absent from the late file" do
       {:ok, %{early: early, late: late}} = split()
-      assert code_to_name(early)["R4-1"] == "Laura"
+      assert code_to_name(early)["R4-1"] == "Fern"
 
       late_names = late |> code_to_name() |> Map.values()
-      refute "Laura" in late_names
+      refute "Fern" in late_names
     end
 
     test "rising R4s are R3 in the early file and R4 in the late file" do
       {:ok, %{early: early, late: late}} = split()
-      assert code_to_name(early)["R3-1"] == "Clare"
-      assert code_to_name(late)["R4-6"] == "Clare"
+      assert code_to_name(early)["R3-1"] == "Isolde"
+      assert code_to_name(late)["R4-6"] == "Isolde"
     end
 
     test "interns are the late R1s and are absent from the early file" do
       {:ok, %{early: early, late: late}} = split()
-      assert code_to_name(late)["R1-1"] == "Hannah"
+      assert code_to_name(late)["R1-1"] == "Astrid"
 
       early_names = early |> code_to_name() |> Map.values()
-      refute "Hannah" in early_names
+      refute "Astrid" in early_names
     end
   end
 
   describe "split/2 name reconciliation" do
-    test "alias names resolve to canonical form (Evdokiya -> Zhenya)" do
+    test "alias names resolve to canonical form (Aleksandra -> Sasha)" do
       {:ok, %{early: early, late: late}} = split()
-      assert code_to_name(early)["R1-4"] == "Zhenya"
-      assert code_to_name(late)["R2-7"] == "Zhenya"
+      assert code_to_name(early)["R1-4"] == "Sasha"
+      assert code_to_name(late)["R2-7"] == "Sasha"
     end
 
-    test "first-token names resolve to suffixed canonical form (Anne -> Annie)" do
+    test "first-token names resolve to suffixed canonical form (Rose -> Rosie)" do
       {:ok, %{early: early}} = split()
-      assert code_to_name(early)["R4-5"] == "Annie"
+      assert code_to_name(early)["R4-5"] == "Rosie"
     end
 
     test "rising-class rows are reordered to canonical position order in the late file" do
       {:ok, %{late: late}} = split()
       names = late |> code_to_name()
-      assert names["R4-1"] == "Paige R"
-      assert names["R4-2"] == "Grace"
-      assert names["R4-8"] == "Tiffany"
+      assert names["R4-1"] == "Juno R"
+      assert names["R4-2"] == "Solene"
+      assert names["R4-8"] == "Opal"
     end
   end
 
@@ -132,8 +132,8 @@ defmodule ResidencySchedule.Importer.SummerFloatSplitterTest do
 
   describe "split/2 error paths" do
     test "returns an error when a roster row is missing" do
-      broken = String.replace(@fixture, ~r/^Clare,.*\n/m, "")
-      assert {:error, {:unmatched, "R3-1", "Clare"}} = SummerFloatSplitter.split(broken)
+      broken = String.replace(@fixture, ~r/^Isolde,.*\n/m, "")
+      assert {:error, {:unmatched, "R3-1", "Isolde"}} = SummerFloatSplitter.split(broken)
     end
 
     test "returns an error when the block structure is unexpected" do

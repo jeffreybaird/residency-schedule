@@ -267,7 +267,7 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
           position_code: "R3-1",
           residency_year: 3,
           schedule_number: 1,
-          name: "Alexis"
+          name: "Briar"
         })
 
       {:ok, sr_2026} =
@@ -275,7 +275,7 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
           position_code: "R4-1",
           residency_year: 4,
           schedule_number: 1,
-          name: "Alexis"
+          name: "Briar"
         })
 
       {:ok, _} =
@@ -292,7 +292,7 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
       ResidencySchedule.Accounts.set_home_resident(user, sr_2023.id)
 
       {:ok, _view, html} = live(conn, "/?date=2026-07-08&view=day")
-      assert html =~ "Alexis"
+      assert html =~ "Briar"
       # The resident is one entity, so the filter counts them once across years.
       assert html =~ "Residents (1)"
     end

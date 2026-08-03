@@ -7,6 +7,10 @@ end
 config :residency_schedule, ResidencyScheduleWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+if roster_path = System.get_env("ROSTER_PATH") do
+  config :residency_schedule, roster_path: roster_path
+end
+
 # Allow Resend in dev when RESEND_API_KEY is set
 if config_env() == :dev and System.get_env("RESEND_API_KEY") do
   config :residency_schedule, ResidencySchedule.Mailer,

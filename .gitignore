@@ -42,3 +42,5 @@ npm-debug.log
 .claude/settings.local.json
 
 .playwright-mcp/
+# Real schedule data (PII) — never commit
+/data/
