@@ -59,6 +59,30 @@ defmodule ResidencyScheduleWeb.DemoModeTest do
     end
   end
 
+  describe "demo mode banner" do
+    test "warns on every page that the data is invented" do
+      set_demo_mode(true)
+      seed_schedule()
+
+      {:ok, _view, html} = live(build_conn(), "/schedule")
+
+      assert html =~ ~s(id="demo-banner")
+      assert html =~ "Demo Mode"
+      assert html =~ "bg-red-600"
+    end
+
+    test "stays hidden on the real deployment", %{conn: conn} do
+      set_demo_mode(false)
+      seed_schedule()
+      %{conn: conn} = authenticate_session(%{conn: conn})
+
+      {:ok, _view, html} = live(conn, "/schedule")
+
+      refute html =~ ~s(id="demo-banner")
+      refute html =~ "Demo Mode"
+    end
+  end
+
   describe "writes refused in demo mode" do
     setup do
       set_demo_mode(true)
