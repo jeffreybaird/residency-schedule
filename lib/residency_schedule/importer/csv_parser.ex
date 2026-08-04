@@ -53,7 +53,7 @@ defmodule ResidencySchedule.Importer.CsvParser do
 
   Returns `{:error, reason}` if the file cannot be parsed at all.
 
-      iex> csv = File.read!("test/fixtures/sample_schedule.csv")
+      iex> csv = File.read!("test/fixtures/sample.csv")
       iex> {:ok, residents, _warnings} = ResidencySchedule.Importer.CsvParser.parse(csv)
       iex> length(residents) > 0
       true

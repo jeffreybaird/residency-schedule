@@ -11,7 +11,7 @@ defmodule ResidencySchedule.ShiftOverridesTest do
         position_code: "R4-1",
         residency_year: 4,
         schedule_number: 1,
-        name: "Clare"
+        name: "Isolde"
       })
 
     {:ok, rb} =
@@ -19,10 +19,10 @@ defmodule ResidencySchedule.ShiftOverridesTest do
         position_code: "R2-1",
         residency_year: 2,
         schedule_number: 1,
-        name: "Emily"
+        name: "Nora"
       })
 
-    # Clare is on Night Float Jul 1–14
+    # Isolde is on Night Float Jul 1–14
     {:ok, _} =
       Rotations.insert_rotations(ra.id, [
         %{
@@ -33,7 +33,7 @@ defmodule ResidencySchedule.ShiftOverridesTest do
         }
       ])
 
-    # Emily is on Elective Jul 1–14
+    # Nora is on Elective Jul 1–14
     {:ok, _} =
       Rotations.insert_rotations(rb.id, [
         %{
@@ -98,7 +98,7 @@ defmodule ResidencySchedule.ShiftOverridesTest do
 
       overrides = ShiftOverrides.list_overrides_for_resident_as_original(ra.id)
       assert length(overrides) == 1
-      assert hd(overrides).covering_schedule_resident.name == "Emily"
+      assert hd(overrides).covering_schedule_resident.name == "Nora"
     end
 
     test "returns empty for resident with no overrides", %{rb: rb} do
@@ -122,7 +122,7 @@ defmodule ResidencySchedule.ShiftOverridesTest do
 
       overrides = ShiftOverrides.list_overrides_for_resident_as_cover(rb.id)
       assert length(overrides) == 1
-      assert hd(overrides).rotation.schedule_resident.name == "Clare"
+      assert hd(overrides).rotation.schedule_resident.name == "Isolde"
     end
 
     test "returns empty for resident who is not covering anyone", %{ra: ra} do

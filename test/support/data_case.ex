@@ -33,6 +33,19 @@ defmodule ResidencySchedule.DataCase do
   end
 
   @doc """
+  Toggles the `:demo_mode` application flag for the duration of one test,
+  restoring the previous value on exit.
+  """
+  def set_demo_mode(enabled) do
+    previous = Application.get_env(:residency_schedule, :demo_mode, false)
+    Application.put_env(:residency_schedule, :demo_mode, enabled)
+
+    ExUnit.Callbacks.on_exit(fn ->
+      Application.put_env(:residency_schedule, :demo_mode, previous)
+    end)
+  end
+
+  @doc """
   Sets up the sandbox based on the test tags.
   """
   def setup_sandbox(tags) do
@@ -48,8 +61,8 @@ defmodule ResidencySchedule.DataCase do
   def seed_schedule(year \\ 2023) do
     fixture =
       if year == 2023,
-        do: "test/fixtures/sample_schedule.csv",
-        else: "test/fixtures/sample_schedule_2026.csv"
+        do: "test/fixtures/sample.csv",
+        else: "test/fixtures/sample_2026.csv"
 
     csv = File.read!(fixture)
     {:ok, result, _warnings} = ResidencySchedule.Importer.ScheduleImporter.import_csv(csv)

@@ -170,7 +170,7 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
   use ResidencySchedule.DataCase  # sets up sandbox
 
   test "full pipeline: CSV binary → database rows" do
-    csv = File.read!("test/fixtures/sample_schedule.csv")
+    csv = File.read!("test/fixtures/sample.csv")
 
     assert {:ok, %{residents: r_count, rotations: rot_count}} =
              ScheduleImporter.import_csv(csv)
@@ -180,12 +180,12 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
 
     # Spot-check a known resident from the fixture
     resident = Residents.get_resident_by_position!("R4-1")
-    assert resident.name == "Alexis"
+    assert resident.name == "Briar"
     assert length(resident.rotations) > 0
   end
 
   test "re-importing the same CSV replaces data without duplication" do
-    csv = File.read!("test/fixtures/sample_schedule.csv")
+    csv = File.read!("test/fixtures/sample.csv")
     {:ok, first} = ScheduleImporter.import_csv(csv)
     {:ok, second} = ScheduleImporter.import_csv(csv)
     assert first.residents == second.residents
@@ -193,8 +193,8 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
   end
 
   test "importing a second academic year does not affect the first" do
-    csv_2023 = File.read!("test/fixtures/sample_schedule.csv")
-    csv_2026 = File.read!("test/fixtures/sample_schedule_2026.csv")
+    csv_2023 = File.read!("test/fixtures/sample.csv")
+    csv_2026 = File.read!("test/fixtures/sample_2026.csv")
     {:ok, _} = ScheduleImporter.import_csv(csv_2023)
     {:ok, _} = ScheduleImporter.import_csv(csv_2026)
 
@@ -232,9 +232,9 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
 end
 ```
 
-**Test fixture:** Check in `test/fixtures/sample_schedule.csv` — this should be the
+**Test fixture:** Check in `test/fixtures/sample.csv` — this should be the
 actual 2023-2024 CSV with names replaced by pseudonyms if privacy is a concern.
-A second fixture `test/fixtures/sample_schedule_2026.csv` with a different start
+A second fixture `test/fixtures/sample_2026.csv` with a different start
 year is needed for multi-year tests (can be a modified copy of the first).
 
 ---
@@ -310,7 +310,7 @@ Add these to `test/support/data_case.ex` for use across all context tests:
 
 ```elixir
 def seed_schedule(year \\ 2023) do
-  csv = File.read!("test/fixtures/sample_schedule.csv")
+  csv = File.read!("test/fixtures/sample.csv")
   {:ok, result, _warnings} = ResidencySchedule.Importer.ScheduleImporter.import_csv(csv)
   result
 end

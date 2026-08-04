@@ -4,7 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
-    <.live_title default="URMC OBGYN">
+    <meta name="brand-name" content={ResidencySchedule.brand_name()} />
+    <meta name="demo-mode" content={to_string(ResidencySchedule.demo_mode?())} />
+    <.live_title default={ResidencySchedule.brand_name()}>
       {assigns[:page_title]}
     </.live_title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -33,13 +35,14 @@
     </script>
   </head>
   <body>
+    <.demo_banner />
     <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div class="px-4 sm:px-6 py-3 flex items-center justify-between">
         <a
           href="/"
           class="flex items-center gap-2 text-base font-semibold text-gray-800 hover:text-blue-600 transition-colors shrink-0"
         >
-          <img src="/favicon.svg" alt="" class="w-6 h-6" /> URMC OBGYN
+          <img src="/favicon.svg" alt="" class="w-6 h-6" />{ResidencySchedule.brand_name()}
         </a>
 
         <%!-- Desktop nav --%>

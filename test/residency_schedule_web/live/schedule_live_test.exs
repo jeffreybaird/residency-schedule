@@ -54,11 +54,11 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
 
     test "renders non-graduated residents in the grid", %{html: html} do
-      assert html =~ "Carson"
+      assert html =~ "Quinn"
     end
 
     test "graduated R4 cohort rendered with c/o label", %{html: html} do
-      assert html =~ "Alexis"
+      assert html =~ "Briar"
       assert html =~ "c/o 2023"
     end
 
@@ -69,15 +69,15 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
 
     test "year filter shows only the cohort currently at R2", %{view: view} do
       html = view |> element("button[phx-value-year='2']") |> render_click()
-      assert html =~ "Carson"
-      refute html =~ "Kathryn"
+      assert html =~ "Quinn"
+      refute html =~ "Greta"
     end
 
     test "All filter restores all residents", %{view: view} do
       view |> element("button[phx-value-year='2']") |> render_click()
       html = view |> element("button[phx-value-year='all']") |> render_click()
-      assert html =~ "Carson"
-      assert html =~ "Kathryn"
+      assert html =~ "Quinn"
+      assert html =~ "Greta"
     end
 
     test "year group separator rows appear between classes", %{html: html} do
@@ -94,15 +94,15 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     } do
       render_hook(view, "view_academic_year", %{"aca_year" => "2023"})
       html = view |> element("button[phx-value-year='4']") |> render_click()
-      assert html =~ "Alexis"
-      refute html =~ "Kathryn"
+      assert html =~ "Briar"
+      refute html =~ "Greta"
     end
 
     test "view_academic_year handles integer aca_year from JS hooks", %{view: view} do
       render_hook(view, "view_academic_year", %{"aca_year" => 2023})
       html = view |> element("button[phx-value-year='4']") |> render_click()
-      assert html =~ "Alexis"
-      refute html =~ "Kathryn"
+      assert html =~ "Briar"
+      refute html =~ "Greta"
     end
   end
 
@@ -117,14 +117,14 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
 
     test "shows R4 residents when their rotations have not ended", %{html: html} do
-      assert html =~ "Alexis"
+      assert html =~ "Briar"
       assert html =~ ~s(data-year-group="2023")
     end
 
     test "R4 filter shows R4 residents", %{view: view} do
       html = view |> element("button[phx-value-year='4']") |> render_click()
-      assert html =~ "Alexis"
-      refute html =~ "Carson"
+      assert html =~ "Briar"
+      refute html =~ "Quinn"
     end
   end
 
@@ -146,7 +146,7 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
 
     test "incoming class is rendered with c/o label", %{html: html} do
-      assert html =~ "Hannah"
+      assert html =~ "Astrid"
       assert html =~ "c/o 2029"
     end
   end

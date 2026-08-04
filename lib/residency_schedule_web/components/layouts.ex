@@ -17,6 +17,31 @@ defmodule ResidencyScheduleWeb.Layouts do
   defp nav_home_label(_user), do: "Following"
 
   @doc """
+  Renders a red banner warning that the visible schedule is synthetic.
+
+  Demo deployments serve invented residents on invented rotations. The banner
+  makes that unmissable, so nobody mistakes the demo for the real call schedule
+  and shows up on the wrong service. Renders nothing outside demo mode.
+
+  ## Examples
+
+      <Layouts.demo_banner />
+
+  """
+  def demo_banner(assigns) do
+    ~H"""
+    <div
+      :if={ResidencySchedule.demo_mode?()}
+      id="demo-banner"
+      role="status"
+      class="bg-red-600 text-white text-center text-sm font-semibold px-4 py-2"
+    >
+      Demo Mode — every resident, name, and rotation on this site is made up.
+    </div>
+    """
+  end
+
+  @doc """
   Renders your app layout.
 
   This function is typically invoked from every template,

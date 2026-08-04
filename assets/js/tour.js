@@ -8,7 +8,7 @@ const MODAL_RADIUS = 4;
 const CALENDAR_STEPS = [
   {
     id: "welcome",
-    title: "Welcome to URMC OBGYN Scheduling!",
+    title: (_role, brand) => `Welcome to ${brand}!`,
     text: "Let\u2019s take a quick look around so you know where everything is. This will only take a minute.<br><br><em style='font-size:0.85em;color:#666'>Click anywhere outside the tour to explore \u2014 a button will appear to continue.</em>",
     buttons: ["next"],
   },
@@ -369,7 +369,9 @@ function buildButtons(keys, tour) {
 
 // ── Tour factory ─────────────────────────────────────────────────────────────
 
-function buildTour(page, startAtId, role) {
+// The demo is public and carries invented data, so the copy must not name the
+// program. `brand` comes from the server via the brand-name meta tag.
+function buildTour(page, startAtId, role, brand) {
   // Steps may scope themselves to roles, and title/text may be functions of
   // the role so the copy matches what the viewer actually sees.
   const steps = (STEP_SETS[page] || SCHEDULE_STEPS).filter(
@@ -397,8 +399,9 @@ function buildTour(page, startAtId, role) {
   for (const step of effectiveSteps) {
     tour.addStep({
       id: step.id,
-      title: typeof step.title === "function" ? step.title(role) : step.title,
-      text: typeof step.text === "function" ? step.text(role) : step.text,
+      title:
+        typeof step.title === "function" ? step.title(role, brand) : step.title,
+      text: typeof step.text === "function" ? step.text(role, brand) : step.text,
       attachTo: step.attachTo,
       buttons: buildButtons(step.buttons || ["next"], tour),
     });

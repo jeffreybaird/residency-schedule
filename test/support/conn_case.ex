@@ -28,7 +28,9 @@ defmodule ResidencyScheduleWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import ResidencyScheduleWeb.ConnCase
-      import ResidencySchedule.DataCase, only: [seed_schedule: 0, seed_schedule: 1]
+
+      import ResidencySchedule.DataCase,
+        only: [seed_schedule: 0, seed_schedule: 1, set_demo_mode: 1]
     end
   end
 

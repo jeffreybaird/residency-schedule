@@ -24,12 +24,12 @@ defmodule ResidencySchedule.Importer.ScheduleMerger do
   map with `:position_code`, `:name`, `:date`, `:base`, and `:addon` keys.
 
       iex> early =
-      ...>   "test/fixtures/summer_float_sample.csv"
+      ...>   "test/fixtures/summer_float.csv"
       ...>   |> File.read!()
       ...>   |> ResidencySchedule.Importer.SummerFloatSplitter.split()
       ...>   |> elem(1)
       ...>   |> Map.fetch!(:early)
-      iex> base = File.read!("test/fixtures/2025-2026.csv")
+      iex> base = File.read!("test/fixtures/schedule_2025_2026.csv")
       iex> {:ok, %{conflicts: conflicts}} = ResidencySchedule.Importer.ScheduleMerger.merge(base, early)
       iex> length(conflicts)
       12
@@ -76,12 +76,12 @@ defmodule ResidencySchedule.Importer.ScheduleMerger do
   returned as conflicts; the base value wins in the merged output.
 
       iex> late =
-      ...>   "test/fixtures/summer_float_sample.csv"
+      ...>   "test/fixtures/summer_float.csv"
       ...>   |> File.read!()
       ...>   |> ResidencySchedule.Importer.SummerFloatSplitter.split()
       ...>   |> elem(1)
       ...>   |> Map.fetch!(:late)
-      iex> base = File.read!("test/fixtures/2026-2027.csv")
+      iex> base = File.read!("test/fixtures/schedule_2026_2027.csv")
       iex> {:ok, %{conflicts: conflicts}} = ResidencySchedule.Importer.ScheduleMerger.prepend(base, late)
       iex> length(conflicts)
       0

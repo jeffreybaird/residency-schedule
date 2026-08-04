@@ -140,7 +140,7 @@ The importer derives the academic year automatically from the dates in the file 
 Row 0: "",  "Dates", "2026-07-06", "2026-07-13", ...   ← start dates
 Row 1: "",  "",      "2026-07-12", "2026-07-19", ...   ← end dates
 Row 2: event annotation row (Retreat, CREOGS, etc.)    ← skipped
-Row 3+: resident rows: "R4-1", "Alexis", "ONC", "HWD", ...
+Row 3+: resident rows: "R4-1", "Briar", "ONC", "HWD", ...
 ```
 
 Only rows where column A matches `R[1-4]-\d+` are imported. All other rows are skipped.

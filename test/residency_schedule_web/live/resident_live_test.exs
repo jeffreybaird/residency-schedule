@@ -272,6 +272,49 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
     end
   end
 
+  describe "coworkers tab" do
+    setup %{conn: conn} do
+      seed_schedule()
+      resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
+      {:ok, view, _html} = live(conn, "/residents/#{resident.id}")
+      %{view: view, resident: resident}
+    end
+
+    test "shows a Coworkers tab button", %{view: view} do
+      assert has_element?(view, "button[phx-value-tab='coworkers']")
+    end
+
+    test "switching to the coworkers tab shows the coworkers table", %{view: view} do
+      html = view |> element("button[phx-value-tab='coworkers']") |> render_click()
+
+      assert html =~ "Shared Shifts"
+      assert has_element?(view, "#coworkers-tab")
+    end
+
+    test "renders a row per coworker with shared shifts", %{view: view, resident: resident} do
+      view |> element("button[phx-value-tab='coworkers']") |> render_click()
+
+      counts = Rotations.list_coworker_shared_shift_counts(resident.id)
+      assert counts != []
+
+      for coworker <- counts do
+        assert has_element?(view, "#coworker-row-#{coworker.resident.id}")
+      end
+    end
+
+    test "clicking a coworker row navigates to the compare page for that pair", %{
+      view: view,
+      resident: resident
+    } do
+      view |> element("button[phx-value-tab='coworkers']") |> render_click()
+      top = hd(Rotations.list_coworker_shared_shift_counts(resident.id))
+
+      view |> element("#coworker-row-#{top.resident.id}") |> render_click()
+
+      assert_redirect(view, "/compare?a=#{resident.id}&b=#{top.resident.id}")
+    end
+  end
+
   describe "multi-year career" do
     test "renders rotations from every academic year on one continuous page", %{conn: conn} do
       {:ok, s2023} = ResidencySchedule.Schedules.upsert_schedule(2023, "2023–2024")
@@ -282,7 +325,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
           position_code: "R3-1",
           residency_year: 3,
           schedule_number: 1,
-          name: "Alexis"
+          name: "Briar"
         })
 
       {:ok, sr_2026} =
@@ -290,7 +333,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
           position_code: "R4-1",
           residency_year: 4,
           schedule_number: 1,
-          name: "Alexis"
+          name: "Briar"
         })
 
       {:ok, _} =

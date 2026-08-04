@@ -7,6 +7,14 @@ defmodule ResidencyScheduleWeb.Plugs.RequireAuth do
   def init(opts), do: opts
 
   def call(conn, _opts) do
+    if ResidencySchedule.demo_mode?() do
+      assign(conn, :current_user, ResidencySchedule.demo_user())
+    else
+      authenticate(conn)
+    end
+  end
+
+  defp authenticate(conn) do
     user_id = get_session(conn, :user_id)
 
     with id when not is_nil(id) <- user_id,

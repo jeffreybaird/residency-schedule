@@ -11,7 +11,7 @@ defmodule ResidencySchedule.Residents.CalendarTokenTest do
         position_code: "R4-1",
         residency_year: 4,
         schedule_number: 1,
-        name: "Clare"
+        name: "Isolde"
       })
 
     %{resident: resident}
@@ -50,7 +50,7 @@ defmodule ResidencySchedule.Residents.CalendarTokenTest do
     test "returns the resident for a valid token", %{resident: resident} do
       found = Residents.get_resident_by_token!(resident.calendar_token)
       assert found.id == resident.id
-      assert found.name == "Clare"
+      assert found.name == "Isolde"
     end
 
     test "raises for an unknown token" do

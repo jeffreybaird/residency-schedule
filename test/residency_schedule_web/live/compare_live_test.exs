@@ -134,4 +134,27 @@ defmodule ResidencyScheduleWeb.CompareLiveTest do
       end
     end
   end
+
+  describe "deep link to a pair" do
+    setup %{conn: conn} do
+      seed_schedule()
+      schedule = hd(ResidencySchedule.Schedules.list_schedules())
+      [a, b | _] = ResidencySchedule.Residents.list_residents_for_schedule(schedule.id)
+      %{conn: conn, a: a, b: b}
+    end
+
+    test "preselects both residents from a and b query params", %{conn: conn, a: a, b: b} do
+      {:ok, view, _html} = live(conn, "/compare?a=#{a.id}&b=#{b.id}")
+
+      assert has_element?(view, "option[value='#{a.id}'][selected]")
+      assert has_element?(view, "option[value='#{b.id}'][selected]")
+      assert render(view) =~ "Shared Shifts"
+    end
+
+    test "ignores invalid resident ids and stays in the unselected state", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/compare?a=not-a-number&b=999999")
+
+      refute html =~ "Shared Shifts"
+    end
+  end
 end

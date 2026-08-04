@@ -91,6 +91,50 @@ defmodule ResidencySchedule.Mailer do
   end
 
   @doc """
+  Sends a denial notification email to a user whose approval was declined.
+
+  Exempt from doctest — sends email.
+  """
+  def send_denial_email(user, base_url) do
+    email =
+      new()
+      |> to(user.email)
+      |> from({from_name(), @from_address})
+      |> subject("Update on your access request — Residency Schedule")
+      |> text_body("""
+      Hi,
+
+      Thanks for your interest in Residency Schedule. After review, your
+      access request was not approved at this time.
+
+      If you believe this was a mistake, just reply to this email and an
+      administrator can take another look:
+
+      #{base_url}/login
+      """)
+      |> html_body("""
+      <p>Hi,</p>
+      <p>Thanks for your interest in Residency Schedule. After review, your
+      access request was not approved at this time.</p>
+      <p>If you believe this was a mistake, just reply to this email and an
+      administrator can take another look.</p>
+      <p style="color: #666; font-size: 12px;">
+        <a href="#{base_url}/login">Residency Schedule</a>
+      </p>
+      """)
+
+    case deliver(email) do
+      {:ok, _metadata} = success ->
+        success
+
+      {:error, reason} = error ->
+        require Logger
+        Logger.error("Mailer.send_denial_email failed: #{inspect(reason)}")
+        error
+    end
+  end
+
+  @doc """
   Notifies the admin that a new user is requesting approval.
 
   Exempt from doctest — sends email.

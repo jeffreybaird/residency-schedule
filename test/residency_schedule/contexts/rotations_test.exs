@@ -11,7 +11,7 @@ defmodule ResidencySchedule.RotationsTest do
         position_code: "R4-1",
         residency_year: 4,
         schedule_number: 1,
-        name: "Alexis"
+        name: "Briar"
       })
 
     {:ok, rb} =
@@ -19,7 +19,7 @@ defmodule ResidencySchedule.RotationsTest do
         position_code: "R4-2",
         residency_year: 4,
         schedule_number: 2,
-        name: "Emily"
+        name: "Nora"
       })
 
     rots_a = [
@@ -356,15 +356,15 @@ defmodule ResidencySchedule.RotationsTest do
     setup do
       {:ok, sched} = Schedules.upsert_schedule(2023, "2023–2024")
 
-      {:ok, clare} =
+      {:ok, isolde} =
         Residents.insert_resident(sched.id, %{
           position_code: "R4-8",
           residency_year: 4,
           schedule_number: 8,
-          name: "Clare"
+          name: "Isolde"
         })
 
-      {:ok, emily} =
+      {:ok, nora} =
         Residents.insert_resident(sched.id, %{
           position_code: "R2-8",
           residency_year: 2,
@@ -373,7 +373,7 @@ defmodule ResidencySchedule.RotationsTest do
         })
 
       {:ok, _} =
-        Rotations.insert_rotations(clare.id, [
+        Rotations.insert_rotations(isolde.id, [
           %{
             slot_index: 0,
             start_date: ~D[2023-07-01],
@@ -383,7 +383,7 @@ defmodule ResidencySchedule.RotationsTest do
         ])
 
       {:ok, _} =
-        Rotations.insert_rotations(emily.id, [
+        Rotations.insert_rotations(nora.id, [
           %{
             slot_index: 0,
             start_date: ~D[2023-07-01],
@@ -392,26 +392,26 @@ defmodule ResidencySchedule.RotationsTest do
           }
         ])
 
-      clares_rotation = Rotations.list_rotations_for_resident(clare.id) |> hd()
+      clares_rotation = Rotations.list_rotations_for_resident(isolde.id) |> hd()
 
       %{
         sched: sched,
-        clare: clare,
-        emily: emily,
+        isolde: isolde,
+        nora: nora,
         clares_rotation: clares_rotation
       }
     end
 
     test "lists coverage row when override overlaps the range", %{
       sched: sched,
-      clare: clare,
-      emily: emily,
+      isolde: isolde,
+      nora: nora,
       clares_rotation: rot
     } do
       {:ok, _} =
         ShiftOverrides.create_override(%{
           rotation_id: rot.id,
-          covering_schedule_resident_id: emily.id,
+          covering_schedule_resident_id: nora.id,
           override_start_date: ~D[2023-07-08],
           override_end_date: ~D[2023-07-14]
         })
@@ -425,13 +425,13 @@ defmodule ResidencySchedule.RotationsTest do
         )
 
       coverage = Enum.find(rows, & &1.is_coverage)
-      assert coverage.resident.id == emily.id
+      assert coverage.resident.id == nora.id
       assert MapSet.size(coverage.active_dates) == 3
 
-      clare_overridden = Enum.find(rows, fn r -> r.resident.id == clare.id && r.overridden end)
+      clare_overridden = Enum.find(rows, fn r -> r.resident.id == isolde.id && r.overridden end)
 
       assert clare_overridden
-      assert clare_overridden.covered_by.id == emily.id
+      assert clare_overridden.covered_by.id == nora.id
     end
   end
 
@@ -652,6 +652,71 @@ defmodule ResidencySchedule.RotationsTest do
       # so no co-service days from setup
       days = Rotations.list_co_service_days(ra.id, rb.id)
       assert is_list(days)
+    end
+  end
+
+  describe "list_coworker_shared_shift_counts/1" do
+    setup %{schedule: sched} do
+      # rc shares all five oncology days with ra; rd shares three of them.
+      {:ok, rc} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R3-1",
+          residency_year: 3,
+          schedule_number: 1,
+          name: "Pat"
+        })
+
+      {:ok, rd} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R2-1",
+          residency_year: 2,
+          schedule_number: 1,
+          name: "Morgan"
+        })
+
+      {:ok, _} =
+        Rotations.insert_rotations(rc.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-03],
+            end_date: ~D[2023-07-07],
+            rotation_type: :oncology
+          }
+        ])
+
+      {:ok, _} =
+        Rotations.insert_rotations(rd.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-05],
+            end_date: ~D[2023-07-07],
+            rotation_type: :oncology
+          }
+        ])
+
+      %{rc: rc, rd: rd}
+    end
+
+    test "returns coworkers sorted by shared shifts, most to least", %{ra: ra, rc: rc, rd: rd} do
+      result = Rotations.list_coworker_shared_shift_counts(ra.id)
+
+      assert Enum.map(result, & &1.resident.id) == [rc.id, rd.id]
+      assert Enum.map(result, & &1.shared_shifts) == [5, 3]
+    end
+
+    test "excludes the resident themselves", %{ra: ra} do
+      result = Rotations.list_coworker_shared_shift_counts(ra.id)
+      refute Enum.any?(result, &(&1.resident.id == ra.id))
+    end
+
+    test "excludes coworkers with no shared shifts", %{ra: ra, rb: rb} do
+      result = Rotations.list_coworker_shared_shift_counts(ra.id)
+      refute Enum.any?(result, &(&1.resident.id == rb.id))
+    end
+
+    test "each count matches the compare page's co-service day count", %{ra: ra, rc: rc} do
+      [top | _] = Rotations.list_coworker_shared_shift_counts(ra.id)
+      assert top.shared_shifts == length(Rotations.list_effective_co_service_days(ra.id, rc.id))
     end
   end
 end

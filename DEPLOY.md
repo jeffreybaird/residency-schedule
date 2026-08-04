@@ -397,6 +397,182 @@ needed to override that default.
 - **Their logs:** Loki `{unit="residency_schedule.service"} | json | metadata_user_id="42"`.
 
 > **Privacy:** spans and logs carry only numeric user ids — never names or emails.
+## Part 7: The public demo deployment
+
+The demo is a **second instance of the same release** on the same droplet: its
+own database, its own systemd unit, its own port, its own domain. It runs with
+`DEMO_MODE=true`, which removes the login wall and refuses every write.
+
+Its data is the synthetic fixture at `priv/demo/demo_schedule.csv` — invented
+names on the current academic year. Nothing in it derives from real program data.
+`Release.seed_demo/0` reloads it on every deploy, so the demo self-heals.
+
+> **Why the names survive:** `NameNormalizer` rewrites resident names to
+> canonical forms for academic years 2023–2026, and the fixture deliberately
+> covers the current year so it renders on the calendar rather than sitting in
+> an empty future. `normalize/3` therefore skips canonicalization entirely when
+> `DEMO_MODE=true`. If a demo ever imports with `DEMO_MODE` unset, its invented
+> names will be silently replaced with the real residents' names. Regenerate the
+> fixture with `python3 priv/demo/gen_demo_schedule.py`.
+
+The demo runs at **residency-schedule.jeffreybaird.com** on port 4002.
+
+> **Port allocation on this droplet.** 4000 is production residency-schedule,
+> 4001 is the Sudoku Race container (`docker-compose.yml` in that repo publishes
+> `127.0.0.1:4001`), and 4002 is this demo. Check what is already listening
+> before assigning a port to anything new: `ss -tlnp | grep 40`.
+
+### 7.0 Run the provisioning script
+
+`priv/demo/provision_demo.sh` performs steps 7.1 through 7.4 in one pass. It is
+idempotent, and it never touches production's `.env`, systemd unit, nginx block,
+or database — production keeps serving throughout.
+
+```bash
+# Copy it to the droplet, read it, then run as root
+scp priv/demo/provision_demo.sh deploy@<droplet-ip>:/tmp/
+ssh deploy@<droplet-ip>
+less /tmp/provision_demo.sh
+sudo bash /tmp/provision_demo.sh
+```
+
+It generates the demo's database password and `SECRET_KEY_BASE`, writes them to
+`/home/deploy/residency_schedule_demo/.env` with mode 600, and **aborts** if the
+demo role turns out to be able to reach the production database. It prints the remaining manual steps (DNS, certbot, the
+`DEMO_DEPLOY_HOST` secret) when it finishes.
+
+The rest of this section explains what the script does, and is the reference if
+you would rather do it by hand.
+
+### 7.1 Scoped database roles
+
+The demo app must not be able to reach the production database. Give each
+instance a non-superuser role that owns only its own database, so a mistyped
+`DATABASE_URL` fails to connect instead of quietly writing to the wrong place.
+
+```bash
+sudo -u postgres psql << 'EOF'
+-- One role per instance, neither of them superuser.
+CREATE ROLE rs_prod LOGIN PASSWORD 'prod-db-password';
+CREATE ROLE rs_demo LOGIN PASSWORD 'demo-db-password';
+
+CREATE DATABASE residency_schedule_demo OWNER rs_demo;
+ALTER DATABASE residency_schedule_prod OWNER TO rs_prod;
+
+-- Neither role may touch the other's database.
+REVOKE ALL ON DATABASE residency_schedule_prod FROM rs_demo, PUBLIC;
+REVOKE ALL ON DATABASE residency_schedule_demo FROM rs_prod, PUBLIC;
+EOF
+```
+
+Then update the **production** `.env` to stop using the superuser:
+
+```
+DATABASE_URL=ecto://rs_prod:prod-db-password@localhost:5432/residency_schedule_prod
+```
+
+Verify the isolation holds before trusting it:
+
+```bash
+# Should succeed
+PGPASSWORD=demo-db-password psql -U rs_demo -h localhost -d residency_schedule_demo -c '\conninfo'
+
+# Should FAIL with "permission denied for database"
+PGPASSWORD=demo-db-password psql -U rs_demo -h localhost -d residency_schedule_prod -c '\conninfo'
+```
+
+If that second command succeeds, stop and fix the grants — the demo is not isolated.
+
+### 7.2 Demo deployment directory and environment
+
+```bash
+mkdir -p /home/deploy/residency_schedule_demo
+chown deploy:deploy /home/deploy/residency_schedule_demo
+
+cat > /home/deploy/residency_schedule_demo/.env << 'EOF'
+DEMO_MODE=true
+PORT=4002
+DATABASE_URL=ecto://rs_demo:demo-db-password@localhost:5432/residency_schedule_demo
+SECRET_KEY_BASE=<generate a SEPARATE one with: mix phx.gen.secret>
+PHX_HOST=residency-schedule.jeffreybaird.com
+POOL_SIZE=5
+EOF
+
+chmod 600 /home/deploy/residency_schedule_demo/.env
+chown deploy:deploy /home/deploy/residency_schedule_demo/.env
+```
+
+Notes on these values:
+
+- `SECRET_KEY_BASE` **must differ from production.** Sharing it would let a
+  session cookie minted by the public demo be replayed against the real app.
+- `ACCESS_PASSWORD` and `RESEND_API_KEY` are **not required** in demo mode —
+  resident auth and magic-link email are both off.
+- No admin password is configured. Admin access is a **user role**, and the demo
+  database has no user accounts at all, so `/admin/*` is unreachable by
+  construction. Never run `Release.promote_admin/1` against the demo database.
+- `PORT=4002` keeps the demo off production's port 4000.
+
+### 7.3 Demo systemd unit
+
+```bash
+cat > /etc/systemd/system/residency_schedule_demo.service << 'EOF'
+[Unit]
+Description=Residency Schedule Public Demo
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/home/deploy/residency_schedule_demo
+EnvironmentFile=/home/deploy/residency_schedule_demo/.env
+ExecStart=/home/deploy/residency_schedule_demo/bin/residency_schedule start
+ExecStop=/home/deploy/residency_schedule_demo/bin/residency_schedule stop
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable residency_schedule_demo
+```
+
+Grant the deploy user restart rights for the new unit the same way you did for
+production in step 1.4.
+
+### 7.4 Nginx vhost and certificate
+
+Add a server block for `residency-schedule.jeffreybaird.com` proxying to `127.0.0.1:4002`,
+mirroring the production block from step 1.9, then:
+
+```bash
+certbot --nginx -d residency-schedule.jeffreybaird.com
+```
+
+### 7.5 GitHub Secret
+
+The deploy workflow builds one release and ships it to both targets. Add:
+
+- `DEMO_DEPLOY_HOST` — the droplet IP or hostname (same box as production)
+
+`DEPLOY_SSH_KEY` is shared between targets. The demo job has
+`fail-fast: false`, so a broken demo deploy cannot abort the production one.
+
+### 7.6 Resource headroom
+
+Two BEAM releases plus PostgreSQL on a 2 GB droplet is tight. Check before and
+after enabling the demo:
+
+```bash
+free -m
+systemctl status residency_schedule residency_schedule_demo
+```
+
+If memory is short, lower `POOL_SIZE` in the demo `.env` before adding swap.
 
 ---
 
@@ -494,3 +670,66 @@ systemctl reload nginx      # reload after config changes
 ```
 
 Verify the `Connection: upgrade` header is present — it is required for Phoenix LiveView WebSocket connections.
+
+---
+
+## Appendix: Endpoint bind address
+
+The endpoint binds `127.0.0.1` by default. Nginx proxies from the same host, so
+nothing needs to reach it directly.
+
+It previously bound `0.0.0.0`, which published the app to the internet on its raw
+port. That mattered because `config/prod.exs` excludes the hosts `localhost` and
+`127.0.0.1` from `force_ssl`, and the `Host` header is supplied by the client — so
+a request to `http://<droplet-ip>:4000/` carrying `Host: localhost` skipped the
+HTTPS redirect and was served the real application over plaintext.
+
+Before deploying this change, confirm nginx proxies over loopback:
+
+```bash
+nginx -T 2>/dev/null | grep proxy_pass
+# expect http://localhost:4000 (or 127.0.0.1:4000), not the droplet's public IP
+```
+
+If a proxy ever runs on a different host, set `HTTP_IP=0.0.0.0` in that
+instance's `.env` and restrict the port at the firewall instead.
+
+Belt and braces — the raw ports should not be open regardless:
+
+```bash
+ufw allow 22,80,443/tcp
+ufw deny 4000/tcp
+ufw deny 4002/tcp
+ufw enable
+ufw status verbose
+```
+
+---
+
+## Appendix: Running two instances of the same release
+
+Production and the demo are the same release, so they default to the same Erlang
+node name (`residency_schedule@<hostname>`). Only one can register it with EPMD —
+whichever starts second exits immediately with:
+
+```
+Protocol 'inet_tcp': the name residency_schedule@<host> seems to be in use by
+another Erlang node
+```
+
+systemd then restarts it on a loop, so the symptom is a 502 from nginx for the
+instance that lost the race, not an obvious crash.
+
+The demo's `.env` therefore sets a distinct node name:
+
+```
+RELEASE_NODE=residency_schedule_demo@127.0.0.1
+RELEASE_DISTRIBUTION=name
+```
+
+Anything else sharing this droplet with another copy of the release needs the
+same treatment. To check which node names are registered:
+
+```bash
+epmd -names
+```

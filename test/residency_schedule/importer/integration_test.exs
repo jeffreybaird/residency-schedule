@@ -6,7 +6,7 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
 
   describe "full pipeline: CSV binary → database rows" do
     test "imports all residents and rotations from the 2023 fixture" do
-      csv = File.read!("test/fixtures/sample_schedule.csv")
+      csv = File.read!("test/fixtures/sample.csv")
 
       assert {:ok, %{residents: r_count, rotations: rot_count}, _warnings} =
                ScheduleImporter.import_csv(csv)
@@ -15,13 +15,13 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
       assert rot_count > 0
 
       pos = Residents.get_resident_by_position!("R4-1")
-      alexis = Residents.get_resident!(pos.id)
-      assert alexis.name == "Alexis"
-      assert length(alexis.rotations) > 0
+      briar = Residents.get_resident!(pos.id)
+      assert briar.name == "Briar"
+      assert length(briar.rotations) > 0
     end
 
     test "re-importing the same CSV replaces data without duplication" do
-      csv = File.read!("test/fixtures/sample_schedule.csv")
+      csv = File.read!("test/fixtures/sample.csv")
       {:ok, first, _} = ScheduleImporter.import_csv(csv)
       {:ok, second, _} = ScheduleImporter.import_csv(csv)
       assert first.residents == second.residents
@@ -29,8 +29,8 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
     end
 
     test "importing a second academic year does not affect the first" do
-      csv_2023 = File.read!("test/fixtures/sample_schedule.csv")
-      csv_2026 = File.read!("test/fixtures/sample_schedule_2026.csv")
+      csv_2023 = File.read!("test/fixtures/sample.csv")
+      csv_2026 = File.read!("test/fixtures/sample_2026.csv")
       {:ok, _, _} = ScheduleImporter.import_csv(csv_2023)
       {:ok, _, _} = ScheduleImporter.import_csv(csv_2026)
 
@@ -41,14 +41,14 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
     end
 
     test "year rollover is corrected — January dates show year+1" do
-      csv = File.read!("test/fixtures/sample_schedule.csv")
+      csv = File.read!("test/fixtures/sample.csv")
       {:ok, _, _} = ScheduleImporter.import_csv(csv)
 
       pos = Residents.get_resident_by_position!("R4-1")
-      alexis = Residents.get_resident!(pos.id)
+      briar = Residents.get_resident!(pos.id)
 
       all_dates =
-        Enum.flat_map(alexis.rotations, &[&1.start_date, &1.end_date])
+        Enum.flat_map(briar.rotations, &[&1.start_date, &1.end_date])
 
       bad = Enum.filter(all_dates, fn d -> d.month in 1..6 and d.year == 2023 end)
       assert bad == [], "Found uncorrected year-rollover dates: #{inspect(bad)}"
@@ -59,7 +59,7 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
     end
 
     test "backtick junk cell produces a warning, not a crash" do
-      csv = File.read!("test/fixtures/sample_schedule.csv")
+      csv = File.read!("test/fixtures/sample.csv")
       {:ok, _summary, warnings} = ScheduleImporter.import_csv(csv)
       backtick = Enum.find(warnings, fn {_code, _idx, val} -> val == "`" end)
       assert backtick != nil

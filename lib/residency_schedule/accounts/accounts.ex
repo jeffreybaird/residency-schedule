@@ -242,7 +242,20 @@ defmodule ResidencySchedule.Accounts do
   Exempt from doctest — hits the database.
   """
   def list_pending_users do
-    from(u in User, where: u.approved == false, order_by: [asc: u.inserted_at])
+    from(u in User,
+      where: u.approved == false and u.denied == false,
+      order_by: [asc: u.inserted_at]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Lists all users who have been denied and are awaiting a possible reinstatement.
+
+  Exempt from doctest — hits the database.
+  """
+  def list_denied_users do
+    from(u in User, where: u.denied == true, order_by: [asc: u.inserted_at])
     |> Repo.all()
   end
 
@@ -278,6 +291,49 @@ defmodule ResidencySchedule.Accounts do
   end
 
   @doc """
+  Soft-rejects a pending user's approval request by marking the account as
+  denied and emailing them the decision. A denied account stays in the
+  database but cannot access the site; an admin can later reinstate it. Only
+  pending (unapproved) users can be denied; approved users must be revoked
+  instead.
+
+  Returns `{:ok, user}`, `{:error, :already_approved}`, or
+  `{:error, changeset}`.
+
+  Exempt from doctest — hits the database.
+  """
+  def deny_user(%User{approved: true}), do: {:error, :already_approved}
+
+  def deny_user(%User{} = user) do
+    with {:ok, denied_user} <-
+           user
+           |> User.denial_changeset(%{denied: true})
+           |> Repo.update() do
+      send_denial_notification(denied_user)
+      {:ok, denied_user}
+    end
+  end
+
+  defp send_denial_notification(user) do
+    base_url = ResidencyScheduleWeb.Endpoint.url()
+    ResidencySchedule.Mailer.send_denial_email(user, base_url)
+  end
+
+  @doc """
+  Reinstates a denied user by clearing the denied flag, returning the account
+  to the pending state so the user can try again and an admin can approve it.
+
+  Returns `{:ok, user}` or `{:error, changeset}`.
+
+  Exempt from doctest — hits the database.
+  """
+  def reinstate_user(%User{} = user) do
+    user
+    |> User.denial_changeset(%{denied: false})
+    |> Repo.update()
+  end
+
+  @doc """
   Revokes approval from a user. Admins cannot be revoked — demote the admin
   role first — so a revoked account can never be the only working admin.
   Returns `{:ok, user}`, `{:error, :admin_cannot_be_revoked}`, or
@@ -299,8 +355,13 @@ defmodule ResidencySchedule.Accounts do
   Marks the user's guided tour as completed.
   Returns `{:ok, user}` or `{:error, changeset}`.
 
+  An unpersisted user — the demo visitor — has no row to update, so it is
+  returned unchanged rather than raising.
+
   Exempt from doctest — hits the database.
   """
+  def complete_tour(%User{id: nil} = user), do: {:ok, user}
+
   def complete_tour(user) do
     user
     |> User.tour_changeset(%{tour_completed: true})

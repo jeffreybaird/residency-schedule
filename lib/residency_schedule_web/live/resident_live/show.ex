@@ -72,6 +72,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
        stats_expanded: true,
        night_shifts_expanded: false,
        shift_coworkers_modal: nil,
+       active_tab: :schedule,
+       coworkers: Rotations.list_coworker_shared_shift_counts(resident.id),
        current_user: current_user
      )}
   end
@@ -83,6 +85,21 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     end
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("switch_tab", %{"tab" => "coworkers"}, socket) do
+    {:noreply, assign(socket, active_tab: :coworkers)}
+  end
+
+  @impl true
+  def handle_event("switch_tab", _params, socket) do
+    {:noreply, assign(socket, active_tab: :schedule)}
+  end
+
+  @impl true
+  def handle_event("open_compare", %{"a" => a, "b" => b}, socket) do
+    {:noreply, push_navigate(socket, to: "/compare?a=#{a}&b=#{b}")}
   end
 
   @impl true
@@ -284,7 +301,25 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
         </div>
       </div>
 
-      <%= if @schedule_start && @schedule_end do %>
+      <div class="mb-4 flex gap-1 border-b border-gray-200">
+        <button
+          phx-click="switch_tab"
+          phx-value-tab="schedule"
+          class={tab_button_class(@active_tab == :schedule)}
+        >
+          Schedule
+        </button>
+        <button
+          phx-click="switch_tab"
+          phx-value-tab="coworkers"
+          class={tab_button_class(@active_tab == :coworkers)}
+        >
+          Coworkers
+        </button>
+      </div>
+
+      <%= if @active_tab == :schedule do %>
+        <%= if @schedule_start && @schedule_end do %>
         <div class="mb-4 text-sm text-gray-500">
           {Calendar.strftime(@schedule_start, "%B %-d, %Y")} – {Calendar.strftime(
             @schedule_end,
@@ -734,11 +769,72 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             </div>
           </div>
         <% end %>
-      <% else %>
-        <p class="text-gray-500">No rotations recorded for this resident.</p>
+        <% else %>
+          <p class="text-gray-500">No rotations recorded for this resident.</p>
+        <% end %>
+      <% end %>
+
+      <%= if @active_tab == :coworkers do %>
+        <div id="coworkers-tab">
+          <%= if @coworkers == [] do %>
+            <p class="text-gray-500 py-8 text-center">
+              No shared shifts with any other resident this year.
+            </p>
+          <% else %>
+            <p class="mb-3 text-sm text-gray-500">
+              Residents {@resident.name} shares shifts with, most to least. Select a row to compare
+              their schedules side by side.
+            </p>
+            <div class="rounded-xl border-2 border-gray-300 overflow-hidden">
+              <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-100">
+                  <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Resident</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600">Shared Shifts</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <%= for coworker <- @coworkers do %>
+                    <tr
+                      id={"coworker-row-#{coworker.resident.id}"}
+                      phx-click="open_compare"
+                      phx-value-a={@resident.id}
+                      phx-value-b={coworker.resident.id}
+                      class="cursor-pointer hover:bg-gray-100 hover:shadow-sm transition-colors"
+                    >
+                      <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                          <span class="text-xs text-gray-400 font-mono w-10 shrink-0">
+                            {coworker.resident.position_code}
+                          </span>
+                          <span class="font-medium text-gray-800">
+                            {coworker.resident.name}
+                          </span>
+                        </div>
+                      </td>
+                      <td class="px-4 py-3 text-right tabular-nums font-semibold text-gray-700">
+                        {coworker.shared_shifts}
+                      </td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+          <% end %>
+        </div>
       <% end %>
     </div>
     """
+  end
+
+  defp tab_button_class(active?) do
+    [
+      "px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors",
+      if(active?,
+        do: "border-blue-600 text-blue-600",
+        else: "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+      )
+    ]
   end
 
   # --- Private helpers ---

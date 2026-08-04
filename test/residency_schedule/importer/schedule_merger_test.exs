@@ -7,12 +7,12 @@ defmodule ResidencySchedule.Importer.ScheduleMergerTest do
 
   doctest ScheduleMerger
 
-  @base File.read!("test/fixtures/2025-2026.csv")
-  @base_2027 File.read!("test/fixtures/2026-2027.csv")
+  @base File.read!("test/fixtures/schedule_2025_2026.csv")
+  @base_2027 File.read!("test/fixtures/schedule_2026_2027.csv")
 
   setup_all do
     {:ok, %{early: early, late: late}} =
-      "test/fixtures/summer_float_sample.csv" |> File.read!() |> SummerFloatSplitter.split()
+      "test/fixtures/summer_float.csv" |> File.read!() |> SummerFloatSplitter.split()
 
     %{early: early, late: late}
   end
@@ -39,7 +39,7 @@ defmodule ResidencySchedule.Importer.ScheduleMergerTest do
 
     test "the summer-float value wins for each resident's appended columns", %{early: early} do
       {:ok, %{csv: csv}} = ScheduleMerger.merge(@base, early)
-      # R4-3 Carolyn in early: AMB,OFF,OFF,NF,NF,P (06-08..06-17)
+      # R4-3 Maren in early: AMB,OFF,OFF,NF,NF,P (06-08..06-17)
       assert Enum.take(resident_line(csv, "R4-3"), -6) == ["AMB", "OFF", "OFF", "NF", "NF", "P"]
     end
 
@@ -110,11 +110,11 @@ defmodule ResidencySchedule.Importer.ScheduleMergerTest do
 
     test "the base 2026-2027 value wins on the overlap", %{late: late} do
       {:ok, %{csv: csv}} = ScheduleMerger.prepend(@base_2027, late)
-      # R4-1 Paige R: late ends ...HGYN,HWN (06-29) then FLOAT,FLOAT (07-04);
+      # R4-1 Juno R: late ends ...HGYN,HWN (06-29) then FLOAT,FLOAT (07-04);
       # base 2026-2027 R4-1 begins HGYN,HWN (06-29). The 06-29 cell must be the
       # base value, not the late FLOAT.
-      paige = resident_line(csv, "R4-1")
-      refute "FLOAT" in Enum.slice(paige, 0..14)
+      juno = resident_line(csv, "R4-1")
+      refute "FLOAT" in Enum.slice(juno, 0..14)
     end
 
     test "no real conflicts (06-29 matches; 07-04 base blanks are not conflicts)", %{late: late} do

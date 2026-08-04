@@ -29,12 +29,22 @@ import {buildTour, consumeTourState} from "./tour.js"
 // visible data column in the Gantt scroll container as the user scrolls.
 const Hooks = {}
 
+// Key recording that a demo visitor has already seen the walkthrough. The demo
+// user is unpersisted and shared by every visitor, so the server cannot track
+// this the way it does for a real account — it always offers the tour and the
+// browser decides whether to show it.
+const DEMO_TOUR_SEEN = "demo_tour_seen"
+
 // GuidedTour: launches the Shepherd walkthrough on first login or when
 // the user clicks "Take a tour". Resumes across page navigations via sessionStorage.
 Hooks.GuidedTour = {
   mounted() {
     this._page = this.el.dataset.tourPage || "schedule"
     this._role = this.el.dataset.tourRole || "user"
+    // Read from the layout, not this element: the tour ends on /compare, and a
+    // per-page attribute that only the calendar carried left the "seen" flag
+    // unwritten there, restarting the tour on the redirect home.
+    this._demo = document.querySelector('meta[name="demo-mode"]')?.content === "true"
     this._startTour = () => this._run(this._page)
 
     // Check if we're resuming after a page navigation.
@@ -43,7 +53,7 @@ Hooks.GuidedTour = {
     if (saved && saved.resume === this._page) {
       // Resuming takes priority — never also auto-start
       setTimeout(() => this._run(this._page, saved.startAt), 500)
-    } else if (this.el.dataset.autoStart === "true") {
+    } else if (this.el.dataset.autoStart === "true" && !this._demoTourSeen()) {
       // First-time tour for a new user (no resume state in sessionStorage)
       setTimeout(() => this._run(this._page), 500)
     }
@@ -59,14 +69,43 @@ Hooks.GuidedTour = {
     window.removeEventListener("start-tour", this._startTour)
   },
 
+  // localStorage can throw or be unavailable (private mode, blocked cookies).
+  // Failing to read means "not seen", so the tour still runs.
+  _demoTourSeen() {
+    if (!this._demo) return false
+
+    try {
+      return localStorage.getItem(DEMO_TOUR_SEEN) === "true"
+    } catch (_e) {
+      return false
+    }
+  },
+
+  _markDemoTourSeen() {
+    if (!this._demo) return
+
+    try {
+      localStorage.setItem(DEMO_TOUR_SEEN, "true")
+    } catch (_e) {
+      // Nothing to do — the tour will simply show again next visit.
+    }
+  },
+
+  // Server-rendered so demo and production tours never diverge from the nav.
+  _brand() {
+    return document.querySelector('meta[name="brand-name"]')?.content || "Residency Schedule"
+  },
+
   _run(page, startAtId) {
-    const tour = buildTour(page, startAtId, this._role)
+    const tour = buildTour(page, startAtId, this._role, this._brand())
     tour.on("complete", () => {
+      this._markDemoTourSeen()
       this.pushEvent("tour_completed", {})
     })
     tour.on("cancel", () => {
       // Navigation cancels save state before calling cancel — don't mark complete
       if (!sessionStorage.getItem("guided_tour_state")) {
+        this._markDemoTourSeen()
         this.pushEvent("tour_completed", {})
       }
     })

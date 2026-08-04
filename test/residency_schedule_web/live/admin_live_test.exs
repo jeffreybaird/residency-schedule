@@ -63,21 +63,34 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
 
     test "request_delete shows confirmation UI", %{view: view} do
       schedule = List.first(ResidencySchedule.Schedules.list_schedules())
-      html = view |> element("button[phx-value-id='#{schedule.id}']") |> render_click()
+
+      html =
+        view
+        |> element("button[phx-click='request_delete'][phx-value-id='#{schedule.id}']")
+        |> render_click()
+
       assert html =~ "Confirm"
       assert html =~ "Cancel"
     end
 
     test "cancel_delete hides confirmation UI", %{view: view} do
       schedule = List.first(ResidencySchedule.Schedules.list_schedules())
-      view |> element("button[phx-value-id='#{schedule.id}']") |> render_click()
+
+      view
+      |> element("button[phx-click='request_delete'][phx-value-id='#{schedule.id}']")
+      |> render_click()
+
       view |> element("button[phx-click='cancel_delete']") |> render_click()
       refute has_element?(view, "button[phx-click='confirm_delete']")
     end
 
     test "confirm_delete removes the schedule", %{view: view} do
       schedule = List.first(ResidencySchedule.Schedules.list_schedules())
-      view |> element("button[phx-value-id='#{schedule.id}']") |> render_click()
+
+      view
+      |> element("button[phx-click='request_delete'][phx-value-id='#{schedule.id}']")
+      |> render_click()
+
       html = view |> element("button[phx-click='confirm_delete']") |> render_click()
       refute html =~ "Delete a Schedule"
     end
@@ -87,7 +100,7 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
     setup %{conn: conn} do
       %{conn: conn} = admin_authenticate_session(%{conn: conn})
 
-      # Two schedules with a resident named "Emily K" in each — same person, different years
+      # Two schedules with a resident named "Nora K" in each — same person, different years
       {:ok, sched_a} = Schedules.upsert_schedule(2020, "2020–2021")
       {:ok, sched_b} = Schedules.upsert_schedule(2021, "2021–2022")
 
@@ -96,7 +109,7 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
           position_code: "R3-1",
           residency_year: 3,
           schedule_number: 1,
-          name: "Emily K"
+          name: "Nora K"
         })
 
       {:ok, _emily_b} =
@@ -104,7 +117,7 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
           position_code: "R4-1",
           residency_year: 4,
           schedule_number: 1,
-          name: "Emily K"
+          name: "Nora K"
         })
 
       {:ok, clare_a} =
@@ -112,7 +125,7 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
           position_code: "R2-1",
           residency_year: 2,
           schedule_number: 1,
-          name: "Clare M"
+          name: "Isolde M"
         })
 
       {:ok, _} =
@@ -147,9 +160,9 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
           "covering_schedule_resident_id" => ""
         })
 
-      # Clare M is in sched_a — should appear as a covering option
+      # Isolde M is in sched_a — should appear as a covering option
       assert html =~ clare_a.name
-      # Emily K from sched_b (R4-1) should NOT appear in the covering dropdown
+      # Nora K from sched_b (R4-1) should NOT appear in the covering dropdown
       refute html =~ "R4-1"
     end
 
@@ -165,7 +178,7 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
           "covering_schedule_resident_id" => ""
         })
 
-      refute html =~ "Clare M"
+      refute html =~ "Isolde M"
     end
   end
 
@@ -260,6 +273,45 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
 
       assert html =~ "Admins cannot be revoked"
       assert ResidencySchedule.Accounts.get_user!(admin.id).approved == true
+    end
+  end
+
+  describe "pending user approval" do
+    setup %{conn: conn} do
+      %{conn: conn} = admin_authenticate_session(%{conn: conn})
+      %{conn: conn}
+    end
+
+    test "shows Approve and Deny buttons for a pending user", %{conn: conn} do
+      {:ok, pending} = ResidencySchedule.Accounts.create_user(%{email: "pending@gmail.com"})
+
+      {:ok, view, html} = live(conn, "/admin")
+
+      assert html =~ "Pending Approval"
+      assert html =~ "pending@gmail.com"
+      assert has_element?(view, "button[phx-click='approve_user'][phx-value-id='#{pending.id}']")
+      assert has_element?(view, "button[phx-click='deny_user'][phx-value-id='#{pending.id}']")
+    end
+
+    test "denying a pending user removes them from the pending list but keeps the record", %{
+      conn: conn
+    } do
+      {:ok, pending} = ResidencySchedule.Accounts.create_user(%{email: "pending@gmail.com"})
+
+      {:ok, view, _html} = live(conn, "/admin")
+
+      html =
+        view
+        |> element("button[phx-click='deny_user'][phx-value-id='#{pending.id}']")
+        |> render_click()
+
+      refute html =~ "pending@gmail.com"
+      assert ResidencySchedule.Accounts.get_user!(pending.id).denied == true
+    end
+
+    test "links to the separate denied-users page", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/admin")
+      assert has_element?(view, "a[href='/admin/denied']")
     end
   end
 
