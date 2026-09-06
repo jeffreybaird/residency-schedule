@@ -320,455 +320,467 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
       <%= if @active_tab == :schedule do %>
         <%= if @schedule_start && @schedule_end do %>
-        <div class="mb-4 text-sm text-gray-500">
-          {Calendar.strftime(@schedule_start, "%B %-d, %Y")} – {Calendar.strftime(
-            @schedule_end,
-            "%B %-d, %Y"
-          )} &nbsp;·&nbsp;
-          <a
-            href={"/residents/#{@resident.id}/calendar.ics"}
-            class="text-blue-600 hover:text-blue-800"
-            title="One-time download — import into any calendar app"
-          >
-            Download .ics
-          </a>
-          <span class="text-gray-300 mx-1">·</span>
-          <a
-            href={"/feed/#{@resident.calendar_token}/calendar.ics"}
-            class="text-blue-600 hover:text-blue-800"
-            title="Subscribe — paste this URL into Google Calendar's 'Add from URL' to get live updates"
-            onclick="navigator.clipboard.writeText(window.location.origin + this.getAttribute('href')); event.preventDefault(); this.textContent = 'Copied!'; setTimeout(() => this.textContent = 'Subscribe URL', 1500);"
-          >
-            Subscribe URL
-          </a>
-        </div>
+          <div class="mb-4 text-sm text-gray-500">
+            {Calendar.strftime(@schedule_start, "%B %-d, %Y")} – {Calendar.strftime(
+              @schedule_end,
+              "%B %-d, %Y"
+            )} &nbsp;·&nbsp;
+            <a
+              href={"/residents/#{@resident.id}/calendar.ics"}
+              class="text-blue-600 hover:text-blue-800"
+              title="One-time download — import into any calendar app"
+            >
+              Download .ics
+            </a>
+            <span class="text-gray-300 mx-1">·</span>
+            <a
+              href={"/feed/#{@resident.calendar_token}/calendar.ics"}
+              class="text-blue-600 hover:text-blue-800"
+              title="Subscribe — paste this URL into Google Calendar's 'Add from URL' to get live updates"
+              onclick="navigator.clipboard.writeText(window.location.origin + this.getAttribute('href')); event.preventDefault(); this.textContent = 'Copied!'; setTimeout(() => this.textContent = 'Subscribe URL', 1500);"
+            >
+              Subscribe URL
+            </a>
+          </div>
 
-        <%!-- Sticky stats container --%>
-        <div id="sticky-stats" class="sticky top-14 z-40 bg-white mb-3">
-          <%!-- Stats card: scrollable body, toggle button anchored at bottom outside scroll --%>
-          <div class={[
-            "border-2 border-gray-300",
-            if(@stats_expanded && @night_shift_counts != [],
-              do: "rounded-t-xl",
-              else: "rounded-xl"
-            )
-          ]}>
-            <%!-- Card header --%>
-            <div class="flex items-center justify-between px-4 py-2 bg-gray-100 border-b-2 border-gray-300 rounded-t-xl">
-              <span class="text-xs font-semibold text-gray-600">
-                <span class="text-gray-800">{@resident.name}</span>
-                <span class="text-gray-400 mx-1">·</span>
-                <span class="uppercase tracking-widest text-gray-500">Schedule Stats</span>
-              </span>
-              <button
-                phx-click="toggle_stats"
-                class={[
-                  "flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-0.5 transition-colors",
-                  if(@stats_expanded,
-                    do: "bg-gray-200 text-gray-600 hover:bg-gray-300",
-                    else: "bg-blue-50 text-blue-600 hover:bg-blue-100"
-                  )
-                ]}
-              >
-                <svg
+          <%!-- Sticky stats container --%>
+          <div id="sticky-stats" class="sticky top-14 z-40 bg-white mb-3">
+            <%!-- Stats card: scrollable body, toggle button anchored at bottom outside scroll --%>
+            <div class={[
+              "border-2 border-gray-300",
+              if(@stats_expanded && @night_shift_counts != [],
+                do: "rounded-t-xl",
+                else: "rounded-xl"
+              )
+            ]}>
+              <%!-- Card header --%>
+              <div class="flex items-center justify-between px-4 py-2 bg-gray-100 border-b-2 border-gray-300 rounded-t-xl">
+                <span class="text-xs font-semibold text-gray-600">
+                  <span class="text-gray-800">{@resident.name}</span>
+                  <span class="text-gray-400 mx-1">·</span>
+                  <span class="uppercase tracking-widest text-gray-500">Schedule Stats</span>
+                </span>
+                <button
+                  phx-click="toggle_stats"
                   class={[
-                    "w-3 h-3 transition-transform",
-                    if(@stats_expanded, do: "rotate-90", else: "")
+                    "flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-0.5 transition-colors",
+                    if(@stats_expanded,
+                      do: "bg-gray-200 text-gray-600 hover:bg-gray-300",
+                      else: "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                    )
                   ]}
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
                 >
-                  <path
-                    fill-rule="evenodd"
-                    d="M7.293 4.707a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
-                {if @stats_expanded, do: "Collapse", else: "Expand"}
-              </button>
+                  <svg
+                    class={[
+                      "w-3 h-3 transition-transform",
+                      if(@stats_expanded, do: "rotate-90", else: "")
+                    ]}
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M7.293 4.707a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  {if @stats_expanded, do: "Collapse", else: "Expand"}
+                </button>
+              </div>
+
+              <%= if @stats_expanded do %>
+                <%!-- Stats grid: scrollable, capped height --%>
+                <div class="overflow-y-auto max-h-[25vh]">
+                  <div class="grid grid-cols-2 divide-x divide-y divide-gray-200 bg-gray-50">
+                    <div class="px-4 py-3" title="Total scheduled service blocks (excludes vacation)">
+                      <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                        Total Shifts
+                      </p>
+                      <p class="text-xl font-bold text-gray-800">{@total_shifts}</p>
+                    </div>
+                    <div class="px-4 py-3" title="Service blocks with a start date on or after today">
+                      <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                        Shifts Remaining
+                      </p>
+                      <p class="text-xl font-bold text-gray-800">{@shifts_remaining}</p>
+                    </div>
+                    <div
+                      class="px-4 py-3"
+                      title="Night float and weekend night blocks at Strong Memorial remaining"
+                    >
+                      <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                        Night Shifts Remaining – Strong
+                      </p>
+                      <p class="text-xl font-bold text-gray-800">{@night_shifts_remaining_strong}</p>
+                    </div>
+                    <div
+                      class="px-4 py-3"
+                      title="Night float and weekend night blocks at Highland remaining"
+                    >
+                      <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                        Night Shifts Remaining – Highland
+                      </p>
+                      <p class="text-xl font-bold text-gray-800">
+                        {@night_shifts_remaining_highland}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <%!-- Night shift toggle: anchored at card bottom, never inside the scroll area --%>
+                <%= if @night_shift_counts != [] do %>
+                  <div class={[
+                    "border-t border-gray-200",
+                    if(@stats_expanded && @night_shift_counts != [], do: "", else: "rounded-b-xl")
+                  ]}>
+                    <button
+                      phx-click="toggle_night_shifts"
+                      class="flex items-center justify-between w-full px-4 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                    >
+                      <span class="flex items-center gap-1.5">
+                        <svg
+                          class={[
+                            "w-2.5 h-2.5 text-gray-400 transition-transform",
+                            if(@night_shifts_expanded, do: "rotate-90", else: "")
+                          ]}
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fill-rule="evenodd"
+                            d="M7.293 4.707a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                        Night Shift Breakdown
+                      </span>
+                      <span class={[
+                        "rounded-full px-2 py-0.5 transition-colors",
+                        if(@night_shifts_expanded,
+                          do: "bg-gray-200 text-gray-600",
+                          else: "bg-gray-100 text-gray-500"
+                        )
+                      ]}>
+                        {if @night_shifts_expanded, do: "Collapse", else: "Expand"}
+                      </span>
+                    </button>
+                  </div>
+                <% end %>
+              <% end %>
             </div>
 
-            <%= if @stats_expanded do %>
-              <%!-- Stats grid: scrollable, capped height --%>
-              <div class="overflow-y-auto max-h-[25vh]">
-                <div class="grid grid-cols-2 divide-x divide-y divide-gray-200 bg-gray-50">
-                  <div class="px-4 py-3" title="Total scheduled service blocks (excludes vacation)">
-                    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
-                      Total Shifts
-                    </p>
-                    <p class="text-xl font-bold text-gray-800">{@total_shifts}</p>
-                  </div>
-                  <div class="px-4 py-3" title="Service blocks with a start date on or after today">
-                    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
-                      Shifts Remaining
-                    </p>
-                    <p class="text-xl font-bold text-gray-800">{@shifts_remaining}</p>
-                  </div>
-                  <div
-                    class="px-4 py-3"
-                    title="Night float and weekend night blocks at Strong Memorial remaining"
-                  >
-                    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
-                      Night Shifts Remaining – Strong
-                    </p>
-                    <p class="text-xl font-bold text-gray-800">{@night_shifts_remaining_strong}</p>
-                  </div>
-                  <div
-                    class="px-4 py-3"
-                    title="Night float and weekend night blocks at Highland remaining"
-                  >
-                    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
-                      Night Shifts Remaining – Highland
-                    </p>
-                    <p class="text-xl font-bold text-gray-800">{@night_shifts_remaining_highland}</p>
+            <%!-- Night shift breakdown drawer: expands below the card --%>
+            <%= if @stats_expanded && @night_shifts_expanded && @night_shift_counts != [] do %>
+              <div class="border-2 border-t-0 border-gray-300 rounded-b-xl overflow-hidden">
+                <div class="divide-y divide-gray-100">
+                  <%= for {type, days} <- @night_shift_counts do %>
+                    <% color = Rotations.rotation_type_color(type)
+                    pill_label = Rotations.rotation_type_label(type) %>
+                    <div class="flex items-center justify-between px-4 py-2 bg-white">
+                      <span
+                        title={pill_label}
+                        class={[
+                          "inline-flex h-8 w-44 max-w-full shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
+                          color
+                        ]}
+                      >
+                        {pill_label}
+                      </span>
+                      <span class="text-sm font-semibold text-gray-700">
+                        {days} day{if days != 1, do: "s"}
+                      </span>
+                    </div>
+                  <% end %>
+                  <div class="flex items-center justify-between px-4 py-2 bg-gray-50">
+                    <span class="text-sm font-medium text-gray-600">Total</span>
+                    <span class="text-sm font-bold text-gray-800">
+                      {@night_shift_counts |> Enum.map(&elem(&1, 1)) |> Enum.sum()} days
+                    </span>
                   </div>
                 </div>
               </div>
-
-              <%!-- Night shift toggle: anchored at card bottom, never inside the scroll area --%>
-              <%= if @night_shift_counts != [] do %>
-                <div class={[
-                  "border-t border-gray-200",
-                  if(@stats_expanded && @night_shift_counts != [], do: "", else: "rounded-b-xl")
-                ]}>
-                  <button
-                    phx-click="toggle_night_shifts"
-                    class="flex items-center justify-between w-full px-4 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                  >
-                    <span class="flex items-center gap-1.5">
-                      <svg
-                        class={[
-                          "w-2.5 h-2.5 text-gray-400 transition-transform",
-                          if(@night_shifts_expanded, do: "rotate-90", else: "")
-                        ]}
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fill-rule="evenodd"
-                          d="M7.293 4.707a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
-                          clip-rule="evenodd"
-                        />
-                      </svg>
-                      Night Shift Breakdown
-                    </span>
-                    <span class={[
-                      "rounded-full px-2 py-0.5 transition-colors",
-                      if(@night_shifts_expanded,
-                        do: "bg-gray-200 text-gray-600",
-                        else: "bg-gray-100 text-gray-500"
-                      )
-                    ]}>
-                      {if @night_shifts_expanded, do: "Collapse", else: "Expand"}
-                    </span>
-                  </button>
-                </div>
-              <% end %>
             <% end %>
           </div>
 
-          <%!-- Night shift breakdown drawer: expands below the card --%>
-          <%= if @stats_expanded && @night_shifts_expanded && @night_shift_counts != [] do %>
-            <div class="border-2 border-t-0 border-gray-300 rounded-b-xl overflow-hidden">
-              <div class="divide-y divide-gray-100">
-                <%= for {type, days} <- @night_shift_counts do %>
-                  <% color = Rotations.rotation_type_color(type)
-                  pill_label = Rotations.rotation_type_label(type) %>
-                  <div class="flex items-center justify-between px-4 py-2 bg-white">
-                    <span
-                      title={pill_label}
-                      class={[
-                        "inline-flex h-8 w-44 max-w-full shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
-                        color
-                      ]}
-                    >
-                      {pill_label}
-                    </span>
-                    <span class="text-sm font-semibold text-gray-700">
-                      {days} day{if days != 1, do: "s"}
-                    </span>
-                  </div>
-                <% end %>
-                <div class="flex items-center justify-between px-4 py-2 bg-gray-50">
-                  <span class="text-sm font-medium text-gray-600">Total</span>
-                  <span class="text-sm font-bold text-gray-800">
-                    {@night_shift_counts |> Enum.map(&elem(&1, 1)) |> Enum.sum()} days
-                  </span>
-                </div>
-              </div>
-            </div>
-          <% end %>
-        </div>
-
-        <div
-          id="rotation-table"
-          class="relative rounded-xl border-2 border-gray-300"
-          phx-hook="ServiceFilterAnchored"
-        >
           <div
-            id="rotation-table-scroll"
-            phx-hook="ScrollToToday"
-            class="overflow-auto overscroll-contain rounded-xl [overflow-anchor:none]"
+            id="rotation-table"
+            class="relative rounded-xl border-2 border-gray-300"
+            phx-hook="ServiceFilterAnchored"
           >
-            <table class="table-fixed w-full min-w-0 divide-y divide-gray-200 text-sm">
-              <colgroup>
-                <col style="width: 14rem" />
-                <col />
-                <col />
-                <col style="width: 4.5rem" />
-              </colgroup>
-              <thead class="sticky top-0 z-10 bg-gray-100">
-                <tr>
-                  <th class="px-4 py-3 text-center font-semibold text-gray-600">
-                    <div class="inline-flex items-center justify-center gap-0.5">
-                      <span>Rotation</span>
-                      <button
-                        id="service-filter-toggle"
-                        type="button"
-                        phx-click="toggle_service_filter_menu"
-                        aria-haspopup="true"
-                        aria-expanded={@service_filter_open}
-                        aria-label={
-                          if @service_filter_open,
-                            do: "Close service filter menu",
-                            else: "Open service filter menu"
-                        }
-                        class={[
-                          "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors duration-75 ease-out",
-                          if(@service_filter_open,
-                            do: "bg-gray-200 text-gray-800",
-                            else: "text-gray-500 hover:bg-gray-200 hover:text-gray-800"
-                          )
-                        ]}
-                      >
-                        <.icon
-                          name={
+            <div
+              id="rotation-table-scroll"
+              phx-hook="ScrollToToday"
+              class="overflow-auto overscroll-contain rounded-xl [overflow-anchor:none]"
+            >
+              <table class="table-fixed w-full min-w-0 divide-y divide-gray-200 text-sm">
+                <colgroup>
+                  <col style="width: 14rem" />
+                  <col />
+                  <col />
+                  <col style="width: 4.5rem" />
+                </colgroup>
+                <thead class="sticky top-0 z-10 bg-gray-100">
+                  <tr>
+                    <th class="px-4 py-3 text-center font-semibold text-gray-600">
+                      <div class="inline-flex items-center justify-center gap-0.5">
+                        <span>Rotation</span>
+                        <button
+                          id="service-filter-toggle"
+                          type="button"
+                          phx-click="toggle_service_filter_menu"
+                          aria-haspopup="true"
+                          aria-expanded={@service_filter_open}
+                          aria-label={
                             if @service_filter_open,
-                              do: "hero-chevron-up",
-                              else: "hero-chevron-down"
+                              do: "Close service filter menu",
+                              else: "Open service filter menu"
                           }
-                          class="h-4 w-4"
-                        />
-                      </button>
-                    </div>
-                  </th>
-                  <th class="px-4 py-3 text-center font-semibold text-gray-600">Start</th>
-                  <th class="px-4 py-3 text-center font-semibold text-gray-600">End</th>
-                  <th class="px-4 py-3 text-right font-semibold text-gray-600">Days</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                <%= if @filtered_entries == [] do %>
-                  <tr id="rotation-table-empty-state">
-                    <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-400">
-                      No schedule entries match the selected service filters.
-                    </td>
-                  </tr>
-                <% else %>
-                  <%= for {year_label, year_entries} <- chunk_by_year(@filtered_entries) do %>
-                    <%= if @multi_year? do %>
-                      <tr class="bg-gray-50">
-                        <td
-                          colspan="4"
-                          class="px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-gray-500"
+                          class={[
+                            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors duration-75 ease-out",
+                            if(@service_filter_open,
+                              do: "bg-gray-200 text-gray-800",
+                              else: "text-gray-500 hover:bg-gray-200 hover:text-gray-800"
+                            )
+                          ]}
                         >
-                          {year_label}
-                        </td>
-                      </tr>
-                    <% end %>
-                    <%= for entry <- year_entries do %>
-                      <% past = Date.compare(entry.end_date, @today) == :lt %>
-                      <% covered = Map.get(entry, :covered_by) %>
-                      <% is_coverage = Map.get(entry, :is_coverage, false) %>
-                      <% color = entry_color(entry.rotation_type) %>
-                      <% label = entry_label(entry.rotation_type) %>
-                      <tr
-                        id={entry_row_id(entry)}
-                        data-rotation-type={entry.rotation_type}
-                        data-today-anchor={if entry_row_id(entry) == @today_anchor_id, do: "true"}
-                        phx-click="open_shift_coworkers"
-                        phx-value-rotation-type={entry.rotation_type}
-                        phx-value-slot-index={entry.slot_index}
-                        phx-value-schedule-id={entry.schedule_id}
-                        phx-value-start-date={Date.to_iso8601(entry.start_date)}
-                        phx-value-end-date={Date.to_iso8601(entry.end_date)}
-                        class={[
-                          entry_row_class(entry.rotation_type, past),
-                          if(covered, do: "opacity-60", else: ""),
-                          "cursor-pointer"
-                        ]}
-                      >
-                        <td class="px-4 py-2 align-top">
-                          <div class="flex flex-col items-start gap-0.5 text-left">
-                            <span
-                              title={label}
-                              class={[
-                                "inline-flex h-8 w-full max-w-[11rem] shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
-                                color,
-                                if(covered, do: "line-through opacity-70", else: "")
-                              ]}
-                            >
-                              {label}
-                            </span>
-                            <%= if covered do %>
-                              <span class="max-w-full text-xs text-gray-400 italic break-words">
-                                covered by {covered.name}
+                          <.icon
+                            name={
+                              if @service_filter_open,
+                                do: "hero-chevron-up",
+                                else: "hero-chevron-down"
+                            }
+                            class="h-4 w-4"
+                          />
+                        </button>
+                      </div>
+                    </th>
+                    <th class="px-4 py-3 text-center font-semibold text-gray-600">Start</th>
+                    <th class="px-4 py-3 text-center font-semibold text-gray-600">End</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600">Days</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <%= if @filtered_entries == [] do %>
+                    <tr id="rotation-table-empty-state">
+                      <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-400">
+                        No schedule entries match the selected service filters.
+                      </td>
+                    </tr>
+                  <% else %>
+                    <%= for {year_label, year_entries} <- chunk_by_year(@filtered_entries) do %>
+                      <%= if @multi_year? do %>
+                        <tr class="bg-gray-50">
+                          <td
+                            colspan="4"
+                            class="px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-gray-500"
+                          >
+                            {year_label}
+                          </td>
+                        </tr>
+                      <% end %>
+                      <%= for entry <- year_entries do %>
+                        <% past = Date.compare(entry.end_date, @today) == :lt %>
+                        <% covered = Map.get(entry, :covered_by) %>
+                        <% is_coverage = Map.get(entry, :is_coverage, false) %>
+                        <% color = entry_color(entry.rotation_type) %>
+                        <% label = entry_label(entry.rotation_type) %>
+                        <tr
+                          id={entry_row_id(entry)}
+                          data-rotation-type={entry.rotation_type}
+                          data-today-anchor={if entry_row_id(entry) == @today_anchor_id, do: "true"}
+                          phx-click="open_shift_coworkers"
+                          phx-value-rotation-type={entry.rotation_type}
+                          phx-value-slot-index={entry.slot_index}
+                          phx-value-schedule-id={entry.schedule_id}
+                          phx-value-start-date={Date.to_iso8601(entry.start_date)}
+                          phx-value-end-date={Date.to_iso8601(entry.end_date)}
+                          class={[
+                            entry_row_class(entry.rotation_type, past),
+                            if(covered, do: "opacity-60", else: ""),
+                            "cursor-pointer"
+                          ]}
+                        >
+                          <td class="px-4 py-2 align-top">
+                            <div class="flex flex-col items-start gap-0.5 text-left">
+                              <span
+                                title={label}
+                                class={[
+                                  "inline-flex h-8 w-full max-w-[11rem] shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
+                                  color,
+                                  if(covered, do: "line-through opacity-70", else: "")
+                                ]}
+                              >
+                                {label}
                               </span>
-                            <% end %>
-                            <%= if is_coverage do %>
-                              <span class="max-w-full text-xs text-blue-500 italic break-words">
-                                covering {entry.original_resident.name}
-                              </span>
-                            <% end %>
-                          </div>
-                        </td>
-                        <td class={[
-                          "px-4 py-2 text-center",
-                          if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
-                        ]}>
-                          {Calendar.strftime(entry.start_date, "%b %-d, %Y")}
-                        </td>
-                        <td class={[
-                          "px-4 py-2 text-center",
-                          if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-700")
-                        ]}>
-                          {Calendar.strftime(entry.end_date, "%b %-d, %Y")}
-                        </td>
-                        <td class={[
-                          "px-4 py-2 text-right tabular-nums",
-                          if(entry.rotation_type == "off", do: "text-gray-400", else: "text-gray-500")
-                        ]}>
-                          {Date.diff(entry.end_date, entry.start_date) + 1}
-                        </td>
-                      </tr>
+                              <%= if covered do %>
+                                <span class="max-w-full text-xs text-gray-400 italic break-words">
+                                  covered by {covered.name}
+                                </span>
+                              <% end %>
+                              <%= if is_coverage do %>
+                                <span class="max-w-full text-xs text-blue-500 italic break-words">
+                                  covering {entry.original_resident.name}
+                                </span>
+                              <% end %>
+                            </div>
+                          </td>
+                          <td class={[
+                            "px-4 py-2 text-center",
+                            if(entry.rotation_type == "off",
+                              do: "text-gray-400",
+                              else: "text-gray-700"
+                            )
+                          ]}>
+                            {Calendar.strftime(entry.start_date, "%b %-d, %Y")}
+                          </td>
+                          <td class={[
+                            "px-4 py-2 text-center",
+                            if(entry.rotation_type == "off",
+                              do: "text-gray-400",
+                              else: "text-gray-700"
+                            )
+                          ]}>
+                            {Calendar.strftime(entry.end_date, "%b %-d, %Y")}
+                          </td>
+                          <td class={[
+                            "px-4 py-2 text-right tabular-nums",
+                            if(entry.rotation_type == "off",
+                              do: "text-gray-400",
+                              else: "text-gray-500"
+                            )
+                          ]}>
+                            {Date.diff(entry.end_date, entry.start_date) + 1}
+                          </td>
+                        </tr>
+                      <% end %>
                     <% end %>
                   <% end %>
-                <% end %>
-              </tbody>
-            </table>
-          </div>
-
-          <%!-- Desktop dropdown --%>
-          <%= if @service_filter_open do %>
-            <div
-              id="service-filter-panel"
-              class={[
-                "hidden sm:block",
-                "w-[min(22rem,calc(100vw-2rem))]",
-                "rounded-2xl border border-gray-200/80 bg-white py-2 shadow-lg shadow-gray-900/10",
-                "transition-[opacity,transform] duration-75 ease-out motion-reduce:transition-none",
-                "opacity-100 scale-100"
-              ]}
-              role="menu"
-              aria-label="Service filters"
-            >
-              {service_filter_body(assigns)}
+                </tbody>
+              </table>
             </div>
 
-            <%!-- Mobile bottom sheet --%>
-            <div class="sm:hidden fixed inset-0 z-[70] flex items-end justify-center">
-              <div phx-click="close_service_filter_menu" class="absolute inset-0 bg-black/40"></div>
+            <%!-- Desktop dropdown --%>
+            <%= if @service_filter_open do %>
               <div
-                class="relative w-full bg-white rounded-t-2xl shadow-lg py-2 max-h-[70vh] flex flex-col"
+                id="service-filter-panel"
+                class={[
+                  "hidden sm:block",
+                  "w-[min(22rem,calc(100vw-2rem))]",
+                  "rounded-2xl border border-gray-200/80 bg-white py-2 shadow-lg shadow-gray-900/10",
+                  "transition-[opacity,transform] duration-75 ease-out motion-reduce:transition-none",
+                  "opacity-100 scale-100"
+                ]}
                 role="menu"
                 aria-label="Service filters"
               >
                 {service_filter_body(assigns)}
               </div>
+
+              <%!-- Mobile bottom sheet --%>
+              <div class="sm:hidden fixed inset-0 z-[70] flex items-end justify-center">
+                <div phx-click="close_service_filter_menu" class="absolute inset-0 bg-black/40"></div>
+                <div
+                  class="relative w-full bg-white rounded-t-2xl shadow-lg py-2 max-h-[70vh] flex flex-col"
+                  role="menu"
+                  aria-label="Service filters"
+                >
+                  {service_filter_body(assigns)}
+                </div>
+              </div>
+            <% end %>
+          </div>
+
+          <%= if @shift_coworkers_modal do %>
+            <% modal = @shift_coworkers_modal %>
+            <% type_label = entry_label(modal.rotation_type) %>
+            <% color = entry_color(modal.rotation_type) %>
+            <div
+              id="shift-coworkers-modal"
+              class="fixed inset-0 z-[70] flex items-center justify-center"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="shift-coworkers-modal-title"
+            >
+              <div phx-click="close_shift_coworkers" class="absolute inset-0 bg-black/40"></div>
+              <div class="relative bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 z-10 max-h-[80vh] overflow-y-auto">
+                <div class="flex items-start justify-between gap-3 mb-4">
+                  <div>
+                    <h3 id="shift-coworkers-modal-title" class="text-lg font-semibold text-gray-800">
+                      {type_label}
+                    </h3>
+                    <p class="text-sm text-gray-500 mt-1">
+                      {Calendar.strftime(modal.start_date, "%b %-d, %Y")} – {Calendar.strftime(
+                        modal.end_date,
+                        "%b %-d, %Y"
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    phx-click="close_shift_coworkers"
+                    class="text-gray-400 hover:text-gray-600 text-xl leading-none shrink-0"
+                    aria-label="Close"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div class="mb-3">
+                  <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
+                    {type_label}
+                  </span>
+                  <span class="text-xs text-gray-400 ml-2">
+                    {length(modal.coworker_rows)} resident{if length(modal.coworker_rows) != 1,
+                      do: "s"}
+                  </span>
+                </div>
+
+                <%= if modal.coworker_rows == [] do %>
+                  <p class="text-sm text-gray-400">No schedule rows match this block.</p>
+                <% else %>
+                  <ul id="shift-coworkers-list" class="space-y-3 pl-0.5">
+                    <%= for row <- modal.coworker_rows do %>
+                      <% sr = row.resident %>
+                      <li class="flex flex-col gap-0.5 text-sm border-b border-gray-100 last:border-0 pb-3 last:pb-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <span class="text-xs text-gray-400 font-mono w-10 shrink-0">
+                            {sr.position_code}
+                          </span>
+                          <.link
+                            navigate={"/residents/#{sr.id}"}
+                            class={[
+                              "hover:text-blue-600 hover:underline font-medium",
+                              if(row.overridden,
+                                do: "line-through text-gray-400",
+                                else: "text-gray-800"
+                              )
+                            ]}
+                          >
+                            {sr.name}
+                          </.link>
+                          <%= if row.overridden do %>
+                            <span class="text-xs text-gray-400 italic">
+                              → {row.covered_by.name}
+                            </span>
+                          <% end %>
+                          <%= if row.is_coverage do %>
+                            <span class="text-xs text-blue-500 italic">(covering)</span>
+                          <% end %>
+                        </div>
+                        <p class="text-xs text-gray-500 pl-12">
+                          {Rotations.format_date_set_within_block(
+                            row.active_dates,
+                            modal.start_date,
+                            modal.end_date
+                          )}
+                        </p>
+                      </li>
+                    <% end %>
+                  </ul>
+                <% end %>
+              </div>
             </div>
           <% end %>
-        </div>
-
-        <%= if @shift_coworkers_modal do %>
-          <% modal = @shift_coworkers_modal %>
-          <% type_label = entry_label(modal.rotation_type) %>
-          <% color = entry_color(modal.rotation_type) %>
-          <div
-            id="shift-coworkers-modal"
-            class="fixed inset-0 z-[70] flex items-center justify-center"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="shift-coworkers-modal-title"
-          >
-            <div phx-click="close_shift_coworkers" class="absolute inset-0 bg-black/40"></div>
-            <div class="relative bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 z-10 max-h-[80vh] overflow-y-auto">
-              <div class="flex items-start justify-between gap-3 mb-4">
-                <div>
-                  <h3 id="shift-coworkers-modal-title" class="text-lg font-semibold text-gray-800">
-                    {type_label}
-                  </h3>
-                  <p class="text-sm text-gray-500 mt-1">
-                    {Calendar.strftime(modal.start_date, "%b %-d, %Y")} – {Calendar.strftime(
-                      modal.end_date,
-                      "%b %-d, %Y"
-                    )}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  phx-click="close_shift_coworkers"
-                  class="text-gray-400 hover:text-gray-600 text-xl leading-none shrink-0"
-                  aria-label="Close"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div class="mb-3">
-                <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
-                  {type_label}
-                </span>
-                <span class="text-xs text-gray-400 ml-2">
-                  {length(modal.coworker_rows)} resident{if length(modal.coworker_rows) != 1, do: "s"}
-                </span>
-              </div>
-
-              <%= if modal.coworker_rows == [] do %>
-                <p class="text-sm text-gray-400">No schedule rows match this block.</p>
-              <% else %>
-                <ul id="shift-coworkers-list" class="space-y-3 pl-0.5">
-                  <%= for row <- modal.coworker_rows do %>
-                    <% sr = row.resident %>
-                    <li class="flex flex-col gap-0.5 text-sm border-b border-gray-100 last:border-0 pb-3 last:pb-0">
-                      <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-xs text-gray-400 font-mono w-10 shrink-0">
-                          {sr.position_code}
-                        </span>
-                        <.link
-                          navigate={"/residents/#{sr.id}"}
-                          class={[
-                            "hover:text-blue-600 hover:underline font-medium",
-                            if(row.overridden,
-                              do: "line-through text-gray-400",
-                              else: "text-gray-800"
-                            )
-                          ]}
-                        >
-                          {sr.name}
-                        </.link>
-                        <%= if row.overridden do %>
-                          <span class="text-xs text-gray-400 italic">
-                            → {row.covered_by.name}
-                          </span>
-                        <% end %>
-                        <%= if row.is_coverage do %>
-                          <span class="text-xs text-blue-500 italic">(covering)</span>
-                        <% end %>
-                      </div>
-                      <p class="text-xs text-gray-500 pl-12">
-                        {Rotations.format_date_set_within_block(
-                          row.active_dates,
-                          modal.start_date,
-                          modal.end_date
-                        )}
-                      </p>
-                    </li>
-                  <% end %>
-                </ul>
-              <% end %>
-            </div>
-          </div>
-        <% end %>
         <% else %>
           <p class="text-gray-500">No rotations recorded for this resident.</p>
         <% end %>
