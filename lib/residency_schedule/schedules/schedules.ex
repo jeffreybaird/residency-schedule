@@ -81,6 +81,24 @@ defmodule ResidencySchedule.Schedules do
   end
 
   @doc """
+  Returns the schedule whose rotations span the given date, or nil when no
+  imported schedule covers it.
+
+  Exempt from doctest — hits the database. See `SchedulesTest`.
+  """
+  def get_schedule_for_date(%Date{} = date) do
+    from(s in Schedule,
+      join: sr in assoc(s, :schedule_residents),
+      join: r in assoc(sr, :rotations),
+      where: r.start_date <= ^date and r.end_date >= ^date,
+      order_by: [desc: s.academic_year],
+      limit: 1,
+      select: s
+    )
+    |> Repo.one()
+  end
+
+  @doc """
   Returns the most recent schedule by academic year, or nil if none exist.
   """
   def latest_schedule do

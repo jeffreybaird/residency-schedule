@@ -22,6 +22,38 @@ defmodule ResidencyScheduleWeb.Router do
     plug ResidencyScheduleWeb.Plugs.RequireAdmin
   end
 
+  pipeline :mcp do
+    plug :accepts, ["json"]
+    plug ResidencyScheduleWeb.Plugs.RequireBearerToken
+  end
+
+  # ── OAuth 2.1 + MCP ───────────────────────────────────────────────────────
+
+  scope "/", ResidencyScheduleWeb do
+    pipe_through :api
+
+    get "/.well-known/oauth-authorization-server", OAuthController, :authorization_server_metadata
+    get "/.well-known/oauth-protected-resource", OAuthController, :protected_resource_metadata
+    get "/.well-known/oauth-protected-resource/mcp", OAuthController, :protected_resource_metadata
+    post "/oauth/register", OAuthController, :register
+    post "/oauth/token", OAuthController, :token
+  end
+
+  scope "/oauth", ResidencyScheduleWeb do
+    pipe_through :browser
+
+    get "/authorize", OAuthController, :authorize
+    post "/authorize", OAuthController, :decide
+  end
+
+  scope "/mcp", ResidencyScheduleWeb do
+    pipe_through :mcp
+
+    post "/", MCPController, :create
+    get "/", MCPController, :not_allowed
+    delete "/", MCPController, :not_allowed
+  end
+
   # ── Public auth routes ────────────────────────────────────────────────────
 
   scope "/", ResidencyScheduleWeb do

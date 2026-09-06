@@ -145,4 +145,32 @@ defmodule ResidencySchedule.ShiftOverrides do
     )
     |> Repo.all()
   end
+
+  @doc """
+  Returns true when any override already covers part of the rotation within
+  the inclusive date range.
+
+  Exempt from doctest — hits the database. See `ShiftOverridesTest`.
+  """
+  def rotation_covered_in_range?(rotation_id, start_date, end_date) do
+    from(o in ShiftOverride,
+      where: o.rotation_id == ^rotation_id,
+      where: o.override_start_date <= ^end_date and o.override_end_date >= ^start_date
+    )
+    |> Repo.exists?()
+  end
+
+  @doc """
+  Returns true when the schedule resident is already covering someone else's
+  rotation on any day in the inclusive date range.
+
+  Exempt from doctest — hits the database. See `ShiftOverridesTest`.
+  """
+  def resident_covering_in_range?(schedule_resident_id, start_date, end_date) do
+    from(o in ShiftOverride,
+      where: o.covering_schedule_resident_id == ^schedule_resident_id,
+      where: o.override_start_date <= ^end_date and o.override_end_date >= ^start_date
+    )
+    |> Repo.exists?()
+  end
 end

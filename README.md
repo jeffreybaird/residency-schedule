@@ -40,6 +40,9 @@ lib/
 │   ├── rotations/                     # Rotation context + schema (a resident's assignment for a date slot)
 │   ├── shift_overrides/               # Manual edits layered on top of imported rotations
 │   ├── accounts/                      # Users, passwords, and magic-link tokens
+│   ├── oauth/                         # OAuth 2.1 authorization server backing the MCP endpoint
+│   ├── change_requests/               # Pending schedule-change requests (approval creates a ShiftOverride)
+│   ├── assistant/                     # Name/rotation resolvers, duty-hour check, question-answering facade
 │   ├── importer/                      # CSV → database pipeline
 │   │   ├── csv_parser.ex              #   parse raw CSV into dated slots + resident rows
 │   │   ├── csv.ex                     #   low-level CSV decoding
@@ -65,7 +68,10 @@ lib/
 │   ├── controllers/
 │   │   ├── auth_controller.ex         #   login, magic-link verify/confirm, set-password
 │   │   ├── ical_controller.ex         #   serves .ics calendar feeds
+│   │   ├── oauth_controller.ex        #   OAuth discovery, registration, consent page, token endpoint
+│   │   ├── mcp_controller.ex          #   "/mcp" — Streamable HTTP MCP transport
 │   │   └── page_controller.ex
+│   ├── mcp/                           # JSON-RPC handling, MCP server core, tool catalogue
 │   ├── live/                          # LiveView pages
 │   │   ├── schedule_live/             #   "/" — Gantt rotation grid
 │   │   ├── resident_live/             #   "/residents/:id" — one resident's year
@@ -75,7 +81,7 @@ lib/
 │   │   ├── builder_live/              #   "/admin/build" — schedule generator
 │   │   ├── edit_live/                 #   "/admin/edit" — manual rotation edits
 │   │   └── admin_live/                #   "/admin" — user approvals
-│   ├── plugs/                         # require_auth / require_admin / require_auth_or_admin
+│   ├── plugs/                         # require_auth / require_admin / require_bearer_token
 │   ├── components/                    # Layouts + core components
 │   └── router.ex
 │
@@ -121,6 +127,49 @@ can follow a resident's schedule), `resident` (URMC email, auto-approved), or
 > **Convention:** every public function carries a doctest, and every branch is
 > covered by an ExUnit test. See [`CLAUDE.md`](CLAUDE.md) for the full code-style
 > and testing rules this project enforces.
+
+---
+
+## Assistant API (MCP over OAuth)
+
+The app exposes a [Model Context Protocol](https://modelcontextprotocol.io)
+server so an assistant such as Claude can answer schedule questions and file
+change requests on a user's behalf. It is a Streamable HTTP endpoint at
+`POST /mcp`, protected by OAuth 2.1 (authorization code + PKCE, dynamic client
+registration, refresh-token rotation). The app is its own authorization server;
+users log in with their normal magic-link or password login and approve access
+on a consent page.
+
+**Connecting a client.** Point the client at `https://<PHX_HOST>/mcp`. Discovery
+is automatic: a 401 from `/mcp` carries a `WWW-Authenticate` header pointing at
+`/.well-known/oauth-protected-resource`, which names the authorization server
+(`/.well-known/oauth-authorization-server`), which lists the registration,
+authorize, and token endpoints. Redirect URIs must be `https` or `localhost`.
+
+**Tools.**
+
+| Tool | What it answers | Writes? |
+|---|---|---|
+| `whoami` | Caller's email, role, home resident, today's date | no |
+| `find_resident` | Resolve a first name / nickname; lists candidates when ambiguous | no |
+| `who_is_on` | Who is effectively on a service on a date ("strong ob", "onc", "NF") | no |
+| `resident_schedule` | A resident's effective blocks in a date range | no |
+| `shared_shifts` | Days two residents work the same service from a date onward | no |
+| `check_coverage` | Dry run of one resident covering another's shift: problems + estimated 80-hour check | no |
+| `request_coverage` | Files a **pending** change request | yes |
+| `list_change_requests` | Requests visible to the caller (admins: all) | no |
+| `review_change_request` | Admin approves (creates the shift override) or denies | yes |
+| `cancel_change_request` | Requester or admin cancels a pending request | yes |
+
+**Permissions.** Any approved user may read. A resident may file a request only
+when their home resident is the person covering or the person covered; admins
+may file, approve, deny, and cancel anything. Nothing changes on the schedule
+until an admin approves.
+
+**Limits.** Duty-hour results are estimates from nominal hours per rotation
+(12 h or 9 h per day); only the 80-hour rolling 4-week average is checked.
+"Today" is America/New_York. The MCP server is stateless (no session ids, no
+server-initiated SSE stream).
 
 ---
 
@@ -225,6 +274,7 @@ rollback, editing `.env`, resetting the database — see the **Maintenance** and
 |---|---|
 | [`README.md`](README.md) | This overview — structure + deploy summary |
 | [`DEVELOPMENT.md`](DEVELOPMENT.md) | Local setup, CSV format, DB management, common issues |
+| [Assistant API](#assistant-api-mcp-over-oauth) | Connecting an MCP client, tools, permissions |
 | [`DEPLOY.md`](DEPLOY.md) | Step-by-step production provisioning + maintenance |
 | [`CLAUDE.md`](CLAUDE.md) | Code-style and testing rules enforced in this repo |
 | [`residency_schedule_plan_v2.md`](residency_schedule_plan_v2.md) | Full architectural spec |
