@@ -539,16 +539,75 @@ defmodule ResidencySchedule.Rotations do
     |> Repo.all()
   end
 
+  # Days off: not a shift at all.
+  @non_working_rotations ~w(vacation post_call)
+
+  # Working days, but the resident is alone: no other resident is on the same
+  # service, so these never count as shared shifts.
+  @solo_rotations ~w(float swing away_rotation ambulatory elective)
+
+  @doc """
+  Returns true when a rotation type is a working day (a "shift"). Every
+  rotation counts except vacation and post-call; float is a shift.
+
+      iex> ResidencySchedule.Rotations.working_day?("float")
+      true
+
+      iex> ResidencySchedule.Rotations.working_day?("vacation")
+      false
+  """
+  def working_day?(rotation_type), do: rotation_type not in @non_working_rotations
+
+  @doc """
+  Returns true when a rotation type can have more than one resident on the
+  same service at once, so two residents on it together share a shift.
+  Float, swing, away, ambulatory, and elective are working days but solo.
+
+      iex> ResidencySchedule.Rotations.shared_service?("strong_obstetrics")
+      true
+
+      iex> ResidencySchedule.Rotations.shared_service?("rei")
+      true
+
+      iex> ResidencySchedule.Rotations.shared_service?("float")
+      false
+
+      iex> ResidencySchedule.Rotations.shared_service?("vacation")
+      false
+  """
+  def shared_service?(rotation_type) do
+    working_day?(rotation_type) and rotation_type not in @solo_rotations
+  end
+
+  @doc """
+  Rotation types that are working days but never shared service.
+
+      iex> "swing" in ResidencySchedule.Rotations.solo_rotation_types()
+      true
+  """
+  def solo_rotation_types, do: @solo_rotations
+
+  @doc """
+  Rotation types that are days off rather than shifts.
+
+      iex> ResidencySchedule.Rotations.non_working_rotation_types()
+      ["vacation", "post_call"]
+  """
+  def non_working_rotation_types, do: @non_working_rotations
+
   @doc """
   Returns co-service days (same rotation type, overlapping dates) for two schedule residents.
+  Only rotation types that are shared service count (see `shared_service?/1`).
   """
   def list_co_service_days(schedule_resident_a_id, schedule_resident_b_id) do
+    excluded = @non_working_rotations ++ @solo_rotations
+
     from(a in Rotation,
       join: b in Rotation,
       on:
         b.schedule_resident_id == ^schedule_resident_b_id and b.rotation_type == a.rotation_type,
       where: a.schedule_resident_id == ^schedule_resident_a_id,
-      where: a.rotation_type not in ["float", "post_call", "vacation", "ambulatory", "elective"],
+      where: a.rotation_type not in ^excluded,
       where: a.start_date <= b.end_date and a.end_date >= b.start_date,
       select: %{
         overlap_start: fragment("GREATEST(?, ?)", a.start_date, b.start_date),
@@ -701,18 +760,16 @@ defmodule ResidencySchedule.Rotations do
   @doc """
   Computes effective co-service days for two schedule residents, accounting for shift overrides.
   Returns a list of `%{date: Date, rotation_type: String}` maps for days both residents
-  are on the same service (excluding float, post_call, vacation, ambulatory, elective).
+  are on the same shared service (see `shared_service?/1`).
   """
   def list_effective_co_service_days(schedule_resident_a_id, schedule_resident_b_id) do
-    excluded = ~w[float post_call vacation ambulatory elective]
-
     segs_a =
       effective_segments_for_resident(schedule_resident_a_id)
-      |> Enum.reject(fn s -> s.covered_by != nil or s.rotation_type in excluded end)
+      |> Enum.reject(fn s -> s.covered_by != nil or not shared_service?(s.rotation_type) end)
 
     segs_b =
       effective_segments_for_resident(schedule_resident_b_id)
-      |> Enum.reject(fn s -> s.covered_by != nil or s.rotation_type in excluded end)
+      |> Enum.reject(fn s -> s.covered_by != nil or not shared_service?(s.rotation_type) end)
 
     for a <- segs_a,
         b <- segs_b,

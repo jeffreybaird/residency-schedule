@@ -100,11 +100,55 @@ defmodule ResidencySchedule.AssistantTest do
     end
   end
 
+  describe "shifts_remaining/3" do
+    test "counts working days including solo rotations and coverage", ctx do
+      assert {:ok, result} = Assistant.shifts_remaining("clare", "2026-07-06")
+      assert result.count == 21
+      assert result.counting_rule.not_shifts == ["vacation", "post_call"]
+
+      tiff_ob = rotation_on(ctx.tiff, ~D[2026-07-15])
+
+      {:ok, _} =
+        ShiftOverrides.create_override(%{
+          rotation_id: tiff_ob.id,
+          covering_schedule_resident_id: ctx.clare.id,
+          override_start_date: ~D[2026-07-15],
+          override_end_date: ~D[2026-07-15]
+        })
+
+      assert {:ok, %{count: 21}} = Assistant.shifts_remaining("clare", "2026-07-06")
+      assert {:ok, %{count: 20}} = Assistant.shifts_remaining("tiff", "2026-07-06")
+    end
+
+    test "excludes days off and honours the range", ctx do
+      {:ok, _} =
+        ResidencySchedule.Rotations.insert_rotations(ctx.clare.id, [
+          %{
+            slot_index: 3,
+            start_date: ~D[2026-07-27],
+            end_date: ~D[2026-08-02],
+            rotation_type: :vacation
+          }
+        ])
+
+      assert {:ok, %{count: 0}} = Assistant.shifts_remaining("clare", "2026-07-27")
+
+      assert {:ok, %{count: 2, by_rotation: [%{rotation_type: "night_float", days: 2}]}} =
+               Assistant.shifts_remaining("clare", "2026-07-25", "2026-07-31")
+    end
+
+    test "unknown resident" do
+      assert {:error, {:resident_not_found, "Zed"}} =
+               Assistant.shifts_remaining("Zed", "2026-07-06")
+    end
+  end
+
   describe "shared_shifts/4" do
     test "counts co-service days in range", _ctx do
       assert {:ok, result} = Assistant.shared_shifts("clare", "mary", "2026-07-06")
       assert result.count == 7
       assert [%{rotation_type: "strong_obstetrics", days: 7}] = result.by_rotation
+      assert "float" in result.counting_rule.working_days_not_shared
 
       assert {:ok, result} = Assistant.shared_shifts("clare", "mary", "2026-07-10", "2026-07-11")
       assert result.count == 2

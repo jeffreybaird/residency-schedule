@@ -154,7 +154,8 @@ authorize, and token endpoints. Redirect URIs must be `https` or `localhost`.
 | `find_resident` | Resolve a first name / nickname; lists candidates when ambiguous | no |
 | `who_is_on` | Who is effectively on a service on a date ("strong ob", "onc", "NF") | no |
 | `resident_schedule` | A resident's effective blocks in a date range | no |
-| `shared_shifts` | Days two residents work the same service from a date onward | no |
+| `shifts_remaining` | A resident's working days from a date onward (float counts; vacation and post-call do not) | no |
+| `shared_shifts` | Days two residents are on the same shared service from a date onward (solo rotations such as float never count) | no |
 | `check_coverage` | Dry run of one resident covering another's shift: problems + estimated 80-hour check | no |
 | `request_coverage` | Files a **pending** change request | yes |
 | `list_change_requests` | Requests visible to the caller (admins: all) | no |
