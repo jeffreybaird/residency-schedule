@@ -31,10 +31,20 @@ defmodule ResidencySchedule.ScheduleBuilder.DutyHours do
     ultrasound
   )a
 
+  @hours_by_name Map.new(@twelve_hour_rotations, &{Atom.to_string(&1), 12})
+                 |> Map.merge(Map.new(@nine_hour_rotations, &{Atom.to_string(&1), 9}))
+
   @doc """
-  Returns the daily hours for a given rotation type atom.
+  Returns the daily hours for a given rotation type, as an atom or the string
+  form stored in the database.
 
   Returns 12 for 12-hour shifts, 9 for 9-hour shifts, and 0 for off-service.
+
+      iex> ResidencySchedule.ScheduleBuilder.DutyHours.hours_for_rotation("night_float")
+      12
+
+      iex> ResidencySchedule.ScheduleBuilder.DutyHours.hours_for_rotation("vacation")
+      0
 
       iex> ResidencySchedule.ScheduleBuilder.DutyHours.hours_for_rotation(:strong_obstetrics)
       12
@@ -45,6 +55,9 @@ defmodule ResidencySchedule.ScheduleBuilder.DutyHours do
       iex> ResidencySchedule.ScheduleBuilder.DutyHours.hours_for_rotation(:vacation)
       0
   """
+  def hours_for_rotation(rotation_type) when is_binary(rotation_type),
+    do: Map.get(@hours_by_name, rotation_type, 0)
+
   def hours_for_rotation(rotation_type) when rotation_type in @twelve_hour_rotations, do: 12
   def hours_for_rotation(rotation_type) when rotation_type in @nine_hour_rotations, do: 9
   def hours_for_rotation(_), do: 0

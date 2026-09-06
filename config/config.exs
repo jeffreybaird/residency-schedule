@@ -7,6 +7,8 @@
 # General application configuration
 import Config
 
+config :elixir, :time_zone_database, Tz.TimeZoneDatabase
+
 config :residency_schedule,
   ecto_repos: [ResidencySchedule.Repo],
   generators: [timestamp_type: :utc_datetime],

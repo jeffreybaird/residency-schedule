@@ -215,14 +215,26 @@ defmodule ResidencyScheduleWeb.AuthController do
       user.approved ->
         # Home is the calendar at "/". When a user has an assigned resident the
         # calendar opens filtered to them; the resident detail page stays reachable
-        # via the "My page" nav link.
-        redirect(conn, to: "/")
+        # via the "My page" nav link. A login started from the OAuth consent page
+        # returns there instead.
+        conn
+        |> delete_session(:return_to)
+        |> redirect(to: signed_in_path(conn))
 
       user.denied ->
         render(conn, :show, step: :denied, email: user.email)
 
       true ->
         render(conn, :show, step: :pending_approval, email: user.email)
+    end
+  end
+
+  # Only the OAuth consent page may be resumed after login; anything else in
+  # the session is ignored so a crafted value cannot redirect elsewhere.
+  defp signed_in_path(conn) do
+    case get_session(conn, :return_to) do
+      "/oauth/authorize" <> _rest = path -> path
+      _other -> "/"
     end
   end
 end

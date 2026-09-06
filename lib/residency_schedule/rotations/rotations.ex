@@ -99,6 +99,37 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
+  Returns the schedule resident's rotation containing the date, with
+  `schedule_resident` (and its virtual name) preloaded, or nil.
+
+  Exempt from doctest — hits the database. See `RotationsTest`.
+  """
+  def get_rotation_for_resident_on_date(schedule_resident_id, date) do
+    sr_query = ScheduleResident.with_name_query()
+
+    from(rot in Rotation,
+      where: rot.schedule_resident_id == ^schedule_resident_id,
+      where: rot.start_date <= ^date and rot.end_date >= ^date,
+      preload: [schedule_resident: ^sr_query],
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Fetches a rotation by id with `schedule_resident` (and its virtual name)
+  preloaded, or nil.
+
+  Exempt from doctest — hits the database. See `RotationsTest`.
+  """
+  def get_rotation(id) do
+    sr_query = ScheduleResident.with_name_query()
+
+    from(rot in Rotation, where: rot.id == ^id, preload: [schedule_resident: ^sr_query])
+    |> Repo.one()
+  end
+
+  @doc """
   Returns all rotations in a date range (inclusive), across all residents.
   """
   def list_rotations_in_range(start_date, end_date) do
