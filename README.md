@@ -158,6 +158,7 @@ authorize, and token endpoints. Redirect URIs must be `https` or `localhost`.
 | `shifts_remaining` | A resident's working days from a date onward (float counts; vacation and post-call do not) | no |
 | `shared_shifts` | Days two residents are on the same shared service from a date onward (solo rotations such as float never count) | no |
 | `shared_shifts_by_coworker` | One resident's shared-shift count with every other resident, most shared first | no |
+| `shared_shift_matrix` | Shared-shift counts for every pair in a schedule, optionally one class | no |
 | `check_coverage` | Dry run of one resident covering another's shift: problems + estimated 80-hour check | no |
 | `request_coverage` | Files a **pending** change request | yes |
 | `list_change_requests` | Requests visible to the caller (admins: all) | no |

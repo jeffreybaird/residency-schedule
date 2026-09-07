@@ -154,6 +154,73 @@ defmodule ResidencySchedule.AssistantTest do
     end
   end
 
+  describe "shared_shift_matrix/1" do
+    test "lists every pair, zeros included, matching the pairwise tool", _ctx do
+      assert {:ok, result} = Assistant.shared_shift_matrix(%{from: "2026-07-06"})
+      assert result.academic_year == 2026
+      assert length(result.residents) == 3
+      assert length(result.pairs) == 3
+
+      # Clare/Mary share Strong OB Jul 6–12; Mary/Tiff share it Jul 13–19; Clare/Tiff never overlap.
+      assert Enum.map(result.pairs, &{&1.resident.name, &1.coworker.name, &1.count}) == [
+               {"Clare", "Mary", 7},
+               {"Mary", "Tiff", 7},
+               {"Clare", "Tiff", 0}
+             ]
+
+      for pair <- result.pairs do
+        {:ok, %{count: count}} =
+          Assistant.shared_shifts(pair.resident.name, pair.coworker.name, "2026-07-06")
+
+        assert pair.count == count, "#{pair.resident.name}/#{pair.coworker.name}"
+      end
+    end
+
+    test "honours range, coverage, and the class filter", ctx do
+      tiff_ob = rotation_on(ctx.tiff, ~D[2026-07-15])
+
+      {:ok, _} =
+        ShiftOverrides.create_override(%{
+          rotation_id: tiff_ob.id,
+          covering_schedule_resident_id: ctx.clare.id,
+          override_start_date: ~D[2026-07-15],
+          override_end_date: ~D[2026-07-16]
+        })
+
+      assert {:ok, %{pairs: [%{resident: %{name: "Clare"}, coworker: %{name: "Mary"}, count: 2}]}} =
+               Assistant.shared_shift_matrix(%{
+                 from: "2026-07-13",
+                 to: "2026-07-19",
+                 residency_year: 2
+               })
+
+      # Tiff is off on the two covered days, so Mary/Tiff drop from 7 to 5.
+      assert {:ok, %{pairs: pairs}} =
+               Assistant.shared_shift_matrix(%{from: "2026-07-13", to: "2026-07-19"})
+
+      assert Enum.map(pairs, &{&1.resident.name, &1.coworker.name, &1.count}) == [
+               {"Mary", "Tiff", 5},
+               {"Clare", "Mary", 2},
+               {"Clare", "Tiff", 0}
+             ]
+    end
+
+    test "selects the schedule by academic year and rejects bad input", _ctx do
+      {:ok, _} = Schedules.upsert_schedule(2025, "2025–2026")
+
+      assert {:ok, %{academic_year: 2025, pairs: [], residents: []}} =
+               Assistant.shared_shift_matrix(%{academic_year: 2025})
+
+      assert {:error, {:schedule_not_found, 2019}} =
+               Assistant.shared_shift_matrix(%{academic_year: 2019})
+
+      assert {:error, :invalid_residency_year} =
+               Assistant.shared_shift_matrix(%{residency_year: 0})
+
+      assert {:error, :invalid_date} = Assistant.shared_shift_matrix(%{from: "soon"})
+    end
+  end
+
   describe "who_is_on/2" do
     test "lists residents on the service with coverage applied", ctx do
       assert {:ok, result} = Assistant.who_is_on("strong ob", "2026-07-15")

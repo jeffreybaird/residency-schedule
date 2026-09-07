@@ -120,6 +120,28 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
         read_only: true
       ),
       tool(
+        "shared_shift_matrix",
+        "Shared shifts for every pair of residents",
+        "Shared-shift counts for every pair of residents in a schedule from a date onward, computed in one pass. Every pair is listed, zeros included, most shared first. " <>
+          "Restrict to one class with residency_year; pick another schedule with academic_year. Same counting rule as shared_shifts. " <>
+          "Use it for questions about the whole program ('which two residents overlap most', 'who is isolated'). For one resident use shared_shifts_by_coworker.",
+        %{
+          from: string("Count from this date. " <> @date_desc),
+          to: string("Count through this date (inclusive). Defaults to the end of the schedule."),
+          residency_year: %{
+            type: "integer",
+            description: "Residency year 1–4 to restrict the matrix to one class."
+          },
+          academic_year: %{
+            type: "integer",
+            description:
+              "Schedule start year, e.g. 2026. Defaults to the schedule active on `from`."
+          }
+        },
+        [],
+        read_only: true
+      ),
+      tool(
         "check_coverage",
         "Check a proposed cover",
         "Dry run: could `covering` take `original`'s shift on the dates? Returns the shift, any blocking problems, and an ESTIMATED ACGME 80-hour check (nominal hours per rotation; no shift times exist). Writes nothing.",
@@ -282,6 +304,15 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
   defp dispatch("list_residents", args, _user),
     do:
       Assistant.list_residents(%{
+        residency_year: args["residency_year"],
+        academic_year: args["academic_year"]
+      })
+
+  defp dispatch("shared_shift_matrix", args, _user),
+    do:
+      Assistant.shared_shift_matrix(%{
+        from: args["from"],
+        to: args["to"],
         residency_year: args["residency_year"],
         academic_year: args["academic_year"]
       })

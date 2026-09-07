@@ -638,15 +638,57 @@ defmodule ResidencySchedule.Rotations do
       []
   """
   def effective_segments_for_resident(schedule_resident_id) do
-    alias ResidencySchedule.ShiftOverrides
+    build_effective_segments(
+      list_rotations_for_resident(schedule_resident_id),
+      ShiftOverrides.list_overrides_for_resident_as_original(schedule_resident_id),
+      ShiftOverrides.list_overrides_for_resident_as_cover(schedule_resident_id)
+    )
+  end
 
-    rotations = list_rotations_for_resident(schedule_resident_id)
+  @doc """
+  Effective rotation segments for every resident in a schedule, keyed by
+  schedule resident id, loaded with three queries instead of three per
+  resident. Each value has the same shape as `effective_segments_for_resident/1`.
 
-    overrides_as_original =
-      ShiftOverrides.list_overrides_for_resident_as_original(schedule_resident_id)
+  Exempt from doctest — hits the database. See `RotationsTest`.
+  """
+  def effective_segments_for_schedule(schedule_id) do
+    rotations_by_resident =
+      schedule_id
+      |> list_rotations_for_schedule()
+      |> Enum.group_by(& &1.schedule_resident_id)
 
-    overrides_as_cover = ShiftOverrides.list_overrides_for_resident_as_cover(schedule_resident_id)
+    overrides = ShiftOverrides.list_overrides_for_schedule(schedule_id)
+    as_original = Enum.group_by(overrides, & &1.rotation.schedule_resident_id)
+    as_cover = Enum.group_by(overrides, & &1.covering_schedule_resident_id)
 
+    schedule_id
+    |> Residents.list_residents_for_schedule()
+    |> Map.new(fn resident ->
+      {resident.id,
+       build_effective_segments(
+         Map.get(rotations_by_resident, resident.id, []),
+         Map.get(as_original, resident.id, []),
+         Map.get(as_cover, resident.id, [])
+       )}
+    end)
+  end
+
+  @doc """
+  Returns every rotation in a schedule ordered by resident then start date.
+
+  Exempt from doctest — hits the database. See `RotationsTest`.
+  """
+  def list_rotations_for_schedule(schedule_id) do
+    from(rot in Rotation,
+      join: sr in assoc(rot, :schedule_resident),
+      where: sr.schedule_id == ^schedule_id,
+      order_by: [rot.schedule_resident_id, rot.start_date]
+    )
+    |> Repo.all()
+  end
+
+  defp build_effective_segments(rotations, overrides_as_original, overrides_as_cover) do
     covered_blocks =
       Enum.map(overrides_as_original, fn o ->
         {o.override_start_date, o.override_end_date, {:covered_by, o.covering_schedule_resident}}

@@ -11,7 +11,15 @@ defmodule ResidencySchedule.Assistant do
   """
 
   alias ResidencySchedule.Accounts.User
-  alias ResidencySchedule.Assistant.{DutyHoursCheck, LocalDate, ResidentResolver, RotationAliases}
+
+  alias ResidencySchedule.Assistant.{
+    DutyHoursCheck,
+    LocalDate,
+    ResidentResolver,
+    RotationAliases,
+    SharedShiftMatrix
+  }
+
   alias ResidencySchedule.{ChangeRequests, Residents, Rotations, Schedules, ShiftOverrides}
 
   # ── Residents ──────────────────────────────────────────────────────────────
@@ -188,11 +196,13 @@ defmodule ResidencySchedule.Assistant do
          {:ok, to} <- LocalDate.parse_optional(to),
          {:ok, schedule} <- schedule_for(from),
          {:ok, resident} <- resolve(name, schedule.id) do
+      residents = Residents.list_residents_for_schedule(schedule.id)
+      counts = pair_counts_for_schedule(schedule.id, from, to)
+
       coworkers =
-        schedule.id
-        |> Residents.list_residents_for_schedule()
+        residents
         |> Enum.reject(&(&1.id == resident.id))
-        |> Enum.map(&coworker_share(resident, &1, from, to))
+        |> Enum.map(&coworker_share(counts, resident, &1))
         |> Enum.sort_by(&{-&1.count, &1.coworker.residency_year, &1.coworker.position_code})
 
       {:ok,
@@ -201,6 +211,54 @@ defmodule ResidencySchedule.Assistant do
          from: from,
          to: to,
          coworkers: coworkers,
+         counting_rule: shared_counting_rule()
+       }}
+    end
+  end
+
+  @doc """
+  Shared-shift counts for every pair of residents in a schedule, computed in
+  one pass. `opts` may carry `:from` (default today), `:to` (default end of
+  schedule), `:academic_year` (schedule start year, default the schedule
+  active on `from`), and `:residency_year` to restrict the matrix to one
+  class. Every pair is listed, zeros included, most shared first.
+
+  Exempt from doctest — hits the database. See `AssistantTest`.
+  """
+  def shared_shift_matrix(opts \\ %{}) do
+    with {:ok, from} <- LocalDate.parse(opts[:from]),
+         {:ok, to} <- LocalDate.parse_optional(opts[:to]),
+         {:ok, schedule} <- schedule_for_opts(opts, from),
+         {:ok, residency_year} <- parse_residency_year(opts[:residency_year]) do
+      residents =
+        schedule.id
+        |> Residents.list_residents_for_schedule()
+        |> Enum.filter(&(residency_year == nil or &1.residency_year == residency_year))
+
+      counts = pair_counts_for_schedule(schedule.id, from, to)
+
+      pairs =
+        for {a, i} <- Enum.with_index(residents),
+            b <- Enum.drop(residents, i + 1) do
+          shared = SharedShiftMatrix.lookup(counts, a.id, b.id)
+
+          %{
+            resident: resident_summary(a, nil),
+            coworker: resident_summary(b, nil),
+            count: shared.count,
+            by_rotation: by_rotation_list(shared.by_rotation)
+          }
+        end
+
+      {:ok,
+       %{
+         schedule: schedule.label,
+         academic_year: schedule.academic_year,
+         residency_year: residency_year,
+         from: from,
+         to: to,
+         residents: Enum.map(residents, &resident_summary(&1, nil)),
+         pairs: Enum.sort_by(pairs, &(-&1.count)),
          counting_rule: shared_counting_rule()
        }}
     end
@@ -304,17 +362,34 @@ defmodule ResidencySchedule.Assistant do
 
   # ── Private: shared shifts ─────────────────────────────────────────────────
 
-  defp coworker_share(resident, coworker, from, to) do
-    days =
-      resident.id
-      |> Rotations.list_effective_co_service_days(coworker.id)
-      |> Enum.filter(&within?(&1.date, from, to))
+  defp pair_counts_for_schedule(schedule_id, from, to) do
+    schedule_id
+    |> Rotations.effective_segments_for_schedule()
+    |> Map.new(fn {id, segments} ->
+      {id, segments |> SharedShiftMatrix.cells() |> clip_cells(from, to)}
+    end)
+    |> SharedShiftMatrix.pair_counts()
+  end
+
+  defp clip_cells(cells, from, to),
+    do: Enum.filter(cells, fn {date, _type} -> within?(date, from, to) end)
+
+  defp coworker_share(counts, resident, coworker) do
+    shared = SharedShiftMatrix.lookup(counts, resident.id, coworker.id)
 
     %{
       coworker: resident_summary(coworker, nil),
-      count: length(days),
-      by_rotation: count_by_rotation(days)
+      count: shared.count,
+      by_rotation: by_rotation_list(shared.by_rotation)
     }
+  end
+
+  defp by_rotation_list(by_rotation) do
+    by_rotation
+    |> Enum.map(fn {type, days} ->
+      %{rotation_type: type, rotation_label: Rotations.rotation_type_label(type), days: days}
+    end)
+    |> Enum.sort_by(&(-&1.days))
   end
 
   defp shared_counting_rule do
@@ -325,7 +400,9 @@ defmodule ResidencySchedule.Assistant do
     }
   end
 
-  defp schedule_for_opts(%{academic_year: year}) when not is_nil(year) do
+  defp schedule_for_opts(opts, fallback_date \\ LocalDate.today())
+
+  defp schedule_for_opts(%{academic_year: year}, _fallback_date) when not is_nil(year) do
     with {:ok, year} <- parse_integer(year, :invalid_academic_year) do
       case Schedules.get_by_year(year) do
         nil -> {:error, {:schedule_not_found, year}}
@@ -334,7 +411,7 @@ defmodule ResidencySchedule.Assistant do
     end
   end
 
-  defp schedule_for_opts(_opts), do: schedule_for(LocalDate.today())
+  defp schedule_for_opts(_opts, fallback_date), do: schedule_for(fallback_date)
 
   defp parse_residency_year(nil), do: {:ok, nil}
 
