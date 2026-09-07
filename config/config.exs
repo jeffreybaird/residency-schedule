@@ -18,10 +18,12 @@ config :residency_schedule,
 # Chat assistant model provider. Swap providers or models here; the API key
 # comes from the environment in config/runtime.exs.
 config :residency_schedule, :chat,
+  enabled: false,
   provider: ResidencySchedule.Assistant.Chat.Providers.Anthropic,
   model: "claude-sonnet-5",
   effort: "low",
-  max_tokens: 16_000
+  max_tokens: 16_000,
+  daily_message_limit: 50
 
 # Configure the endpoint
 config :residency_schedule, ResidencyScheduleWeb.Endpoint,

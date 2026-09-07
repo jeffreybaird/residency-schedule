@@ -9,6 +9,7 @@ config :residency_schedule, roster_path: "test/fixtures/roster.csv"
 
 # Chat tests never reach a real model
 config :residency_schedule, :chat,
+  enabled: true,
   provider: ResidencySchedule.Assistant.Chat.Providers.Fake,
   model: "fake"
 
