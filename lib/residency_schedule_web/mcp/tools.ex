@@ -32,7 +32,8 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
       tool(
         "find_resident",
         "Find a resident",
-        "Resolves a first name or nickname to one resident in the schedule active on the date. Reports candidates when the name is ambiguous.",
+        "Resolves a first name or nickname to one resident in the schedule active on the date. " <>
+          "Reports candidates when the name is ambiguous. person_id identifies the same person in every academic year.",
         %{name: string("Resident's name, e.g. 'Clare' or 'Nora K'."), date: string(@date_desc)},
         ["name"],
         read_only: true
@@ -41,6 +42,7 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
         "list_residents",
         "List residents",
         "Lists the residents in a schedule with their position codes and residency years. " <>
+          "person_id is the same for one person across academic years, so compare it to tell whether two roster entries are the same resident. " <>
           "Filter with residency_year (1–4, e.g. 2 for the R2 class). academic_year picks the schedule by its start year (e.g. 2026 for 2026–2027); defaults to the schedule active today.",
         %{
           residency_year: %{

@@ -27,10 +27,11 @@ defmodule ResidencySchedule.AssistantTest do
 
   describe "find_resident/2 and whoami/1" do
     test "resolves by first name", %{tiff: tiff} do
-      assert {:ok, %{id: id, position_code: "R3-1", schedule: "2026–2027"}} =
+      assert {:ok, %{person_id: person_id, position_code: "R3-1", schedule: "2026–2027"}} =
                Assistant.find_resident("tiff", "2026-07-10")
 
-      assert id == tiff.id
+      assert person_id == tiff.resident_id
+      refute Map.has_key?(elem(Assistant.find_resident("tiff", "2026-07-10"), 1), :id)
     end
 
     test "reports unknown and ambiguous names" do
@@ -79,8 +80,10 @@ defmodule ResidencySchedule.AssistantTest do
     end
 
     test "whoami describes the home resident", ctx do
-      assert {:ok, %{role: :resident, home_resident: %{name: "Clare"}, today: %Date{}}} =
+      assert {:ok, %{role: :resident, home_resident: %{name: "Clare"} = home, today: %Date{}}} =
                Assistant.whoami(ctx.clare_user)
+
+      assert home.person_id == ctx.clare.resident_id
 
       assert {:ok, %{role: :admin, home_resident: nil}} = Assistant.whoami(ctx.admin)
     end
@@ -92,6 +95,21 @@ defmodule ResidencySchedule.AssistantTest do
       assert result.academic_year == 2026
       assert result.residency_year == nil
       assert Enum.map(result.residents, & &1.position_code) == ["R2-1", "R2-2", "R3-1"]
+    end
+
+    test "reports the person id, shared by every year the person appears in", ctx do
+      seed_prior_year_for_clare(ctx)
+
+      {:ok, %{residents: current}} = Assistant.list_residents(%{academic_year: 2026})
+      {:ok, %{residents: prior}} = Assistant.list_residents(%{academic_year: 2025})
+
+      clare_now = Enum.find(current, &(&1.name == "Clare"))
+      clare_then = Enum.find(prior, &(&1.name == "Clare"))
+
+      assert clare_now.person_id == ctx.clare.resident_id
+      assert clare_then.person_id == clare_now.person_id
+      assert clare_then.position_code != clare_now.position_code
+      refute Map.has_key?(clare_now, :id)
     end
 
     test "filters by residency year, accepting strings", _ctx do

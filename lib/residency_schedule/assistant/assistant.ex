@@ -548,9 +548,11 @@ defmodule ResidencySchedule.Assistant do
 
   # ── Private: summaries ─────────────────────────────────────────────────────
 
+  # `person_id` is the resident's one record across every academic year; the
+  # per-year roster row id is deliberately not exposed.
   defp resident_summary(resident, schedule) do
     %{
-      id: resident.id,
+      person_id: resident.resident_id,
       name: resident.name,
       position_code: resident.position_code,
       residency_year: resident.residency_year,

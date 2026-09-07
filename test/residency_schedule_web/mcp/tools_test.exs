@@ -45,8 +45,16 @@ defmodule ResidencyScheduleWeb.MCP.ToolsTest do
     end
 
     test "find_resident, resident_schedule, and shared_shifts", ctx do
-      assert %{structuredContent: %{name: "Tiff"}} =
+      assert %{structuredContent: %{name: "Tiff", person_id: person_id}} =
                call("find_resident", %{"name" => "tiff", "date" => "2026-07-10"}, ctx.clare_user)
+
+      assert person_id == ctx.tiff.resident_id
+
+      assert %{structuredContent: %{residents: residents}} =
+               call("list_residents", %{}, ctx.clare_user)
+
+      assert Enum.all?(residents, &is_integer(&1.person_id))
+      refute Enum.any?(residents, &Map.has_key?(&1, :id))
 
       assert %{structuredContent: %{segments: [_ | _]}} =
                call(
