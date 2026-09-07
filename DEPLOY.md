@@ -107,9 +107,6 @@ SECRET_KEY_BASE=<generate with: mix phx.gen.secret>
 PHX_HOST=yourdomain.com
 ACCESS_PASSWORD=<choose a strong password>
 POOL_SIZE=10
-# Optional chat assistant. When CHAT_ENABLED=true the key is required at boot.
-CHAT_ENABLED=false
-ANTHROPIC_API_KEY=<from console.anthropic.com>
 EOF
 
 chmod 600 /home/deploy/residency_schedule/.env
@@ -122,6 +119,8 @@ mix phx.gen.secret
 ```
 
 > **Important:** `DATABASE_URL` and `ACCESS_PASSWORD` live **only** on the server. They are never sent through GitHub. `SECRET_KEY_BASE` and `PHX_HOST` are also in GitHub Secrets (needed at build time for asset digests).
+
+> The optional chat assistant is switched on from GitHub: set the `CHAT_ENABLED` variable and `ANTHROPIC_API_KEY` secret (Part 2) and the next deploy writes both into this file. When `CHAT_ENABLED=true` the key is required at boot.
 
 ### 1.8 Create the systemd service
 
@@ -208,6 +207,13 @@ In your GitHub repository go to **Settings → Secrets and variables → Actions
 | `DEPLOY_SSH_KEY` | Full private key PEM | Generate with `ssh-keygen -t ed25519 -C "deploy@github-actions" -f ~/.ssh/residency_deploy -N ""`, use the private key file |
 | `SECRET_KEY_BASE` | Output of `mix phx.gen.secret` | Must match the value in your server `.env` |
 | `PHX_HOST` | Your domain | e.g. `residency-schedule.example.com` |
+| `ANTHROPIC_API_KEY` | Key from console.anthropic.com | Optional. The deploy writes it into the production `.env`; only needed when the chat assistant is on |
+
+And under the **Variables** tab (not a secret, it is just a switch):
+
+| Variable | Value | Notes |
+|---|---|---|
+| `CHAT_ENABLED` | `true` or `false` | Optional. The deploy writes it into the production `.env`. Unset leaves the server's current value alone |
 
 **`DATABASE_URL` and `ACCESS_PASSWORD` are NOT GitHub Secrets** — they live only in `/home/deploy/residency_schedule/.env` on the server.
 
