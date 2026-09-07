@@ -1,10 +1,17 @@
-defmodule ResidencyScheduleWeb.ChatLive.Index do
+defmodule ResidencyScheduleWeb.ChatLive.Widget do
   @moduledoc """
-  The chat assistant. Each turn runs in a task so the socket keeps
-  rendering text as it streams; tool calls that change data pause for the
-  user's approval before they run.
+  The chat assistant, rendered by the root layout as a launcher button in the
+  bottom-right corner that opens a floating panel. Each turn runs in a task so
+  the socket keeps rendering text as it streams; tool calls that change data
+  pause for the user's approval before they run.
+
+  The layout renders it only for signed-in users when chat is enabled, and it
+  renders nothing on its own when chat is off. Because the site navigates with
+  full page loads, the conversation lives as long as the page does.
   """
   use ResidencyScheduleWeb, :live_view
+
+  on_mount {ResidencyScheduleWeb.UserAuth, :ensure_authenticated}
 
   require Logger
 
@@ -21,6 +28,7 @@ defmodule ResidencyScheduleWeb.ChatLive.Index do
     {:ok,
      assign(socket,
        enabled: Chat.enabled?(),
+       open: false,
        conversation: Conversation.new(toolbox: Toolbox, user: user),
        entries: [],
        next_id: 1,
@@ -35,6 +43,9 @@ defmodule ResidencyScheduleWeb.ChatLive.Index do
   # ── Events ─────────────────────────────────────────────────────────────────
 
   @impl true
+  def handle_event("open", _params, socket), do: {:noreply, assign(socket, open: true)}
+  def handle_event("close", _params, socket), do: {:noreply, assign(socket, open: false)}
+
   def handle_event("send", %{"message" => text}, socket) do
     text = String.trim(text)
 
@@ -215,7 +226,7 @@ defmodule ResidencyScheduleWeb.ChatLive.Index do
   @doc """
   Turns a tool name into a readable label.
 
-      iex> ResidencyScheduleWeb.ChatLive.Index.tool_label("request_coverage")
+      iex> ResidencyScheduleWeb.ChatLive.Widget.tool_label("request_coverage")
       "Request coverage"
   """
   def tool_label(name) do
@@ -227,7 +238,7 @@ defmodule ResidencyScheduleWeb.ChatLive.Index do
   @doc """
   Pretty-prints tool arguments for the approval card.
 
-      iex> ResidencyScheduleWeb.ChatLive.Index.format_args(%{"covering" => "Nora"})
+      iex> ResidencyScheduleWeb.ChatLive.Widget.format_args(%{"covering" => "Nora"})
       "covering: Nora"
   """
   def format_args(args) when map_size(args) == 0, do: "no arguments"
@@ -244,35 +255,55 @@ defmodule ResidencyScheduleWeb.ChatLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-3xl mx-auto py-6 sm:py-10 px-3 sm:px-4">
-      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Assistant</h1>
-        <div class="flex items-center gap-3 text-sm text-gray-500">
-          <span :if={@enabled} id="chat-remaining">{@remaining} messages left today</span>
-          <button
-            :if={@entries != []}
-            phx-click="reset"
-            disabled={@busy}
-            class="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
-          >
-            New chat
-          </button>
-        </div>
-      </div>
-
-      <div
-        :if={!@enabled}
-        id="chat-disabled"
-        class="rounded-xl border-2 border-gray-200 p-6 text-gray-600"
+    <div :if={@enabled} id="chat-widget-root">
+      <button
+        :if={!@open}
+        id="chat-launcher"
+        type="button"
+        phx-click="open"
+        aria-label="Open the assistant"
+        title="Assistant"
+        class="fixed bottom-4 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
       >
-        The assistant is turned off on this site.
-      </div>
+        <.icon name="hero-chat-bubble-left-right" class="size-7" />
+      </button>
 
-      <div :if={@enabled} class="space-y-4">
+      <section
+        :if={@open}
+        id="chat-panel"
+        role="dialog"
+        aria-label="Assistant"
+        class="fixed inset-x-2 bottom-2 z-40 flex h-[70vh] flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl sm:inset-x-auto sm:bottom-4 sm:right-4 sm:h-[32rem] sm:max-h-[calc(100vh-2rem)] sm:w-96"
+      >
+        <div class="flex items-center justify-between gap-2 border-b border-gray-200 px-4 py-2">
+          <h2 class="text-sm font-semibold text-gray-800">Assistant</h2>
+          <div class="flex items-center gap-2 text-xs text-gray-500">
+            <span id="chat-remaining">{@remaining} messages left today</span>
+            <button
+              :if={@entries != []}
+              type="button"
+              phx-click="reset"
+              disabled={@busy}
+              class="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+            >
+              New chat
+            </button>
+            <button
+              id="chat-close"
+              type="button"
+              phx-click="close"
+              aria-label="Close the assistant"
+              class="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            >
+              <.icon name="hero-x-mark" class="size-4" />
+            </button>
+          </div>
+        </div>
+
         <div
           id="chat-log"
           phx-hook="ChatScroll"
-          class="rounded-xl border-2 border-gray-200 p-4 min-h-[40vh] max-h-[60vh] overflow-y-auto space-y-3"
+          class="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3"
         >
           <p :if={@entries == []} class="text-sm text-gray-500">
             Ask about who is on a service, a resident's schedule, shared shifts, or coverage.
@@ -284,27 +315,29 @@ defmodule ResidencyScheduleWeb.ChatLive.Index do
         <div
           :if={@pending != []}
           id="chat-approval"
-          class="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3"
+          class="space-y-2 border-t border-amber-200 bg-amber-50 px-4 py-3"
         >
           <p class="text-sm font-semibold text-amber-900">
             The assistant wants to make a change. Run it?
           </p>
-          <div :for={call <- @pending} class="rounded-lg bg-white border border-amber-200 p-3">
+          <div :for={call <- @pending} class="rounded-lg border border-amber-200 bg-white p-2">
             <p class="text-sm font-medium text-gray-800">{tool_label(call.name)}</p>
-            <pre class="mt-1 text-xs text-gray-600 whitespace-pre-wrap">{format_args(call.args)}</pre>
+            <pre class="mt-1 whitespace-pre-wrap text-xs text-gray-600">{format_args(call.args)}</pre>
           </div>
           <div class="flex gap-2">
             <button
+              type="button"
               phx-click="approve"
               disabled={@busy}
-              class="px-4 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+              class="rounded-md bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
               Approve
             </button>
             <button
+              type="button"
               phx-click="deny"
               disabled={@busy}
-              class="px-4 py-1.5 rounded-md text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+              class="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
             >
               Deny
             </button>
@@ -314,29 +347,30 @@ defmodule ResidencyScheduleWeb.ChatLive.Index do
         <p
           :if={@error}
           id="chat-error"
-          class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+          class="mx-4 mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
         >
           {@error}
         </p>
 
-        <form id="chat-form" phx-submit="send" class="flex gap-2">
+        <form id="chat-form" phx-submit="send" class="flex gap-2 border-t border-gray-200 px-3 py-2">
           <input
             type="text"
             name="message"
             autocomplete="off"
             placeholder="Who is on onc tomorrow?"
             disabled={@busy or @pending != []}
-            class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:bg-gray-50"
+            phx-mounted={JS.focus()}
+            class="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:bg-gray-50"
           />
           <button
             type="submit"
             disabled={@busy or @pending != []}
-            class="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            class="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             Send
           </button>
         </form>
-      </div>
+      </section>
     </div>
     """
   end

@@ -67,15 +67,6 @@
           >
             Compare
           </a>
-          <%= if ResidencySchedule.Assistant.Chat.enabled?() do %>
-            <a
-              id="nav-chat"
-              href="/chat"
-              class="px-3 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-            >
-              Assistant
-            </a>
-          <% end %>
           <%= if user = @conn.assigns[:current_user] do %>
             <%= if my_page_path = nav_home_path(user) do %>
               <%= if @conn.request_path == my_page_path do %>
@@ -153,11 +144,6 @@
             <a href="/compare" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
               Compare
             </a>
-            <%= if ResidencySchedule.Assistant.Chat.enabled?() do %>
-              <a href="/chat" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                Assistant
-              </a>
-            <% end %>
             <%= if user = @conn.assigns[:current_user] do %>
               <%= if my_page_path = nav_home_path(user) do %>
                 <%= if @conn.request_path == my_page_path do %>
@@ -209,5 +195,8 @@
       </div>
     </nav>
     {@inner_content}
+    <%= if ResidencySchedule.Assistant.Chat.enabled?() and @conn.assigns[:current_user] do %>
+      {live_render(@conn, ResidencyScheduleWeb.ChatLive.Widget)}
+    <% end %>
   </body>
 </html>

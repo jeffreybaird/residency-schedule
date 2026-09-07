@@ -1,41 +1,105 @@
-defmodule ResidencyScheduleWeb.ChatLiveTest do
+defmodule ResidencyScheduleWeb.ChatWidgetTest do
   use ResidencyScheduleWeb.ConnCase
   import Phoenix.LiveViewTest
 
   alias ResidencySchedule.Assistant.Chat
   alias ResidencySchedule.Assistant.Chat.{Providers.Fake, Quota, ToolCall}
   alias ResidencySchedule.Assistant.LocalDate
-  alias ResidencyScheduleWeb.ChatLive.Index
+  alias ResidencyScheduleWeb.ChatLive.Widget
 
-  doctest Index
+  doctest Widget
 
   setup :authenticate_session
+
+  # Mounts the widget on its own and opens the panel, as a user would by
+  # clicking the launcher.
+  defp open_widget(conn) do
+    {:ok, view, _html} = live_isolated(conn, Widget)
+    view |> element("#chat-launcher") |> render_click()
+    view
+  end
 
   defp send_message(view, text) do
     view |> form("#chat-form", %{"message" => text}) |> render_submit()
     render_async(view)
   end
 
-  describe "unauthenticated access" do
-    test "redirects to /login when no session" do
-      assert redirected_to(get(build_conn(), "/chat")) == "/login"
+  describe "placement in the layout" do
+    test "signed-in pages carry the widget", %{conn: conn} do
+      html = conn |> get("/") |> html_response(200)
+      assert html =~ ~s(id="chat-widget-root")
+      assert html =~ ~s(id="chat-launcher")
+      refute html =~ ~s(id="chat-panel")
+    end
+
+    test "admin pages carry the widget too" do
+      %{conn: conn} = admin_authenticate_session(%{conn: build_conn()})
+      html = conn |> get("/admin") |> html_response(200)
+      assert html =~ ~s(id="chat-widget-root")
+    end
+
+    test "the login page has no widget" do
+      html = build_conn() |> get("/login") |> html_response(200)
+      refute html =~ ~s(id="chat-widget-root")
+    end
+
+    test "demo mode has no widget and no nav link", %{conn: conn} do
+      set_demo_mode(true)
+      html = conn |> get("/") |> html_response(200)
+      refute html =~ ~s(id="chat-widget-root")
+      refute html =~ "/chat"
+    end
+
+    test "the old chat page is gone", %{conn: conn} do
+      assert get(conn, "/chat").status == 404
     end
   end
 
-  describe "when the assistant is off" do
-    test "explains and offers no form", %{conn: conn} do
+  describe "mounting on its own" do
+    test "redirects to /login without a session" do
+      conn = Plug.Test.init_test_session(build_conn(), %{})
+      assert {:error, {:redirect, %{to: "/login"}}} = live_isolated(conn, Widget)
+    end
+
+    test "renders nothing when the assistant is off", %{conn: conn} do
       set_demo_mode(true)
-      {:ok, view, html} = live(conn, "/chat")
-      assert html =~ "turned off"
-      refute has_element?(view, "#chat-form")
+      {:ok, view, _html} = live_isolated(conn, Widget)
+      refute has_element?(view, "#chat-launcher")
+      refute has_element?(view, "#chat-panel")
+    end
+  end
+
+  describe "opening and closing" do
+    test "starts as a launcher and opens into the panel", %{conn: conn} do
+      {:ok, view, _html} = live_isolated(conn, Widget)
+      assert has_element?(view, "#chat-launcher[aria-label='Open the assistant']")
+      refute has_element?(view, "#chat-panel")
+
+      view |> element("#chat-launcher") |> render_click()
+      assert has_element?(view, "#chat-panel[role=dialog]")
+      assert has_element?(view, "#chat-form input[phx-mounted]")
+      assert has_element?(view, "#chat-remaining", "50 messages left today")
+      refute has_element?(view, "#chat-launcher")
+    end
+
+    test "the x closes the panel and keeps the conversation", %{conn: conn} do
+      Fake.script([{:text, "Nora is on onc."}])
+      view = open_widget(conn)
+      send_message(view, "Who is on onc?")
+
+      view |> element("#chat-close[aria-label='Close the assistant']") |> render_click()
+      refute has_element?(view, "#chat-panel")
+      assert has_element?(view, "#chat-launcher")
+
+      view |> element("#chat-launcher") |> render_click()
+      assert has_element?(view, "[data-kind=assistant]", "Nora is on onc.")
     end
   end
 
   describe "a text conversation" do
     test "shows the user's message and the streamed reply", %{conn: conn} do
       Fake.script([{:text, "Nora is on onc."}])
-      {:ok, view, html} = live(conn, "/chat")
-      assert html =~ "50 messages left today"
+      view = open_widget(conn)
 
       send_message(view, "Who is on onc?")
       assert has_element?(view, "[data-kind=user]", "Who is on onc?")
@@ -46,7 +110,7 @@ defmodule ResidencyScheduleWeb.ChatLiveTest do
 
     test "renders the reply's markdown and escapes HTML in it", %{conn: conn} do
       Fake.script([{:text, "**Today:**\n- Clare <b>x</b>\n- Mary"}])
-      {:ok, view, _html} = live(conn, "/chat")
+      view = open_widget(conn)
 
       send_message(view, "Who is on?")
       assert has_element?(view, "[data-kind=assistant] strong", "Today:")
@@ -56,7 +120,7 @@ defmodule ResidencyScheduleWeb.ChatLiveTest do
     end
 
     test "ignores blank messages", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/chat")
+      view = open_widget(conn)
       send_message(view, "   ")
       refute has_element?(view, "[data-kind=user]")
       assert has_element?(view, "#chat-remaining", "50 messages left")
@@ -68,7 +132,7 @@ defmodule ResidencyScheduleWeb.ChatLiveTest do
         {:text, "Back."}
       ])
 
-      {:ok, view, _html} = live(conn, "/chat")
+      view = open_widget(conn)
 
       send_message(view, "Hi")
       assert has_element?(view, "#chat-error", "Overloaded")
@@ -80,7 +144,7 @@ defmodule ResidencyScheduleWeb.ChatLiveTest do
 
     test "a crash inside the turn is reported and logged", %{conn: conn} do
       Fake.script([fn _request -> raise "boom" end, {:text, "Recovered."}])
-      {:ok, view, _html} = live(conn, "/chat")
+      view = open_widget(conn)
 
       log = ExUnit.CaptureLog.capture_log(fn -> send_message(view, "Hi") end)
       assert log =~ "chat turn crashed"
@@ -93,7 +157,7 @@ defmodule ResidencyScheduleWeb.ChatLiveTest do
 
     test "new chat clears the log", %{conn: conn} do
       Fake.script([{:text, "Hello."}])
-      {:ok, view, _html} = live(conn, "/chat")
+      view = open_widget(conn)
       send_message(view, "Hi")
       view |> element("button", "New chat") |> render_click()
       refute has_element?(view, "[data-kind=user]")
@@ -104,8 +168,8 @@ defmodule ResidencyScheduleWeb.ChatLiveTest do
       limit = Chat.daily_limit()
       for _ <- 1..limit, do: {:ok, _} = Quota.consume(user, today)
 
-      {:ok, view, html} = live(conn, "/chat")
-      assert html =~ "0 messages left today"
+      view = open_widget(conn)
+      assert has_element?(view, "#chat-remaining", "0 messages left today")
       send_message(view, "Hi")
       assert has_element?(view, "#chat-error", "used today's #{limit} messages")
       refute has_element?(view, "[data-kind=user]")
@@ -123,7 +187,7 @@ defmodule ResidencyScheduleWeb.ChatLiveTest do
         ToolCall.new("toolu_1", "who_is_on", %{"rotation" => "strong ob", "date" => "2026-07-15"})
 
       Fake.script([{:tool_calls, "Checking.", [call]}, {:text, "Found them."}])
-      {:ok, view, _html} = live(conn, "/chat")
+      view = open_widget(conn)
 
       send_message(view, "Who is on strong ob?")
       assert has_element?(view, "[data-kind=tool][data-status=ok]", "Used Who is on")
@@ -134,7 +198,7 @@ defmodule ResidencyScheduleWeb.ChatLiveTest do
     test "a failing tool is shown with its message", %{conn: conn} do
       call = ToolCall.new("toolu_1", "find_resident", %{"name" => "Nobody"})
       Fake.script([{:tool_calls, nil, [call]}, {:text, "No such resident."}])
-      {:ok, view, _html} = live(conn, "/chat")
+      view = open_widget(conn)
 
       send_message(view, "Find Nobody")
       assert has_element?(view, "[data-kind=tool][data-status=error]", "No resident named")
@@ -148,7 +212,7 @@ defmodule ResidencyScheduleWeb.ChatLiveTest do
         })
 
       Fake.script([{:tool_calls, "I will file it.", [call]}, {:text, "Filed."}])
-      {:ok, view, _html} = live(conn, "/chat")
+      view = open_widget(conn)
 
       send_message(view, "Cover me")
       assert has_element?(view, "#chat-approval", "Request coverage")
@@ -170,7 +234,7 @@ defmodule ResidencyScheduleWeb.ChatLiveTest do
         fn request -> {:text, "Declined: " <> last_tool_result(request)} end
       ])
 
-      {:ok, view, _html} = live(conn, "/chat")
+      view = open_widget(conn)
 
       send_message(view, "Cancel my request")
       view |> element("#chat-approval button", "Deny") |> render_click()
