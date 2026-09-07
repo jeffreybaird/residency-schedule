@@ -14,7 +14,14 @@ defmodule ResidencySchedule.Assistant.Chat.Providers.Anthropic.Accumulator do
 
   @type t :: %__MODULE__{}
 
-  @usage_keys ~w(input_tokens output_tokens cache_read_input_tokens cache_creation_input_tokens)
+  # An explicit map, not String.to_existing_atom/1: in a release nothing else
+  # references the cache atoms, so converting by name raised at runtime.
+  @usage_keys %{
+    "input_tokens" => :input_tokens,
+    "output_tokens" => :output_tokens,
+    "cache_read_input_tokens" => :cache_read_input_tokens,
+    "cache_creation_input_tokens" => :cache_creation_input_tokens
+  }
 
   @doc """
   An empty accumulator.
@@ -185,7 +192,7 @@ defmodule ResidencySchedule.Assistant.Chat.Providers.Anthropic.Accumulator do
 
   defp take_usage(usage) do
     usage
-    |> Map.take(@usage_keys)
-    |> Map.new(fn {key, value} -> {String.to_existing_atom(key), value} end)
+    |> Map.take(Map.keys(@usage_keys))
+    |> Map.new(fn {key, value} -> {Map.fetch!(@usage_keys, key), value} end)
   end
 end
