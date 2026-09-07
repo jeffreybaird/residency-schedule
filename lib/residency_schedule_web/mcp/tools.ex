@@ -24,7 +24,7 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
       tool(
         "whoami",
         "Who am I?",
-        "Returns the calling user's email, role, home resident, and today's date. Call this first when a question refers to 'me' or 'my'.",
+        "Returns the calling user's email, role, home resident, today's date, and the server build with the names of every tool it serves. Call this first when a question refers to 'me' or 'my', or to check whether your tool list is up to date.",
         %{},
         [],
         read_only: true
@@ -299,7 +299,18 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
 
   # ── Dispatch ───────────────────────────────────────────────────────────────
 
-  defp dispatch("whoami", _args, user), do: Assistant.whoami(user)
+  # whoami also reports what this server build serves, so a client holding a
+  # stale tool catalogue can prove the mismatch from its own side.
+  defp dispatch("whoami", _args, user) do
+    with {:ok, identity} <- Assistant.whoami(user) do
+      {:ok,
+       Map.put(identity, :server, %{
+         build: ResidencyScheduleWeb.MCP.Build.sha(),
+         tool_count: length(definitions()),
+         tools: Enum.map(definitions(), & &1.name)
+       })}
+    end
+  end
 
   defp dispatch("list_residents", args, _user),
     do:

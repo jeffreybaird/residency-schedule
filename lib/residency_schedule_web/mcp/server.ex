@@ -5,7 +5,7 @@ defmodule ResidencyScheduleWeb.MCP.Server do
   `tools/list`, and `tools/call`; every notification is accepted and ignored.
   """
 
-  alias ResidencyScheduleWeb.MCP.{JsonRpc, Tools}
+  alias ResidencyScheduleWeb.MCP.{Build, JsonRpc, Tools}
 
   @protocol_versions ["2025-06-18", "2025-03-26", "2024-11-05"]
   @default_version "2025-06-18"
@@ -57,7 +57,7 @@ defmodule ResidencyScheduleWeb.MCP.Server do
     JsonRpc.result(id, %{
       protocolVersion: negotiate_version(params["protocolVersion"]),
       capabilities: %{tools: %{listChanged: false}},
-      serverInfo: %{name: "residency-schedule", version: "1.0.0"},
+      serverInfo: %{name: "residency-schedule", version: Build.version()},
       instructions:
         "Schedule assistant for the OB/GYN residency. Names may be first names; dates are YYYY-MM-DD in America/New_York. " <>
           "Use check_coverage before request_coverage. Duty-hour results are estimates."
