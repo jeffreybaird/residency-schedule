@@ -345,6 +345,8 @@ The variables required at runtime are:
 - `ACCESS_PASSWORD` — server-only, never in GitHub Secrets
 - `SECRET_KEY_BASE` — GitHub Secret (used at build time for asset digests)
 - `PHX_HOST` — GitHub Secret
+- `CHAT_ENABLED` — optional; GitHub Variable, written to the server `.env` by the deploy
+- `ANTHROPIC_API_KEY` — optional; GitHub Secret, written to the server `.env` by the deploy; required at boot when `CHAT_ENABLED=true`
 
 ### `config/runtime.exs` is the only place for prod config
 

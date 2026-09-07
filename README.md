@@ -241,8 +241,8 @@ Runtime configuration is read from the environment in `config/runtime.exs` using
 | `PHX_HOST` | server `.env` **and** GitHub Secret | Your public domain |
 | `POOL_SIZE` | server `.env` | DB connection pool size (e.g. `10`) |
 | `DB_SSL` | server `.env` | Set `true` for managed Postgres over SSL |
-| `CHAT_ENABLED` | server `.env` | Set `true` to turn on the chat assistant |
-| `ANTHROPIC_API_KEY` | server `.env` **only** | Required when `CHAT_ENABLED=true` |
+| `CHAT_ENABLED` | GitHub **Variable** → server `.env` | Set `true` to turn on the chat assistant; the deploy writes it to the server |
+| `ANTHROPIC_API_KEY` | GitHub Secret → server `.env` | Required when `CHAT_ENABLED=true`; the deploy writes it to the server |
 
 > Secrets never appear in source, `config/`, or logs. `DATABASE_URL` and
 > `ACCESS_PASSWORD` never leave the server — they are **not** GitHub Secrets.

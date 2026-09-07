@@ -124,13 +124,32 @@ jobs:
           SERVICE: ${{ matrix.service }}
           SEED_DEMO: ${{ matrix.seed_demo }}
           APP_PORT: ${{ matrix.port }}
+          # Chat assistant settings are managed from GitHub and written into
+          # the server .env on each deploy. Prod only: the demo site never
+          # runs the assistant, so its key never lands on that box. Leaving
+          # the variable or secret unset leaves the .env line untouched.
+          CHAT_ENABLED: ${{ matrix.target == 'prod' && vars.CHAT_ENABLED || '' }}
+          ANTHROPIC_API_KEY: ${{ matrix.target == 'prod' && secrets.ANTHROPIC_API_KEY || '' }}
         with:
           host: ${{ secrets[matrix.host_secret] }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: INSTALL_DIR,SERVICE,SEED_DEMO,APP_PORT
+          envs: INSTALL_DIR,SERVICE,SEED_DEMO,APP_PORT,CHAT_ENABLED,ANTHROPIC_API_KEY
           script: |
             set -e
+
+            # Write a KEY=value line into the server .env, replacing any
+            # existing line for that key. Skipped when the value is empty so
+            # an unset GitHub variable never erases a server-side setting.
+            # Rewrites in place through cat so the file keeps its 600 mode.
+            upsert_env() {
+              [ -n "$2" ] || return 0
+              { grep -v "^$1=" "$INSTALL_DIR/.env" || true; echo "$1=$2"; } > "$INSTALL_DIR/.env.tmp"
+              cat "$INSTALL_DIR/.env.tmp" > "$INSTALL_DIR/.env"
+              rm -f "$INSTALL_DIR/.env.tmp"
+            }
+            upsert_env CHAT_ENABLED "$CHAT_ENABLED"
+            upsert_env ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
 
             # Run migrations before swapping (uses server .env for real DB creds)
             # set -a exports all sourced variables to child processes
