@@ -30,6 +30,33 @@ defmodule ResidencySchedule.Assistant do
   end
 
   @doc """
+  Lists residents in one schedule. `opts` may carry `:academic_year` (start
+  year such as 2026; defaults to the schedule active today) and
+  `:residency_year` (1–4) to keep only that class.
+
+  Exempt from doctest — hits the database. See `AssistantTest`.
+  """
+  def list_residents(opts \\ %{}) do
+    with {:ok, schedule} <- schedule_for_opts(opts),
+         {:ok, residency_year} <- parse_residency_year(opts[:residency_year]) do
+      residents =
+        case residency_year do
+          nil -> Residents.list_residents_for_schedule(schedule.id)
+          year -> Residents.list_residents_by_year(schedule.id, year)
+        end
+
+      {:ok,
+       %{
+         schedule: schedule.label,
+         academic_year: schedule.academic_year,
+         residency_year: residency_year,
+         count: length(residents),
+         residents: Enum.map(residents, &resident_summary(&1, schedule))
+       }}
+    end
+  end
+
+  @doc """
   Describes the user's own account and home resident.
 
   Exempt from doctest — hits the database. See `AssistantTest`.
@@ -143,11 +170,38 @@ defmodule ResidencySchedule.Assistant do
          count: length(days),
          by_rotation: count_by_rotation(days),
          dates: Enum.map(days, & &1.date),
-         counting_rule: %{
-           counts: "days both residents are on the same shared service",
-           working_days_not_shared: Rotations.solo_rotation_types(),
-           not_shifts: Rotations.non_working_rotation_types()
-         }
+         counting_rule: shared_counting_rule()
+       }}
+    end
+  end
+
+  @doc """
+  Shared-shift counts between one resident and every other resident in the
+  schedule, from `from` (default today) through `to` (default end of
+  schedule), most shared first. Coworkers with zero shared shifts are
+  included so "who do I never work with" is answerable.
+
+  Exempt from doctest — hits the database. See `AssistantTest`.
+  """
+  def shared_shifts_by_coworker(name, from \\ nil, to \\ nil) do
+    with {:ok, from} <- LocalDate.parse(from),
+         {:ok, to} <- LocalDate.parse_optional(to),
+         {:ok, schedule} <- schedule_for(from),
+         {:ok, resident} <- resolve(name, schedule.id) do
+      coworkers =
+        schedule.id
+        |> Residents.list_residents_for_schedule()
+        |> Enum.reject(&(&1.id == resident.id))
+        |> Enum.map(&coworker_share(resident, &1, from, to))
+        |> Enum.sort_by(&{-&1.count, &1.coworker.residency_year, &1.coworker.position_code})
+
+      {:ok,
+       %{
+         resident: resident_summary(resident, schedule),
+         from: from,
+         to: to,
+         coworkers: coworkers,
+         counting_rule: shared_counting_rule()
        }}
     end
   end
@@ -247,6 +301,61 @@ defmodule ResidencySchedule.Assistant do
       schedule -> {:ok, schedule}
     end
   end
+
+  # ── Private: shared shifts ─────────────────────────────────────────────────
+
+  defp coworker_share(resident, coworker, from, to) do
+    days =
+      resident.id
+      |> Rotations.list_effective_co_service_days(coworker.id)
+      |> Enum.filter(&within?(&1.date, from, to))
+
+    %{
+      coworker: resident_summary(coworker, nil),
+      count: length(days),
+      by_rotation: count_by_rotation(days)
+    }
+  end
+
+  defp shared_counting_rule do
+    %{
+      counts: "days both residents are on the same shared service",
+      working_days_not_shared: Rotations.solo_rotation_types(),
+      not_shifts: Rotations.non_working_rotation_types()
+    }
+  end
+
+  defp schedule_for_opts(%{academic_year: year}) when not is_nil(year) do
+    with {:ok, year} <- parse_integer(year, :invalid_academic_year) do
+      case Schedules.get_by_year(year) do
+        nil -> {:error, {:schedule_not_found, year}}
+        schedule -> {:ok, schedule}
+      end
+    end
+  end
+
+  defp schedule_for_opts(_opts), do: schedule_for(LocalDate.today())
+
+  defp parse_residency_year(nil), do: {:ok, nil}
+
+  defp parse_residency_year(year) do
+    case parse_integer(year, :invalid_residency_year) do
+      {:ok, int} when int in 1..4 -> {:ok, int}
+      {:ok, _out_of_range} -> {:error, :invalid_residency_year}
+      error -> error
+    end
+  end
+
+  defp parse_integer(value, _error) when is_integer(value), do: {:ok, value}
+
+  defp parse_integer(value, error) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {int, ""} -> {:ok, int}
+      _ -> {:error, error}
+    end
+  end
+
+  defp parse_integer(_value, error), do: {:error, error}
 
   # ── Private: resolution ────────────────────────────────────────────────────
 

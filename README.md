@@ -152,10 +152,12 @@ authorize, and token endpoints. Redirect URIs must be `https` or `localhost`.
 |---|---|---|
 | `whoami` | Caller's email, role, home resident, today's date | no |
 | `find_resident` | Resolve a first name / nickname; lists candidates when ambiguous | no |
+| `list_residents` | Residents in a schedule, optionally one residency year (R1–R4) | no |
 | `who_is_on` | Who is effectively on a service on a date ("strong ob", "onc", "NF") | no |
 | `resident_schedule` | A resident's effective blocks in a date range | no |
 | `shifts_remaining` | A resident's working days from a date onward (float counts; vacation and post-call do not) | no |
 | `shared_shifts` | Days two residents are on the same shared service from a date onward (solo rotations such as float never count) | no |
+| `shared_shifts_by_coworker` | One resident's shared-shift count with every other resident, most shared first | no |
 | `check_coverage` | Dry run of one resident covering another's shift: problems + estimated 80-hour check | no |
 | `request_coverage` | Files a **pending** change request | yes |
 | `list_change_requests` | Requests visible to the caller (admins: all) | no |

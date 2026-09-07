@@ -38,6 +38,24 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
         read_only: true
       ),
       tool(
+        "list_residents",
+        "List residents",
+        "Lists the residents in a schedule with their position codes and residency years. " <>
+          "Filter with residency_year (1–4, e.g. 2 for the R2 class). academic_year picks the schedule by its start year (e.g. 2026 for 2026–2027); defaults to the schedule active today.",
+        %{
+          residency_year: %{
+            type: "integer",
+            description: "Residency year 1–4. Omit for everyone."
+          },
+          academic_year: %{
+            type: "integer",
+            description: "Schedule start year, e.g. 2026. Defaults to the current schedule."
+          }
+        },
+        [],
+        read_only: true
+      ),
+      tool(
         "who_is_on",
         "Who is on a service",
         "Lists residents effectively working a rotation on a date, with approved coverage applied. Accepts shorthand like 'strong ob', 'onc', 'NF', 'highland gyn'. On weekends the weekend day/night counterparts are included.",
@@ -85,6 +103,20 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
           to: string("Count through this date (inclusive). Defaults to the end of the schedule.")
         },
         ["resident", "coworker"],
+        read_only: true
+      ),
+      tool(
+        "shared_shifts_by_coworker",
+        "Shared shifts with every coworker",
+        "For one resident, counts the shared shifts with each other resident in the schedule from a date onward, most shared first, zeros included. " <>
+          "Same counting rule as shared_shifts: only days on the same shared service count; solo rotations (float, swing, away, ambulatory, elective) never do. " <>
+          "Use it for 'who does X work with most' or 'who does X never work with'.",
+        %{
+          name: string("Resident's name."),
+          from: string("Count from this date. " <> @date_desc),
+          to: string("Count through this date (inclusive). Defaults to the end of the schedule.")
+        },
+        ["name"],
         read_only: true
       ),
       tool(
@@ -194,6 +226,14 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
 
   def describe_error(:no_schedule), do: "No schedule has been imported yet."
 
+  def describe_error({:schedule_not_found, year}),
+    do: "No schedule has been imported for the academic year starting #{year}."
+
+  def describe_error(:invalid_academic_year),
+    do: "academic_year must be a start year such as 2026."
+
+  def describe_error(:invalid_residency_year), do: "residency_year must be 1, 2, 3, or 4."
+
   def describe_error(:forbidden),
     do:
       "You do not have permission to do that. Residents may only file requests involving their own home resident; admins may review requests."
@@ -238,6 +278,16 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
   # ── Dispatch ───────────────────────────────────────────────────────────────
 
   defp dispatch("whoami", _args, user), do: Assistant.whoami(user)
+
+  defp dispatch("list_residents", args, _user),
+    do:
+      Assistant.list_residents(%{
+        residency_year: args["residency_year"],
+        academic_year: args["academic_year"]
+      })
+
+  defp dispatch("shared_shifts_by_coworker", args, _user),
+    do: Assistant.shared_shifts_by_coworker(args["name"], args["from"], args["to"])
 
   defp dispatch("find_resident", args, _user),
     do: Assistant.find_resident(args["name"], args["date"])

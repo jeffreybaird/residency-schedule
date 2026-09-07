@@ -66,6 +66,94 @@ defmodule ResidencySchedule.AssistantTest do
     end
   end
 
+  describe "list_residents/1" do
+    test "lists everyone in the current schedule", _ctx do
+      assert {:ok, result} = Assistant.list_residents()
+      assert result.academic_year == 2026
+      assert result.residency_year == nil
+      assert Enum.map(result.residents, & &1.position_code) == ["R2-1", "R2-2", "R3-1"]
+    end
+
+    test "filters by residency year, accepting strings", _ctx do
+      assert {:ok, %{count: 2, residency_year: 2}} =
+               Assistant.list_residents(%{residency_year: 2})
+
+      assert {:ok, %{count: 1, residents: [%{name: "Tiff"}]}} =
+               Assistant.list_residents(%{residency_year: "3"})
+
+      assert {:ok, %{count: 0}} = Assistant.list_residents(%{residency_year: 4})
+    end
+
+    test "selects a schedule by academic year", _ctx do
+      {:ok, _} = Schedules.upsert_schedule(2025, "2025–2026")
+
+      assert {:ok, %{academic_year: 2025, count: 0}} =
+               Assistant.list_residents(%{academic_year: "2025"})
+
+      assert {:ok, %{academic_year: 2026, count: 3}} =
+               Assistant.list_residents(%{academic_year: 2026})
+
+      assert {:error, {:schedule_not_found, 2019}} =
+               Assistant.list_residents(%{academic_year: 2019})
+    end
+
+    test "rejects bad filters", _ctx do
+      assert {:error, :invalid_residency_year} = Assistant.list_residents(%{residency_year: 7})
+
+      assert {:error, :invalid_residency_year} =
+               Assistant.list_residents(%{residency_year: "two"})
+
+      assert {:error, :invalid_residency_year} = Assistant.list_residents(%{residency_year: 2.5})
+      assert {:error, :invalid_academic_year} = Assistant.list_residents(%{academic_year: "next"})
+    end
+
+    test "errors with no schedule at all" do
+      Repo.delete_all(Schedules.Schedule)
+      assert {:error, :no_schedule} = Assistant.list_residents()
+    end
+  end
+
+  describe "shared_shifts_by_coworker/3" do
+    test "ranks every coworker, zeros included", _ctx do
+      assert {:ok, result} = Assistant.shared_shifts_by_coworker("clare", "2026-07-06")
+      assert result.resident.name == "Clare"
+
+      assert Enum.map(result.coworkers, &{&1.coworker.name, &1.count}) == [
+               {"Mary", 7},
+               {"Tiff", 0}
+             ]
+
+      assert [%{rotation_type: "strong_obstetrics", days: 7}] = hd(result.coworkers).by_rotation
+      assert "float" in result.counting_rule.working_days_not_shared
+    end
+
+    test "honours the range and coverage", ctx do
+      tiff_ob = rotation_on(ctx.tiff, ~D[2026-07-15])
+
+      {:ok, _} =
+        ShiftOverrides.create_override(%{
+          rotation_id: tiff_ob.id,
+          covering_schedule_resident_id: ctx.clare.id,
+          override_start_date: ~D[2026-07-15],
+          override_end_date: ~D[2026-07-16]
+        })
+
+      assert {:ok,
+              %{
+                coworkers: [
+                  %{coworker: %{name: "Mary"}, count: 2},
+                  %{coworker: %{name: "Tiff"}, count: 0}
+                ]
+              }} =
+               Assistant.shared_shifts_by_coworker("clare", "2026-07-13", "2026-07-19")
+    end
+
+    test "unknown resident" do
+      assert {:error, {:resident_not_found, "Zed"}} =
+               Assistant.shared_shifts_by_coworker("Zed", "2026-07-06")
+    end
+  end
+
   describe "who_is_on/2" do
     test "lists residents on the service with coverage applied", ctx do
       assert {:ok, result} = Assistant.who_is_on("strong ob", "2026-07-15")
