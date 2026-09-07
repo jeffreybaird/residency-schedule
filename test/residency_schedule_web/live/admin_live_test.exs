@@ -388,10 +388,9 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
       {:ok, view, _html} = live(conn, "/admin")
       {:ok, _} = ResidencySchedule.ChangeRequests.cancel_request(clare_user, request.id)
 
-      html =
-        view
-        |> element("button[phx-click='approve_request'][phx-value-id='#{request.id}']")
-        |> render_click()
+      # PubSub has already removed the row, so drive the event directly to
+      # simulate a click that raced the cancellation.
+      html = render_click(view, "approve_request", %{"id" => Integer.to_string(request.id)})
 
       assert html =~ "already decided"
       assert html =~ "Pending Change Requests (0)"

@@ -10,6 +10,8 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: ChangeRequests.subscribe()
+
     {:ok,
      assign(socket,
        schedules: Schedules.list_schedules(),
@@ -306,6 +308,16 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
       {:ok, d} -> d
       _ -> nil
     end
+  end
+
+  # A request was filed or decided elsewhere (assistant API, another admin tab).
+  @impl true
+  def handle_info({:change_request, _event, _request}, socket) do
+    {:noreply,
+     assign(socket,
+       pending_requests: ChangeRequests.list_requests(socket.assigns.current_user, :pending),
+       existing_overrides: ShiftOverrides.list_all_overrides()
+     )}
   end
 
   @impl true

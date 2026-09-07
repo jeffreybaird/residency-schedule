@@ -10,6 +10,10 @@ defmodule ResidencySchedule.ChangeRequests do
   - Any other approved user may file a request only when their home resident
     is the person being covered or the person covering.
   - A requester may cancel their own pending request.
+
+  Every state change is broadcast on `topic/0` as
+  `{:change_request, event, request}` with event one of `:filed`,
+  `:approved`, `:denied`, or `:cancelled`, so live pages can refresh.
   """
   import Ecto.Query
 
@@ -20,6 +24,25 @@ defmodule ResidencySchedule.ChangeRequests do
   alias ResidencySchedule.Rotations
   alias ResidencySchedule.Rotations.Rotation
   alias ResidencySchedule.ShiftOverrides
+
+  @topic "change_requests"
+
+  # ── PubSub ─────────────────────────────────────────────────────────────────
+
+  @doc """
+  The PubSub topic change-request events are broadcast on.
+
+      iex> ResidencySchedule.ChangeRequests.topic()
+      "change_requests"
+  """
+  def topic, do: @topic
+
+  @doc """
+  Subscribes the calling process to change-request events.
+
+  Exempt from doctest — touches the PubSub server. See `ChangeRequestsTest`.
+  """
+  def subscribe, do: Phoenix.PubSub.subscribe(ResidencySchedule.PubSub, @topic)
 
   # ── Filing ─────────────────────────────────────────────────────────────────
 
@@ -37,7 +60,9 @@ defmodule ResidencySchedule.ChangeRequests do
   def request_coverage(%User{} = user, attrs) do
     with {:ok, rotation, covering} <- validate_coverage(attrs),
          :ok <- authorize_filing(user, rotation.schedule_resident, covering) do
-      insert_request(user, rotation, covering, attrs)
+      user
+      |> insert_request(rotation, covering, attrs)
+      |> broadcast(:filed)
     end
   end
 
@@ -74,7 +99,9 @@ defmodule ResidencySchedule.ChangeRequests do
   def approve_request(%User{} = admin, request_id, note \\ nil) do
     with :ok <- ensure_admin(admin),
          {:ok, request} <- fetch_pending(request_id) do
-      Repo.transaction(fn -> approve_in_transaction(admin, request, note) end)
+      fn -> approve_in_transaction(admin, request, note) end
+      |> Repo.transaction()
+      |> broadcast(:approved)
     end
   end
 
@@ -90,6 +117,7 @@ defmodule ResidencySchedule.ChangeRequests do
       request
       |> ChangeRequest.review_changeset(review_attrs(admin, :denied, note))
       |> Repo.update()
+      |> broadcast(:denied)
     end
   end
 
@@ -105,6 +133,7 @@ defmodule ResidencySchedule.ChangeRequests do
       request
       |> Ecto.Changeset.change(status: :cancelled)
       |> Repo.update()
+      |> broadcast(:cancelled)
     end
   end
 
@@ -160,6 +189,15 @@ defmodule ResidencySchedule.ChangeRequests do
   def may_file?(_user, original_person, covering_person, home_person) do
     home_person in [original_person, covering_person]
   end
+
+  # ── Private: broadcasting ──────────────────────────────────────────────────
+
+  defp broadcast({:ok, request} = result, event) do
+    Phoenix.PubSub.broadcast(ResidencySchedule.PubSub, @topic, {:change_request, event, request})
+    result
+  end
+
+  defp broadcast(error, _event), do: error
 
   # ── Private: filing checks ─────────────────────────────────────────────────
 
