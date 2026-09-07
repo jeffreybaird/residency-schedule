@@ -84,6 +84,16 @@ defmodule ResidencyScheduleWeb.MCP.ToolsTest do
       assert {:ok, %{isError: false}} = Tools.call("whoami", nil, ctx.clare_user)
     end
 
+    test "whoami reports the server build and every served tool", ctx do
+      %{structuredContent: %{server: server, home_resident: %{name: "Clare"}}} =
+        call("whoami", %{}, ctx.clare_user)
+
+      assert server.build == ResidencyScheduleWeb.MCP.Build.sha()
+      assert server.tool_count == length(Tools.definitions())
+      assert "list_residents" in server.tools
+      assert "shared_shift_matrix" in server.tools
+    end
+
     test "unknown tool", ctx do
       assert {:error, :unknown_tool} = Tools.call("nope", %{}, ctx.clare_user)
     end

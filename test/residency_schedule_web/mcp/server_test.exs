@@ -22,6 +22,8 @@ defmodule ResidencyScheduleWeb.MCP.ServerTest do
       assert result.protocolVersion == "2025-03-26"
       assert result.capabilities.tools.listChanged == false
       assert result.serverInfo.name == "residency-schedule"
+      assert result.serverInfo.version == ResidencyScheduleWeb.MCP.Build.version()
+      assert result.serverInfo.version =~ "tools @"
     end
 
     test "falls back to the latest version" do
