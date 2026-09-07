@@ -94,6 +94,11 @@ defmodule ResidencyScheduleWeb.MCP.ToolsTest do
       assert "shared_shift_matrix" in server.tools
     end
 
+    test "whoami lists the loaded academic years", ctx do
+      %{structuredContent: %{schedules: [%{academic_year: 2026, start_date: ~D[2026-07-06]}]}} =
+        call("whoami", %{}, ctx.clare_user)
+    end
+
     test "unknown tool", ctx do
       assert {:error, :unknown_tool} = Tools.call("nope", %{}, ctx.clare_user)
     end

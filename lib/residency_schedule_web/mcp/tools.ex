@@ -24,7 +24,7 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
       tool(
         "whoami",
         "Who am I?",
-        "Returns the calling user's email, role, home resident, today's date, and the server build with the names of every tool it serves. Call this first when a question refers to 'me' or 'my', or to check whether your tool list is up to date.",
+        "Returns the calling user's email, role, home resident, today's date, every academic year loaded with the dates it covers, and the server build with the names of every tool it serves. Call this first when a question refers to 'me' or 'my', when a question spans more than one year, or to check whether your tool list is up to date.",
         %{},
         [],
         read_only: true
@@ -66,11 +66,11 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
       tool(
         "resident_schedule",
         "A resident's schedule",
-        "A resident's effective rotation blocks (approved coverage applied) between two dates.",
+        "A resident's effective rotation blocks (approved coverage applied) between two dates, across every academic year they appear in. Each block names its schedule.",
         %{
           name: string("Resident's name."),
           from: string("Start of range. " <> @date_desc),
-          to: string("End of range (inclusive). Defaults to the end of the schedule.")
+          to: string("End of range (inclusive). Defaults to no end.")
         },
         ["name"],
         read_only: true
@@ -78,13 +78,14 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
       tool(
         "shifts_remaining",
         "A resident's remaining shifts",
-        "Counts one resident's working days (shifts) from a date onward, by rotation, with approved coverage applied. " <>
+        "Counts one resident's working days (shifts) between two dates, by rotation and by academic year, with approved coverage applied. " <>
+          "Every academic year the resident appears in is counted, so a from date before their first year gives their whole residency so far (use to = today for 'worked so far'). " <>
           "Every rotation is a shift except vacation and post-call; float, swing, away, ambulatory, and elective all count. " <>
-          "Use it for 'how many shifts does X have left'. For shifts shared with a specific coworker use shared_shifts.",
+          "Use it for 'how many shifts does X have left' and 'how many has X worked'. For shifts shared with a specific coworker use shared_shifts.",
         %{
           name: string("Resident's name."),
           from: string("Count from this date. " <> @date_desc),
-          to: string("Count through this date (inclusive). Defaults to the end of the schedule.")
+          to: string("Count through this date (inclusive). Defaults to no end.")
         },
         ["name"],
         read_only: true

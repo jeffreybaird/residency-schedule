@@ -99,6 +99,29 @@ defmodule ResidencySchedule.Schedules do
   end
 
   @doc """
+  Every schedule with the first and last dates its rotations cover, oldest
+  first. A schedule with no rotations yet has nil dates.
+
+  Exempt from doctest — hits the database. See `SchedulesTest`.
+  """
+  def list_schedule_ranges do
+    from(s in Schedule,
+      left_join: sr in assoc(s, :schedule_residents),
+      left_join: r in assoc(sr, :rotations),
+      group_by: [s.id, s.academic_year, s.label],
+      order_by: [asc: s.academic_year],
+      select: %{
+        id: s.id,
+        academic_year: s.academic_year,
+        label: s.label,
+        start_date: min(r.start_date),
+        end_date: max(r.end_date)
+      }
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Returns the most recent schedule by academic year, or nil if none exist.
   """
   def latest_schedule do

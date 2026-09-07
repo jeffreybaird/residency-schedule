@@ -65,7 +65,8 @@ defmodule ResidencySchedule.Assistant do
   end
 
   @doc """
-  Describes the user's own account and home resident.
+  Describes the user's own account, home resident, and the academic years
+  loaded with the dates each covers.
 
   Exempt from doctest — hits the database. See `AssistantTest`.
   """
@@ -75,7 +76,8 @@ defmodule ResidencySchedule.Assistant do
        email: user.email,
        role: user.role,
        home_resident: home_summary(user.home_resident_id),
-       today: LocalDate.today()
+       today: LocalDate.today(),
+       schedules: Enum.map(Schedules.list_schedule_ranges(), &schedule_range_summary/1)
      }}
   end
 
@@ -115,11 +117,12 @@ defmodule ResidencySchedule.Assistant do
   # ── Shifts ─────────────────────────────────────────────────────────────────
 
   @doc """
-  Counts a resident's remaining working days (shifts), with coverage applied,
-  from `from` (default today) through `to` (default end of schedule). Every
-  rotation except vacation and post-call is a shift, float included. Days
-  someone else is covering are not the resident's shifts; days they cover
-  for someone else are.
+  Counts a resident's working days (shifts), with coverage applied, from
+  `from` (default today) through `to` (default: no end). Every academic year
+  the person appears in is counted, so a `from` before their first year
+  gives their whole residency. Every rotation except vacation and post-call
+  is a shift, float included. Days someone else is covering are not the
+  resident's shifts; days they cover for someone else are.
 
   Exempt from doctest — hits the database. See `AssistantTest`.
   """
@@ -128,12 +131,13 @@ defmodule ResidencySchedule.Assistant do
          {:ok, to} <- LocalDate.parse_optional(to),
          {:ok, schedule} <- schedule_for(from),
          {:ok, resident} <- resolve(name, schedule.id) do
-      days =
-        resident.id
-        |> Rotations.effective_segments_for_resident()
-        |> Enum.reject(&(&1.covered_by != nil))
-        |> Enum.flat_map(&segment_dates/1)
-        |> Enum.filter(&(within?(&1.date, from, to) and Rotations.working_day?(&1.rotation_type)))
+      by_year =
+        resident
+        |> appearances()
+        |> Enum.map(&{&1, working_days(&1, from, to)})
+        |> Enum.reject(fn {_appearance, days} -> days == [] end)
+
+      days = Enum.flat_map(by_year, fn {_appearance, days} -> days end)
 
       {:ok,
        %{
@@ -142,6 +146,7 @@ defmodule ResidencySchedule.Assistant do
          to: to,
          count: length(days),
          by_rotation: count_by_rotation(days),
+         by_year: Enum.map(by_year, &year_count/1),
          counting_rule: %{
            counts: "every working day, including float and solo rotations",
            not_shifts: Rotations.non_working_rotation_types()
@@ -268,7 +273,8 @@ defmodule ResidencySchedule.Assistant do
 
   @doc """
   A resident's effective rotation segments (coverage applied) overlapping the
-  range `from` (default today) through `to` (default end of schedule).
+  range `from` (default today) through `to` (default: no end), across every
+  academic year the person appears in. Each segment names its schedule.
 
   Exempt from doctest — hits the database. See `AssistantTest`.
   """
@@ -278,10 +284,10 @@ defmodule ResidencySchedule.Assistant do
          {:ok, schedule} <- schedule_for(from),
          {:ok, resident} <- resolve(name, schedule.id) do
       segments =
-        resident.id
-        |> Rotations.effective_segments_for_resident()
-        |> Enum.filter(&overlaps?(&1, from, to))
-        |> Enum.map(&segment_summary/1)
+        resident
+        |> appearances()
+        |> Enum.flat_map(&segments_in_range(&1, from, to))
+        |> Enum.sort_by(& &1.start_date, Date)
 
       {:ok,
        %{resident: resident_summary(resident, schedule), from: from, to: to, segments: segments}}
@@ -571,6 +577,42 @@ defmodule ResidencySchedule.Assistant do
       covered_by: segment.covered_by && segment.covered_by.name,
       covering_for: segment.original_resident && segment.original_resident.name
     }
+  end
+
+  defp schedule_range_summary(range) do
+    %{
+      academic_year: range.academic_year,
+      label: range.label,
+      start_date: range.start_date,
+      end_date: range.end_date
+    }
+  end
+
+  defp appearances(resident), do: Residents.list_appearances_for_person(resident.resident_id)
+
+  defp working_days(appearance, from, to) do
+    appearance.id
+    |> Rotations.effective_segments_for_resident()
+    |> Enum.reject(&(&1.covered_by != nil))
+    |> Enum.flat_map(&segment_dates/1)
+    |> Enum.filter(&(within?(&1.date, from, to) and Rotations.working_day?(&1.rotation_type)))
+  end
+
+  defp year_count({appearance, days}) do
+    %{
+      academic_year: appearance.schedule.academic_year,
+      schedule: appearance.schedule.label,
+      residency_year: appearance.residency_year,
+      position_code: appearance.position_code,
+      days: length(days)
+    }
+  end
+
+  defp segments_in_range(appearance, from, to) do
+    appearance.id
+    |> Rotations.effective_segments_for_resident()
+    |> Enum.filter(&overlaps?(&1, from, to))
+    |> Enum.map(&Map.put(segment_summary(&1), :schedule, appearance.schedule.label))
   end
 
   defp count_by_rotation(days) do

@@ -33,6 +33,27 @@ defmodule ResidencySchedule.ScheduleFixtures do
   end
 
   @doc """
+  Adds a 2025–2026 schedule in which Clare (the same person) was an R1:
+  oncology Jul 7–13, vacation Jul 14–20, night float Jul 21–27. That is 14
+  working days. Returns the schedule and Clare's earlier appearance.
+  """
+  def seed_prior_year_for_clare(%{clare: clare}) do
+    {:ok, schedule} = Schedules.upsert_schedule(2025, "2025–2026")
+
+    {:ok, earlier} =
+      Residents.insert_resident(schedule.id, %{
+        resident_id: clare.resident_id,
+        name: clare.name,
+        position_code: "R1-1",
+        residency_year: 1,
+        schedule_number: 1
+      })
+
+    insert_blocks(earlier, [:oncology, :vacation, :night_float], ~D[2025-07-07])
+    %{prior_schedule: schedule, clare_r1: earlier}
+  end
+
+  @doc """
   Creates an approved resident-role user whose home resident is the given
   schedule resident.
   """
@@ -91,12 +112,12 @@ defmodule ResidencySchedule.ScheduleFixtures do
     resident
   end
 
-  defp insert_blocks(resident, types) do
+  defp insert_blocks(resident, types, first_day \\ ~D[2026-07-06]) do
     blocks =
       types
       |> Enum.with_index()
       |> Enum.map(fn {type, idx} ->
-        start = Date.add(~D[2026-07-06], idx * 7)
+        start = Date.add(first_day, idx * 7)
 
         %{slot_index: idx, start_date: start, end_date: Date.add(start, 6), rotation_type: type}
       end)
