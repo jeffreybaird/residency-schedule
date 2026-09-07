@@ -70,35 +70,44 @@ defmodule ResidencyScheduleWeb.Router do
   end
 
   # ── Authenticated site routes ─────────────────────────────────────────────
+  #
+  # One live_session for every signed-in page, admin pages included, so the
+  # nav moves between them without a page load and the sticky chat widget in
+  # the :site layout keeps its conversation across the trip. The plugs guard
+  # only the first request; `:ensure_authenticated` re-checks on every live
+  # navigation, and each admin LiveView adds `:ensure_admin` itself.
 
   scope "/", ResidencyScheduleWeb do
-    pipe_through [:browser, :authenticated]
-
     live_session :authenticated,
-      on_mount: [{ResidencyScheduleWeb.UserAuth, :ensure_authenticated}] do
-      live "/", CalendarLive.Index, :index
-      live "/schedule", ScheduleLive.Index, :index
-      live "/residents/:id", ResidentLive.Show, :show
-      live "/calendar", CalendarLive.Index, :index
-      live "/compare", CompareLive.Index, :index
+      on_mount: [{ResidencyScheduleWeb.UserAuth, :ensure_authenticated}],
+      layout: {ResidencyScheduleWeb.Layouts, :site} do
+      scope "/" do
+        pipe_through [:browser, :authenticated]
+
+        live "/", CalendarLive.Index, :index
+        live "/schedule", ScheduleLive.Index, :index
+        live "/residents/:id", ResidentLive.Show, :show
+        live "/calendar", CalendarLive.Index, :index
+        live "/compare", CompareLive.Index, :index
+      end
+
+      scope "/admin" do
+        pipe_through [:browser, :admin_authenticated]
+
+        live "/", AdminLive.Index, :index
+        live "/denied", AdminLive.Denied, :index
+        live "/upload", UploadLive.Index, :index
+        live "/build", BuilderLive.Index, :index
+        live "/edit", EditLive.Index, :index
+      end
     end
 
-    get "/residents/:id/calendar.ics", IcalController, :show
-    post "/set-home/:resident_id", AuthController, :set_home
-    post "/unset-home", AuthController, :unset_home
-  end
+    scope "/" do
+      pipe_through [:browser, :authenticated]
 
-  # ── Admin-only routes ─────────────────────────────────────────────────────
-
-  scope "/admin", ResidencyScheduleWeb do
-    pipe_through [:browser, :admin_authenticated]
-
-    live_session :admin, on_mount: [{ResidencyScheduleWeb.UserAuth, :ensure_admin}] do
-      live "/", AdminLive.Index, :index
-      live "/denied", AdminLive.Denied, :index
-      live "/upload", UploadLive.Index, :index
-      live "/build", BuilderLive.Index, :index
-      live "/edit", EditLive.Index, :index
+      get "/residents/:id/calendar.ics", IcalController, :show
+      post "/set-home/:resident_id", AuthController, :set_home
+      post "/unset-home", AuthController, :unset_home
     end
   end
 

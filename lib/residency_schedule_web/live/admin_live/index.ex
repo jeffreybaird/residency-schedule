@@ -1,6 +1,8 @@
 defmodule ResidencyScheduleWeb.AdminLive.Index do
   use ResidencyScheduleWeb, :live_view
 
+  on_mount {ResidencyScheduleWeb.UserAuth, :ensure_admin}
+
   alias ResidencySchedule.Accounts
   alias ResidencySchedule.ChangeRequests
   alias ResidencySchedule.Schedules

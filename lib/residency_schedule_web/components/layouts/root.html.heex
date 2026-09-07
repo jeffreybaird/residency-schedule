@@ -36,72 +36,74 @@
   </head>
   <body>
     <.demo_banner />
+    <%!--
+      Live navigation replaces only the LiveView below the nav, so nothing in
+      this nav re-renders between pages. Anything here that depends on the
+      current page (the home link's aria-current, the open mobile menu) is
+      kept in step by app.js on phx:navigate.
+    --%>
     <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div class="px-4 sm:px-6 py-3 flex items-center justify-between">
-        <a
-          href="/"
+        <.link
+          navigate="/"
           class="flex items-center gap-2 text-base font-semibold text-gray-800 hover:text-blue-600 transition-colors shrink-0"
         >
           <img src="/favicon.svg" alt="" class="w-6 h-6" />{ResidencySchedule.brand_name()}
-        </a>
+        </.link>
 
         <%!-- Desktop nav --%>
         <div id="tour-nav" class="hidden sm:flex items-center gap-1">
-          <a
-            href="/"
+          <.link
+            navigate="/"
             class="px-3 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
           >
             Calendar
-          </a>
-          <a
+          </.link>
+          <.link
             id="tour-nav-schedule"
-            href="/schedule"
+            navigate="/schedule"
             class="px-3 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
           >
             Schedule
-          </a>
-          <a
+          </.link>
+          <.link
             id="tour-nav-compare"
-            href="/compare"
+            navigate="/compare"
             class="px-3 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
           >
             Compare
-          </a>
+          </.link>
           <%= if user = @conn.assigns[:current_user] do %>
             <%= if my_page_path = nav_home_path(user) do %>
-              <%= if @conn.request_path == my_page_path do %>
-                <span class="px-3 py-1.5 rounded-md text-sm text-green-700 bg-green-50 font-medium">
-                  {nav_home_label(user)}
-                </span>
-              <% else %>
-                <a
-                  href={my_page_path}
-                  class="px-3 py-1.5 rounded-md text-sm text-green-700 hover:bg-green-50 transition-colors"
-                >
-                  {nav_home_label(user)}
-                </a>
-              <% end %>
+              <.link
+                navigate={my_page_path}
+                data-nav-home
+                aria-current={if @conn.request_path == my_page_path, do: "page"}
+                class="px-3 py-1.5 rounded-md text-sm text-green-700 hover:bg-green-50 transition-colors aria-[current=page]:bg-green-50 aria-[current=page]:font-medium"
+              >
+                {nav_home_label(user)}
+              </.link>
             <% end %>
           <% end %>
           <%= if ResidencySchedule.Accounts.User.admin?(@conn.assigns[:current_user]) do %>
-            <a
-              href="/admin"
+            <.link
+              navigate="/admin"
               class="px-3 py-1.5 rounded-md text-sm text-amber-600 hover:bg-amber-50 hover:text-amber-800 transition-colors"
             >
               Admin
-            </a>
-            <a
-              href="/admin/build"
+            </.link>
+            <.link
+              navigate="/admin/build"
               class="px-3 py-1.5 rounded-md text-sm text-amber-600 hover:bg-amber-50 hover:text-amber-800 transition-colors"
             >
               Build
-            </a>
-            <a
-              href="/admin/edit"
+            </.link>
+            <.link
+              navigate="/admin/edit"
               class="px-3 py-1.5 rounded-md text-sm text-amber-600 hover:bg-amber-50 hover:text-amber-800 transition-colors"
             >
               Edit
-            </a>
+            </.link>
           <% end %>
           <%= if @conn.assigns[:current_user] do %>
             <span class="w-px h-4 bg-gray-200 mx-1"></span>
@@ -118,7 +120,7 @@
         </div>
 
         <%!-- Mobile hamburger --%>
-        <details class="sm:hidden relative">
+        <details id="mobile-nav" class="sm:hidden relative">
           <summary class="list-none cursor-pointer p-2 rounded-md hover:bg-gray-100 transition-colors">
             <svg
               class="w-5 h-5 text-gray-600"
@@ -135,47 +137,52 @@
             </svg>
           </summary>
           <div class="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-50">
-            <a href="/" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+            <.link navigate="/" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
               Calendar
-            </a>
-            <a href="/schedule" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+            </.link>
+            <.link
+              navigate="/schedule"
+              class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
               Schedule
-            </a>
-            <a href="/compare" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+            </.link>
+            <.link
+              navigate="/compare"
+              class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
               Compare
-            </a>
+            </.link>
             <%= if user = @conn.assigns[:current_user] do %>
               <%= if my_page_path = nav_home_path(user) do %>
-                <%= if @conn.request_path == my_page_path do %>
-                  <span class="block px-4 py-2 text-sm text-green-700 font-medium bg-green-50">
-                    {nav_home_label(user)}
-                  </span>
-                <% else %>
-                  <a
-                    href={my_page_path}
-                    class="block px-4 py-2 text-sm text-green-700 hover:bg-green-50"
-                  >
-                    {nav_home_label(user)}
-                  </a>
-                <% end %>
+                <.link
+                  navigate={my_page_path}
+                  data-nav-home
+                  aria-current={if @conn.request_path == my_page_path, do: "page"}
+                  class="block px-4 py-2 text-sm text-green-700 hover:bg-green-50 aria-[current=page]:bg-green-50 aria-[current=page]:font-medium"
+                >
+                  {nav_home_label(user)}
+                </.link>
               <% end %>
             <% end %>
             <%= if ResidencySchedule.Accounts.User.admin?(@conn.assigns[:current_user]) do %>
-              <a href="/admin" class="block px-4 py-2 text-sm text-amber-600 hover:bg-amber-50">
+              <.link
+                navigate="/admin"
+                class="block px-4 py-2 text-sm text-amber-600 hover:bg-amber-50"
+              >
                 Admin
-              </a>
-              <a
-                href="/admin/build"
+              </.link>
+              <.link
+                navigate="/admin/build"
                 class="block px-4 py-2 text-sm text-amber-600 hover:bg-amber-50"
               >
                 Build
-              </a>
-              <a
-                href="/admin/edit"
+              </.link>
+              <.link
+                navigate="/admin/edit"
                 class="block px-4 py-2 text-sm text-amber-600 hover:bg-amber-50"
               >
                 Edit
-              </a>
+              </.link>
             <% end %>
             <%= if @conn.assigns[:current_user] do %>
               <div class="border-t border-gray-100 mt-1 pt-1">
@@ -195,8 +202,5 @@
       </div>
     </nav>
     {@inner_content}
-    <%= if ResidencySchedule.Assistant.Chat.enabled?() and @conn.assigns[:current_user] do %>
-      {live_render(@conn, ResidencyScheduleWeb.ChatLive.Widget)}
-    <% end %>
   </body>
 </html>

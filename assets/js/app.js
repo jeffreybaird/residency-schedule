@@ -75,8 +75,14 @@ Hooks.GuidedTour = {
     this.handleEvent("start-tour", () => this._run(this._page))
   },
 
+  // Live navigation can replace the page under an open tour (browser back or
+  // forward while a step is showing). Shepherd's overlay lives outside the
+  // LiveView, so it is closed here, and nothing is pushed to a view that is
+  // already gone.
   destroyed() {
     window.removeEventListener("start-tour", this._startTour)
+    this._gone = true
+    if (this._tour && this._tour.isActive()) this._tour.cancel()
   },
 
   // localStorage can throw or be unavailable (private mode, blocked cookies).
@@ -108,15 +114,16 @@ Hooks.GuidedTour = {
 
   _run(page, startAtId) {
     const tour = buildTour(page, startAtId, this._role, this._brand())
+    this._tour = tour
     tour.on("complete", () => {
       this._markDemoTourSeen()
-      this.pushEvent("tour_completed", {})
+      if (!this._gone) this.pushEvent("tour_completed", {})
     })
     tour.on("cancel", () => {
       // Navigation cancels save state before calling cancel — don't mark complete
       if (!sessionStorage.getItem("guided_tour_state")) {
         this._markDemoTourSeen()
-        this.pushEvent("tour_completed", {})
+        if (!this._gone) this.pushEvent("tour_completed", {})
       }
     })
     tour.start()
@@ -682,6 +689,21 @@ const liveSocket = new LiveSocket("/live", Socket, {
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
+
+// The nav in the root layout is outside every LiveView, so live navigation
+// leaves it as it was rendered. Mark the home-resident link current only on
+// its own page, and fold the mobile menu the user just picked from.
+const syncNav = () => {
+  document.querySelectorAll("[data-nav-home]").forEach(link => {
+    if (link.getAttribute("href") === window.location.pathname) {
+      link.setAttribute("aria-current", "page")
+    } else {
+      link.removeAttribute("aria-current")
+    }
+  })
+  document.getElementById("mobile-nav")?.removeAttribute("open")
+}
+window.addEventListener("phx:navigate", syncNav)
 
 // connect if there are any LiveViews on the page
 liveSocket.connect()

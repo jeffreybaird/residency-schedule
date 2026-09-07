@@ -1,0 +1,14 @@
+<%!--
+  Live layout for every signed-in page. Rendered inside the root layout, on
+  both the dead and the connected render, so the chat widget below is part of
+  the page from the first paint.
+
+  The widget is sticky: live navigation between pages in the same live
+  session keeps it, and its conversation, alive. The root layout's nav is
+  outside any LiveView and does not re-render on live navigation; app.js keeps
+  its current-page state in step.
+--%>
+{@inner_content}
+<%= if ResidencySchedule.Assistant.Chat.enabled?() do %>
+  {live_render(@socket, ResidencyScheduleWeb.ChatLive.Widget, id: "chat-widget", sticky: true)}
+<% end %>

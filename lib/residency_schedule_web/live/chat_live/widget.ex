@@ -1,13 +1,13 @@
 defmodule ResidencyScheduleWeb.ChatLive.Widget do
   @moduledoc """
-  The chat assistant, rendered by the root layout as a launcher button in the
-  bottom-right corner that opens a floating panel. Each turn runs in a task so
-  the socket keeps rendering text as it streams; tool calls that change data
-  pause for the user's approval before they run.
+  The chat assistant, rendered by the `:site` live layout as a launcher button
+  in the bottom-right corner that opens a floating panel. Each turn runs in a
+  task so the socket keeps rendering text as it streams; tool calls that
+  change data pause for the user's approval before they run.
 
-  The layout renders it only for signed-in users when chat is enabled, and it
-  renders nothing on its own when chat is off. Because the site navigates with
-  full page loads, the conversation lives as long as the page does.
+  The layout renders it sticky, so live navigation between signed-in pages
+  keeps the widget and its conversation; a full page load starts a fresh one.
+  Chat being off renders nothing.
   """
   use ResidencyScheduleWeb, :live_view
 

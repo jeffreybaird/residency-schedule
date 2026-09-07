@@ -1,6 +1,8 @@
 defmodule ResidencyScheduleWeb.AdminLive.Denied do
   use ResidencyScheduleWeb, :live_view
 
+  on_mount {ResidencyScheduleWeb.UserAuth, :ensure_admin}
+
   alias ResidencySchedule.Accounts
 
   @impl true

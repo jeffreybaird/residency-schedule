@@ -1,6 +1,8 @@
 defmodule ResidencyScheduleWeb.UploadLive.Index do
   use ResidencyScheduleWeb, :live_view
 
+  on_mount {ResidencyScheduleWeb.UserAuth, :ensure_admin}
+
   alias ResidencySchedule.Importer.ResidentLinker
   alias ResidencySchedule.Importer.ScheduleImporter
   alias ResidencySchedule.Residents
