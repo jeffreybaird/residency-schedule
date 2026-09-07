@@ -7,6 +7,11 @@ import Config
 # Run `mix help test` for more information.
 config :residency_schedule, roster_path: "test/fixtures/roster.csv"
 
+# Chat tests never reach a real model
+config :residency_schedule, :chat,
+  provider: ResidencySchedule.Assistant.Chat.Providers.Fake,
+  model: "fake"
+
 config :residency_schedule, ResidencySchedule.Repo,
   username: "postgres",
   password: "postgres",

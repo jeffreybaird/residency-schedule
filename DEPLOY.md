@@ -107,6 +107,9 @@ SECRET_KEY_BASE=<generate with: mix phx.gen.secret>
 PHX_HOST=yourdomain.com
 ACCESS_PASSWORD=<choose a strong password>
 POOL_SIZE=10
+# Optional chat assistant. When CHAT_ENABLED=true the key is required at boot.
+CHAT_ENABLED=false
+ANTHROPIC_API_KEY=<from console.anthropic.com>
 EOF
 
 chmod 600 /home/deploy/residency_schedule/.env
