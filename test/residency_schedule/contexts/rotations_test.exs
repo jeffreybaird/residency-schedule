@@ -588,6 +588,38 @@ defmodule ResidencySchedule.RotationsTest do
     end
   end
 
+  describe "effective_segments_for_schedule/1" do
+    test "matches the per-resident builder for every resident", %{schedule: sched} do
+      ra = Residents.get_resident_by_position!("R4-1")
+      rb = sched.id |> Residents.list_residents_for_schedule() |> Enum.find(&(&1.id != ra.id))
+      rotation = hd(Rotations.list_rotations_for_resident(ra.id))
+
+      {:ok, _} =
+        ResidencySchedule.ShiftOverrides.create_override(%{
+          rotation_id: rotation.id,
+          covering_schedule_resident_id: rb.id,
+          override_start_date: rotation.start_date,
+          override_end_date: rotation.start_date
+        })
+
+      bulk = Rotations.effective_segments_for_schedule(sched.id)
+      residents = Residents.list_residents_for_schedule(sched.id)
+      assert map_size(bulk) == length(residents)
+
+      for resident <- residents do
+        assert bulk[resident.id] == Rotations.effective_segments_for_resident(resident.id),
+               resident.name
+      end
+
+      assert Enum.any?(bulk[rb.id], & &1.is_coverage)
+      assert Enum.any?(bulk[ra.id], &(&1.covered_by != nil))
+    end
+
+    test "unknown schedule is empty" do
+      assert Rotations.effective_segments_for_schedule(0) == %{}
+    end
+  end
+
   describe "list_co_service_days/2" do
     test "excludes swing and away even when simultaneous", %{schedule: sched} do
       {:ok, r3} =

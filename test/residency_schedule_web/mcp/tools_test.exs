@@ -247,6 +247,7 @@ defmodule ResidencyScheduleWeb.MCP.ToolsTest do
                "Invalid request"
 
       assert Tools.describe_error(:something_else) =~ "something_else"
+      assert Tools.describe_error(:invalid_academic_year) =~ "2026"
     end
   end
 end
