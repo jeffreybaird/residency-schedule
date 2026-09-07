@@ -23,7 +23,9 @@ end
 # In dev the chat assistant works whenever a key is present; nothing else
 # needs it, so a missing key is not an error.
 if config_env() == :dev do
-  config :residency_schedule, :chat, api_key: System.get_env("ANTHROPIC_API_KEY")
+  if api_key = System.get_env("ANTHROPIC_API_KEY") do
+    config :residency_schedule, :chat, enabled: true, api_key: api_key
+  end
 end
 
 if config_env() == :prod do
@@ -69,7 +71,9 @@ if config_env() == :prod do
   # The chat assistant is opt-in per deployment. When on, its key is required
   # so a misconfigured server fails at boot rather than on the first message.
   if System.get_env("CHAT_ENABLED", "false") == "true" do
-    config :residency_schedule, :chat, api_key: System.fetch_env!("ANTHROPIC_API_KEY")
+    config :residency_schedule, :chat,
+      enabled: true,
+      api_key: System.fetch_env!("ANTHROPIC_API_KEY")
   end
 
   # Resend for transactional email (magic links)

@@ -81,6 +81,7 @@ defmodule ResidencyScheduleWeb.Router do
       live "/residents/:id", ResidentLive.Show, :show
       live "/calendar", CalendarLive.Index, :index
       live "/compare", CompareLive.Index, :index
+      live "/chat", ChatLive.Index, :index
     end
 
     get "/residents/:id/calendar.ics", IcalController, :show

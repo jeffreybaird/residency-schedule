@@ -29,6 +29,16 @@ import {buildTour, consumeTourState} from "./tour.js"
 // visible data column in the Gantt scroll container as the user scrolls.
 const Hooks = {}
 
+// ChatScroll: keeps the assistant log pinned to its newest line as text
+// streams in, unless the user has scrolled up to read something earlier.
+Hooks.ChatScroll = {
+  mounted() { this.el.scrollTop = this.el.scrollHeight },
+  updated() {
+    const nearBottom = this.el.scrollHeight - this.el.scrollTop - this.el.clientHeight < 80
+    if (nearBottom) this.el.scrollTop = this.el.scrollHeight
+  },
+}
+
 // Key recording that a demo visitor has already seen the walkthrough. The demo
 // user is unpersisted and shared by every visitor, so the server cannot track
 // this the way it does for a real account — it always offers the tour and the
