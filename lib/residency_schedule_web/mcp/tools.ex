@@ -58,9 +58,26 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
         read_only: true
       ),
       tool(
+        "shifts_remaining",
+        "A resident's remaining shifts",
+        "Counts one resident's working days (shifts) from a date onward, by rotation, with approved coverage applied. " <>
+          "Every rotation is a shift except vacation and post-call; float, swing, away, ambulatory, and elective all count. " <>
+          "Use it for 'how many shifts does X have left'. For shifts shared with a specific coworker use shared_shifts.",
+        %{
+          name: string("Resident's name."),
+          from: string("Count from this date. " <> @date_desc),
+          to: string("Count through this date (inclusive). Defaults to the end of the schedule.")
+        },
+        ["name"],
+        read_only: true
+      ),
+      tool(
         "shared_shifts",
         "Shared shifts between two residents",
-        "Counts the days two residents work the same service together (approved coverage applied) from a start date onward. Use it for 'how many shifts does X have left with Y'. Ambulatory, elective, float, post-call, and vacation never count.",
+        "Counts the days two residents are on the same shared service at the same time (approved coverage applied) from a date onward. " <>
+          "Use it for 'how many shifts does X have left with Y'. Only rotations that can hold more than one resident count: OB, gyn, onc, night float, weekend blocks, REI, urogyn, ultrasound. " <>
+          "Float, swing, away, ambulatory, and elective are working days but solo, so they are never shared; vacation and post-call are not shifts. " <>
+          "The result's counting_rule spells this out. For a resident's own shift count use shifts_remaining.",
         %{
           resident: string("First resident's name."),
           coworker: string("Second resident's name."),
@@ -229,6 +246,9 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
 
   defp dispatch("resident_schedule", args, _user),
     do: Assistant.resident_schedule(args["name"], args["from"], args["to"])
+
+  defp dispatch("shifts_remaining", args, _user),
+    do: Assistant.shifts_remaining(args["name"], args["from"], args["to"])
 
   defp dispatch("shared_shifts", args, _user),
     do: Assistant.shared_shifts(args["resident"], args["coworker"], args["from"], args["to"])

@@ -154,7 +154,8 @@ authorize, and token endpoints. Redirect URIs must be `https` or `localhost`.
 | `find_resident` | Resolve a first name / nickname; lists candidates when ambiguous | no |
 | `who_is_on` | Who is effectively on a service on a date ("strong ob", "onc", "NF") | no |
 | `resident_schedule` | A resident's effective blocks in a date range | no |
-| `shared_shifts` | Days two residents work the same service from a date onward | no |
+| `shifts_remaining` | A resident's working days from a date onward (float counts; vacation and post-call do not) | no |
+| `shared_shifts` | Days two residents are on the same shared service from a date onward (solo rotations such as float never count) | no |
 | `check_coverage` | Dry run of one resident covering another's shift: problems + estimated 80-hour check | no |
 | `request_coverage` | Files a **pending** change request | yes |
 | `list_change_requests` | Requests visible to the caller (admins: all) | no |
@@ -164,7 +165,9 @@ authorize, and token endpoints. Redirect URIs must be `https` or `localhost`.
 **Permissions.** Any approved user may read. A resident may file a request only
 when their home resident is the person covering or the person covered; admins
 may file, approve, deny, and cancel anything. Nothing changes on the schedule
-until an admin approves.
+until an admin approves, either from the **Pending Change Requests** block on
+`/admin` (which updates live as requests are filed or decided) or through the
+`review_change_request` tool.
 
 **Limits.** Duty-hour results are estimates from nominal hours per rotation
 (12 h or 9 h per day); only the 80-hour rolling 4-week average is checked.

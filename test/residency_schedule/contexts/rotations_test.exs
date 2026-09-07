@@ -571,7 +571,78 @@ defmodule ResidencySchedule.RotationsTest do
     end
   end
 
+  describe "working_day?/1 and shared_service?/1" do
+    test "classifies every known rotation type" do
+      for type <- Rotations.all_rotation_types() do
+        assert Rotations.working_day?(type) == type not in ["vacation", "post_call"]
+      end
+
+      for type <-
+            ~w(strong_obstetrics strong_gynecology oncology night_float rei urogynecology ultrasound strong_weekend_days highland_obstetrics) do
+        assert Rotations.shared_service?(type), type
+      end
+
+      for type <- Rotations.solo_rotation_types() ++ Rotations.non_working_rotation_types() do
+        refute Rotations.shared_service?(type), type
+      end
+    end
+  end
+
   describe "list_co_service_days/2" do
+    test "excludes swing and away even when simultaneous", %{schedule: sched} do
+      {:ok, r3} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R3-1",
+          residency_year: 3,
+          schedule_number: 1,
+          name: "Pat"
+        })
+
+      ra = Residents.get_resident_by_position!("R4-1")
+
+      for {resident, idx} <- [{r3, 0}, {ra, 1}] do
+        {:ok, _} =
+          Rotations.insert_rotations(resident.id, [
+            %{
+              slot_index: 20 + idx,
+              start_date: ~D[2023-10-01],
+              end_date: ~D[2023-10-07],
+              rotation_type: :swing
+            },
+            %{
+              slot_index: 22 + idx,
+              start_date: ~D[2023-10-08],
+              end_date: ~D[2023-10-14],
+              rotation_type: :away_rotation
+            },
+            %{
+              slot_index: 24 + idx,
+              start_date: ~D[2023-10-15],
+              end_date: ~D[2023-10-21],
+              rotation_type: :rei
+            }
+          ])
+      end
+
+      types =
+        ra.id
+        |> Rotations.list_co_service_days(r3.id)
+        |> Enum.map(& &1.rotation_type)
+        |> Enum.uniq()
+
+      refute "swing" in types
+      refute "away_rotation" in types
+      assert "rei" in types
+
+      effective_types =
+        ra.id
+        |> Rotations.list_effective_co_service_days(r3.id)
+        |> Enum.map(& &1.rotation_type)
+        |> Enum.uniq()
+
+      assert Enum.sort(effective_types) == Enum.sort(types)
+    end
+
     test "excludes float and post_call rotations", %{schedule: sched} do
       {:ok, r3} =
         Residents.insert_resident(sched.id, %{

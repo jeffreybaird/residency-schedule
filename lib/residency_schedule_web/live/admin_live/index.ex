@@ -2,6 +2,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
   use ResidencyScheduleWeb, :live_view
 
   alias ResidencySchedule.Accounts
+  alias ResidencySchedule.ChangeRequests
   alias ResidencySchedule.Schedules
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
@@ -9,6 +10,8 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: ChangeRequests.subscribe()
+
     {:ok,
      assign(socket,
        schedules: Schedules.list_schedules(),
@@ -17,6 +20,8 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
        approved_users: Accounts.list_approved_users(),
        role_error: nil,
        existing_overrides: ShiftOverrides.list_all_overrides(),
+       pending_requests: ChangeRequests.list_requests(socket.assigns.current_user, :pending),
+       request_error: nil,
        override_rotation_type: nil,
        override_start_date: nil,
        override_end_date: nil,
@@ -126,6 +131,20 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
         {:noreply,
          assign(socket, override_error: "Please fill in all fields.", override_success: nil)}
     end
+  end
+
+  @impl true
+  def handle_event("approve_request", %{"id" => id}, socket) do
+    socket.assigns.current_user
+    |> ChangeRequests.approve_request(String.to_integer(id))
+    |> refresh_requests(socket)
+  end
+
+  @impl true
+  def handle_event("deny_request", %{"id" => id}, socket) do
+    socket.assigns.current_user
+    |> ChangeRequests.deny_request(String.to_integer(id))
+    |> refresh_requests(socket)
   end
 
   @impl true
@@ -289,6 +308,16 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
       {:ok, d} -> d
       _ -> nil
     end
+  end
+
+  # A request was filed or decided elsewhere (assistant API, another admin tab).
+  @impl true
+  def handle_info({:change_request, _event, _request}, socket) do
+    {:noreply,
+     assign(socket,
+       pending_requests: ChangeRequests.list_requests(socket.assigns.current_user, :pending),
+       existing_overrides: ShiftOverrides.list_all_overrides()
+     )}
   end
 
   @impl true
@@ -559,6 +588,66 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
             </span>
           </div>
 
+          <%!-- Pending change requests (filed via the assistant API) --%>
+          <%= if @pending_requests != [] or @request_error do %>
+            <div class="px-4 py-4 border-b border-gray-200">
+              <p class="text-sm font-medium text-gray-800 mb-2">
+                Pending Change Requests ({length(@pending_requests)})
+              </p>
+              <%= if @request_error do %>
+                <p class="text-sm text-red-600 mb-2">{@request_error}</p>
+              <% end %>
+              <ul class="space-y-2">
+                <%= for r <- @pending_requests do %>
+                  <li
+                    id={"change-request-#{r.id}"}
+                    class="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
+                  >
+                    <div class="text-sm text-gray-700 leading-snug">
+                      <span class={"inline-block rounded px-1.5 py-0.5 text-xs font-medium mr-1 #{Rotations.rotation_type_color(r.rotation.rotation_type)}"}>
+                        {Rotations.rotation_type_label(r.rotation.rotation_type)}
+                      </span>
+                      <span class="font-medium">{r.rotation.schedule_resident.name}</span>
+                      <span class="text-gray-400 mx-1">covered by</span>
+                      <span class="font-medium">{r.covering_schedule_resident.name}</span>
+                      <span class="text-gray-400 text-xs ml-1">
+                        {Calendar.strftime(r.start_date, "%b %-d")}–{Calendar.strftime(
+                          r.end_date,
+                          "%b %-d, %Y"
+                        )}
+                      </span>
+                      <div class="text-xs text-gray-500 mt-0.5">
+                        Requested by {r.requested_by_user.email} on {Calendar.strftime(
+                          r.inserted_at,
+                          "%b %-d, %Y"
+                        )}
+                        <%= if r.note do %>
+                          <span class="text-gray-400">·</span> “{r.note}”
+                        <% end %>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button
+                        phx-click="approve_request"
+                        phx-value-id={r.id}
+                        class="rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        phx-click="deny_request"
+                        phx-value-id={r.id}
+                        class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        Deny
+                      </button>
+                    </div>
+                  </li>
+                <% end %>
+              </ul>
+            </div>
+          <% end %>
+
           <div class="px-4 py-4 space-y-4">
             <div>
               <p class="text-sm font-medium text-gray-800 mb-0.5">Create a Shift Override</p>
@@ -720,6 +809,23 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
       </div>
     </div>
     """
+  end
+
+  defp refresh_requests(result, socket) do
+    error =
+      case result do
+        {:ok, _request} -> nil
+        {:error, :not_pending} -> "That request was already decided."
+        {:error, :not_found} -> "That request no longer exists."
+        {:error, _other} -> "The request could not be updated."
+      end
+
+    {:noreply,
+     assign(socket,
+       pending_requests: ChangeRequests.list_requests(socket.assigns.current_user, :pending),
+       existing_overrides: ShiftOverrides.list_all_overrides(),
+       request_error: error
+     )}
   end
 
   defp date_value(nil), do: ""

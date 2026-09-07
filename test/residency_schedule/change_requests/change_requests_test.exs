@@ -252,6 +252,36 @@ defmodule ResidencySchedule.ChangeRequestsTest do
     end
   end
 
+  describe "PubSub" do
+    test "every state change is broadcast to subscribers", ctx do
+      :ok = ChangeRequests.subscribe()
+
+      {:ok, request} = ChangeRequests.request_coverage(ctx.clare_user, attrs(ctx))
+      assert_receive {:change_request, :filed, %ChangeRequest{id: id}}
+      assert id == request.id
+
+      {:ok, _} = ChangeRequests.cancel_request(ctx.clare_user, request.id)
+      assert_receive {:change_request, :cancelled, %ChangeRequest{status: :cancelled}}
+
+      {:ok, second} = ChangeRequests.request_coverage(ctx.clare_user, attrs(ctx))
+      assert_receive {:change_request, :filed, _}
+      {:ok, _} = ChangeRequests.deny_request(ctx.admin, second.id)
+      assert_receive {:change_request, :denied, %ChangeRequest{status: :denied}}
+
+      {:ok, third} = ChangeRequests.request_coverage(ctx.clare_user, attrs(ctx))
+      assert_receive {:change_request, :filed, _}
+      {:ok, _} = ChangeRequests.approve_request(ctx.admin, third.id)
+      assert_receive {:change_request, :approved, %ChangeRequest{status: :approved}}
+    end
+
+    test "failed actions broadcast nothing", ctx do
+      :ok = ChangeRequests.subscribe()
+      assert {:error, :forbidden} = ChangeRequests.request_coverage(ctx.mary_user, attrs(ctx))
+      assert {:error, :not_found} = ChangeRequests.deny_request(ctx.admin, 0)
+      refute_receive {:change_request, _, _}
+    end
+  end
+
   describe "list_requests/2 and get_request/1" do
     test "admin sees everything; parties see their own; strangers see nothing", ctx do
       {:ok, request} = ChangeRequests.request_coverage(ctx.clare_user, attrs(ctx))

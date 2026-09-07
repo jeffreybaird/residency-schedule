@@ -315,6 +315,98 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
     end
   end
 
+  describe "pending change requests" do
+    setup %{conn: conn} do
+      %{conn: conn, user: admin} = admin_authenticate_session(%{conn: conn})
+      fixtures = ResidencySchedule.ScheduleFixtures.seed_mini_schedule()
+      clare_user = ResidencySchedule.ScheduleFixtures.resident_user(fixtures.clare)
+      tiff_ob = ResidencySchedule.ScheduleFixtures.rotation_on(fixtures.tiff, ~D[2026-07-15])
+
+      {:ok, request} =
+        ResidencySchedule.ChangeRequests.request_coverage(clare_user, %{
+          rotation_id: tiff_ob.id,
+          covering_schedule_resident_id: fixtures.clare.id,
+          start_date: ~D[2026-07-15],
+          end_date: ~D[2026-07-16],
+          note: "swap for clinic"
+        })
+
+      %{conn: conn, admin: admin, request: request, clare_user: clare_user}
+    end
+
+    test "lists the request with both residents and the note", %{
+      conn: conn,
+      request: request,
+      clare_user: clare_user
+    } do
+      {:ok, view, html} = live(conn, "/admin")
+      assert html =~ "Pending Change Requests (1)"
+      assert html =~ "Tiff"
+      assert html =~ "Clare"
+      assert html =~ "swap for clinic"
+      assert html =~ clare_user.email
+
+      assert has_element?(
+               view,
+               "button[phx-click='approve_request'][phx-value-id='#{request.id}']"
+             )
+
+      assert has_element?(view, "button[phx-click='deny_request'][phx-value-id='#{request.id}']")
+    end
+
+    test "approving creates an override and clears the list", %{conn: conn, request: request} do
+      {:ok, view, _html} = live(conn, "/admin")
+
+      html =
+        view
+        |> element("button[phx-click='approve_request'][phx-value-id='#{request.id}']")
+        |> render_click()
+
+      refute html =~ "Pending Change Requests"
+      assert html =~ "Active Overrides (1)"
+      assert ResidencySchedule.ChangeRequests.get_request(request.id).status == :approved
+    end
+
+    test "denying records the decision without an override", %{conn: conn, request: request} do
+      {:ok, view, _html} = live(conn, "/admin")
+
+      html =
+        view
+        |> element("button[phx-click='deny_request'][phx-value-id='#{request.id}']")
+        |> render_click()
+
+      refute html =~ "Pending Change Requests"
+      refute html =~ "Active Overrides"
+      assert ResidencySchedule.ChangeRequests.get_request(request.id).status == :denied
+    end
+
+    test "acting on an already-decided request shows an error", %{
+      conn: conn,
+      request: request,
+      clare_user: clare_user
+    } do
+      {:ok, view, _html} = live(conn, "/admin")
+      {:ok, _} = ResidencySchedule.ChangeRequests.cancel_request(clare_user, request.id)
+
+      # PubSub has already removed the row, so drive the event directly to
+      # simulate a click that raced the cancellation.
+      html = render_click(view, "approve_request", %{"id" => Integer.to_string(request.id)})
+
+      assert html =~ "already decided"
+      assert html =~ "Pending Change Requests (0)"
+    end
+
+    test "section is hidden when nothing is pending", %{
+      conn: conn,
+      admin: admin,
+      request: request
+    } do
+      {:ok, _} = ResidencySchedule.ChangeRequests.deny_request(admin, request.id)
+      {:ok, _view, html} = live(conn, "/admin")
+      refute html =~ "Pending Change Requests"
+    end
+  end
+
   describe "account password card without a password set" do
     setup %{conn: conn} do
       %{conn: conn, user: admin} = admin_authenticate_session(%{conn: conn})

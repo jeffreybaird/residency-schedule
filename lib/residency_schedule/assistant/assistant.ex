@@ -77,12 +77,49 @@ defmodule ResidencySchedule.Assistant do
     end
   end
 
-  # ── Shared shifts ──────────────────────────────────────────────────────────
+  # ── Shifts ─────────────────────────────────────────────────────────────────
 
   @doc """
-  Counts the days two residents are on the same service together, with
+  Counts a resident's remaining working days (shifts), with coverage applied,
+  from `from` (default today) through `to` (default end of schedule). Every
+  rotation except vacation and post-call is a shift, float included. Days
+  someone else is covering are not the resident's shifts; days they cover
+  for someone else are.
+
+  Exempt from doctest — hits the database. See `AssistantTest`.
+  """
+  def shifts_remaining(name, from \\ nil, to \\ nil) do
+    with {:ok, from} <- LocalDate.parse(from),
+         {:ok, to} <- LocalDate.parse_optional(to),
+         {:ok, schedule} <- schedule_for(from),
+         {:ok, resident} <- resolve(name, schedule.id) do
+      days =
+        resident.id
+        |> Rotations.effective_segments_for_resident()
+        |> Enum.reject(&(&1.covered_by != nil))
+        |> Enum.flat_map(&segment_dates/1)
+        |> Enum.filter(&(within?(&1.date, from, to) and Rotations.working_day?(&1.rotation_type)))
+
+      {:ok,
+       %{
+         resident: resident_summary(resident, schedule),
+         from: from,
+         to: to,
+         count: length(days),
+         by_rotation: count_by_rotation(days),
+         counting_rule: %{
+           counts: "every working day, including float and solo rotations",
+           not_shifts: Rotations.non_working_rotation_types()
+         }
+       }}
+    end
+  end
+
+  @doc """
+  Counts the days two residents are on the same shared service together, with
   coverage applied, from `from` (default today) through `to` (default end of
-  schedule). Ambulatory, elective, float, post-call, and vacation never count.
+  schedule). Only rotations that can hold more than one resident count (see
+  `Rotations.shared_service?/1`).
 
   Exempt from doctest — hits the database. See `AssistantTest`.
   """
@@ -105,7 +142,12 @@ defmodule ResidencySchedule.Assistant do
          to: to,
          count: length(days),
          by_rotation: count_by_rotation(days),
-         dates: Enum.map(days, & &1.date)
+         dates: Enum.map(days, & &1.date),
+         counting_rule: %{
+           counts: "days both residents are on the same shared service",
+           working_days_not_shared: Rotations.solo_rotation_types(),
+           not_shifts: Rotations.non_working_rotation_types()
+         }
        }}
     end
   end
@@ -353,6 +395,12 @@ defmodule ResidencySchedule.Assistant do
       }
     end)
     |> Enum.sort_by(&(-&1.days))
+  end
+
+  defp segment_dates(segment) do
+    segment.start_date
+    |> Date.range(segment.end_date)
+    |> Enum.map(&%{date: &1, rotation_type: segment.rotation_type})
   end
 
   defp within?(date, from, nil), do: Date.compare(date, from) != :lt
