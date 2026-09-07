@@ -165,7 +165,8 @@ authorize, and token endpoints. Redirect URIs must be `https` or `localhost`.
 **Permissions.** Any approved user may read. A resident may file a request only
 when their home resident is the person covering or the person covered; admins
 may file, approve, deny, and cancel anything. Nothing changes on the schedule
-until an admin approves.
+until an admin approves, either from the **Pending Change Requests** block on
+`/admin` or through the `review_change_request` tool.
 
 **Limits.** Duty-hour results are estimates from nominal hours per rotation
 (12 h or 9 h per day); only the 80-hour rolling 4-week average is checked.
