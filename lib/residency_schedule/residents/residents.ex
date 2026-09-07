@@ -150,17 +150,17 @@ defmodule ResidencySchedule.Residents do
   end
 
   @doc """
-  Finds or creates a Resident (person) by name, then inserts a ScheduleResident
-  for the given schedule. A newly created person is assigned a unique
-  calendar_token; an existing person keeps theirs, so the same name across
-  academic years resolves to one record.
-  Returns `{:ok, schedule_resident}` or `{:error, changeset}`.
+  Inserts a ScheduleResident for the given schedule. When `attrs` carries a
+  `:resident_id` (an admin-confirmed link) that person is used; otherwise the
+  person is found or created by name. A newly created person is assigned a
+  unique calendar_token; an existing person keeps theirs, so the same name
+  across academic years resolves to one record.
+  Returns `{:ok, schedule_resident}`, `{:error, changeset}`, or
+  `{:error, :person_not_found}` for an unknown `:resident_id`.
   Exempt from doctest — hits the database.
   """
   def insert_resident(schedule_id, attrs) do
-    name = Map.get(attrs, :name)
-
-    with {:ok, person} <- find_or_create_person(name) do
+    with {:ok, person} <- resolve_person(attrs) do
       case %ScheduleResident{}
            |> ScheduleResident.changeset(%{
              resident_id: person.id,
@@ -215,6 +215,15 @@ defmodule ResidencySchedule.Residents do
       select: %{sr | name: r.name}
     )
   end
+
+  defp resolve_person(%{resident_id: person_id}) when is_integer(person_id) do
+    case Repo.get(Resident, person_id) do
+      nil -> {:error, :person_not_found}
+      person -> {:ok, person}
+    end
+  end
+
+  defp resolve_person(attrs), do: find_or_create_person(Map.get(attrs, :name))
 
   defp find_or_create_person(nil), do: create_person(nil)
 

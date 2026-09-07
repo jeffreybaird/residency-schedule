@@ -10,6 +10,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
 
   alias ResidencySchedule.Repo
   alias ResidencySchedule.Importer.CsvParser
+  alias ResidencySchedule.Importer.ResidentLinker
   alias ResidencySchedule.Schedules
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
@@ -30,6 +31,50 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
     with {:ok, parsed_residents, warnings} <- CsvParser.parse(csv_binary),
          {:ok, result} <- persist(parsed_residents) do
       {:ok, result, warnings}
+    end
+  end
+
+  @doc """
+  Parses a CSV and proposes, without writing anything, which existing resident
+  (person) each row belongs to. The admin confirms the links, then `commit/3`
+  persists them.
+
+  Returns `{:ok, %{parsed: [...], academic_year: year, proposals: [...], warnings: [...]}}`
+  or `{:error, reason}`.
+
+      iex> ResidencySchedule.Importer.ScheduleImporter.prepare("")
+      {:error, _}
+  """
+  def prepare(csv_binary) do
+    with {:ok, parsed_residents, warnings} <- CsvParser.parse(csv_binary),
+         {:ok, academic_year} <- academic_year_of(parsed_residents) do
+      {:ok,
+       %{
+         parsed: parsed_residents,
+         academic_year: academic_year,
+         proposals: ResidentLinker.propose(parsed_residents, Residents.list_residents()),
+         warnings: warnings
+       }}
+    end
+  end
+
+  @doc """
+  Persists parsed residents for an academic year using admin-confirmed links:
+  a map of position code to an existing person id or `:new`. Links are
+  validated against the current people first.
+
+  Returns `{:ok, %{schedule_id: id, residents: count, rotations: count}}` or
+  `{:error, reason}`.
+
+      iex> ResidencySchedule.Importer.ScheduleImporter.commit([], 2026, %{})
+      {:error, "No residents or rotations to import"}
+  """
+  def commit([], _academic_year, _links), do: {:error, "No residents or rotations to import"}
+
+  def commit(parsed_residents, academic_year, links) do
+    case ResidentLinker.validate(links, parsed_residents, Residents.list_residents()) do
+      {:ok, links} -> persist(parsed_residents, academic_year, links)
+      {:error, messages} -> {:error, Enum.join(messages, "; ")}
     end
   end
 
@@ -64,7 +109,11 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   """
   def persist([], _academic_year), do: {:error, "No residents or rotations to import"}
 
-  def persist(parsed_residents, academic_year) do
+  def persist(parsed_residents, academic_year), do: persist(parsed_residents, academic_year, %{})
+
+  # Links map position codes to an existing person id or :new; rows absent
+  # from the map fall back to matching an existing person by exact name.
+  defp persist(parsed_residents, academic_year, links) do
     label = Schedules.academic_year_label(academic_year)
 
     Repo.transaction(fn ->
@@ -75,12 +124,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
       {resident_count, rotation_count} =
         Enum.reduce(parsed_residents, {0, 0}, fn parsed, {r_acc, rot_acc} ->
           {:ok, schedule_resident} =
-            Residents.insert_resident(schedule.id, %{
-              position_code: parsed.position_code,
-              residency_year: parsed.residency_year,
-              schedule_number: parsed.schedule_number,
-              name: parsed.name
-            })
+            Residents.insert_resident(schedule.id, resident_attrs(parsed, links))
 
           {:ok, rot_count} = Rotations.insert_rotations(schedule_resident.id, parsed.rotations)
           {r_acc + 1, rot_acc + rot_count}
@@ -89,6 +133,26 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
       %{schedule_id: schedule.id, residents: resident_count, rotations: rotation_count}
     end)
   end
+
+  defp resident_attrs(parsed, links) do
+    %{
+      position_code: parsed.position_code,
+      residency_year: parsed.residency_year,
+      schedule_number: parsed.schedule_number,
+      name: parsed.name
+    }
+    |> put_linked_person(Map.get(links, parsed.position_code))
+  end
+
+  defp put_linked_person(attrs, person_id) when is_integer(person_id),
+    do: Map.put(attrs, :resident_id, person_id)
+
+  defp put_linked_person(attrs, _new_or_unlinked), do: attrs
+
+  defp academic_year_of([]), do: {:error, "No residents or rotations to import"}
+
+  defp academic_year_of(parsed_residents),
+    do: {:ok, derive_academic_year_from_residents(parsed_residents)}
 
   defp derive_academic_year_from_residents(parsed_residents) do
     parsed_residents

@@ -161,6 +161,34 @@ defmodule ResidencySchedule.ResidentsTest do
       assert resident.schedule_id == sched.id
     end
 
+    test "uses the given resident_id instead of matching by name", %{r4: r4} do
+      {:ok, later} = Schedules.upsert_schedule(2024, "2024–2025")
+
+      {:ok, sr} =
+        Residents.insert_resident(later.id, %{
+          position_code: "R4-1",
+          residency_year: 4,
+          schedule_number: 1,
+          name: "Briar Whitfield",
+          resident_id: r4.resident_id
+        })
+
+      assert sr.resident_id == r4.resident_id
+      assert sr.name == "Briar"
+      assert Repo.aggregate(ResidencySchedule.Residents.Resident, :count) == 2
+    end
+
+    test "returns an error for an unknown resident_id", %{schedule: sched} do
+      assert {:error, :person_not_found} =
+               Residents.insert_resident(sched.id, %{
+                 position_code: "R4-9",
+                 residency_year: 4,
+                 schedule_number: 9,
+                 name: "Ghost",
+                 resident_id: 0
+               })
+    end
+
     test "falls back to position_code when name is blank", %{schedule: sched} do
       {:ok, resident} =
         Residents.insert_resident(sched.id, %{
