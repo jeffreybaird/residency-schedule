@@ -25,9 +25,10 @@ defmodule ResidencyScheduleWeb.ChatWidgetTest do
   end
 
   describe "placement in the layout" do
-    test "signed-in pages carry the widget", %{conn: conn} do
+    test "signed-in pages carry the widget as a sticky child", %{conn: conn} do
       html = conn |> get("/") |> html_response(200)
-      assert html =~ ~s(id="chat-widget-root")
+      assert html =~ ~s(id="chat-widget")
+      assert html =~ ~s(data-phx-sticky)
       assert html =~ ~s(id="chat-launcher")
       refute html =~ ~s(id="chat-panel")
     end
@@ -35,18 +36,24 @@ defmodule ResidencyScheduleWeb.ChatWidgetTest do
     test "admin pages carry the widget too" do
       %{conn: conn} = admin_authenticate_session(%{conn: build_conn()})
       html = conn |> get("/admin") |> html_response(200)
-      assert html =~ ~s(id="chat-widget-root")
+      assert html =~ ~s(id="chat-widget")
+      assert html =~ ~s(data-phx-sticky)
     end
+
+    # The widget surviving live navigation is a client behaviour: the browser
+    # carries the sticky element into the next page instead of re-joining it.
+    # Phoenix.LiveViewTest re-joins it and fails, so that half is checked in
+    # a browser, not here. See DataCase.set_chat_enabled/1.
 
     test "the login page has no widget" do
       html = build_conn() |> get("/login") |> html_response(200)
-      refute html =~ ~s(id="chat-widget-root")
+      refute html =~ ~s(id="chat-widget")
     end
 
     test "demo mode has no widget and no nav link", %{conn: conn} do
       set_demo_mode(true)
       html = conn |> get("/") |> html_response(200)
-      refute html =~ ~s(id="chat-widget-root")
+      refute html =~ ~s(id="chat-widget")
       refute html =~ "/chat"
     end
 

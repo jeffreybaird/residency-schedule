@@ -30,7 +30,7 @@ defmodule ResidencyScheduleWeb.ConnCase do
       import ResidencyScheduleWeb.ConnCase
 
       import ResidencySchedule.DataCase,
-        only: [seed_schedule: 0, seed_schedule: 1, set_demo_mode: 1]
+        only: [seed_schedule: 0, seed_schedule: 1, set_chat_enabled: 1, set_demo_mode: 1]
     end
   end
 

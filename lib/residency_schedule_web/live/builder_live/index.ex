@@ -1,6 +1,8 @@
 defmodule ResidencyScheduleWeb.BuilderLive.Index do
   use ResidencyScheduleWeb, :live_view
 
+  on_mount {ResidencyScheduleWeb.UserAuth, :ensure_admin}
+
   alias ResidencySchedule.ScheduleBuilder
   alias ResidencySchedule.Rotations
 

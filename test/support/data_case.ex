@@ -33,6 +33,25 @@ defmodule ResidencySchedule.DataCase do
   end
 
   @doc """
+  Turns the chat assistant on or off for the current test and restores the
+  previous setting afterwards.
+
+  `Phoenix.LiveViewTest` re-joins the sticky chat widget on every
+  `live_redirect/2` with tokens a real client never sends, and the join fails.
+  Browsers keep the widget alive across live navigation instead of re-joining
+  it, so tests that navigate live turn the assistant off with
+  `set_chat_enabled(false)`.
+  """
+  def set_chat_enabled(enabled) do
+    previous = Application.get_env(:residency_schedule, :chat, [])
+    Application.put_env(:residency_schedule, :chat, Keyword.put(previous, :enabled, enabled))
+
+    ExUnit.Callbacks.on_exit(fn ->
+      Application.put_env(:residency_schedule, :chat, previous)
+    end)
+  end
+
+  @doc """
   Toggles the `:demo_mode` application flag for the duration of one test,
   restoring the previous value on exit.
   """
