@@ -44,6 +44,17 @@ defmodule ResidencyScheduleWeb.ChatLiveTest do
       refute has_element?(view, "#chat-thinking")
     end
 
+    test "renders the reply's markdown and escapes HTML in it", %{conn: conn} do
+      Fake.script([{:text, "**Today:**\n- Clare <b>x</b>\n- Mary"}])
+      {:ok, view, _html} = live(conn, "/chat")
+
+      send_message(view, "Who is on?")
+      assert has_element?(view, "[data-kind=assistant] strong", "Today:")
+      assert has_element?(view, "[data-kind=assistant] ul li", "Mary")
+      assert has_element?(view, "[data-kind=assistant] li", "Clare <b>x</b>")
+      refute has_element?(view, "[data-kind=assistant] b")
+    end
+
     test "ignores blank messages", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/chat")
       send_message(view, "   ")

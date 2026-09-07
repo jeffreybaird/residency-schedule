@@ -7,7 +7,7 @@ defmodule ResidencyScheduleWeb.ChatLive.Index do
   use ResidencyScheduleWeb, :live_view
 
   alias ResidencySchedule.Assistant.Chat
-  alias ResidencySchedule.Assistant.Chat.{Conversation, Quota, ToolCall, ToolResult}
+  alias ResidencySchedule.Assistant.Chat.{Conversation, Markdown, Quota, ToolCall, ToolResult}
   alias ResidencySchedule.Assistant.LocalDate
   alias ResidencyScheduleWeb.MCP.Toolbox
 
@@ -348,9 +348,9 @@ defmodule ResidencyScheduleWeb.ChatLive.Index do
   defp entry(%{entry: %{kind: :assistant}} = assigns) do
     ~H"""
     <div id={"entry-#{@entry.id}"} data-kind="assistant" class="flex justify-start">
-      <p class="max-w-[85%] rounded-2xl bg-gray-100 text-gray-800 px-4 py-2 text-sm whitespace-pre-wrap">
-        {@entry.text}
-      </p>
+      <div class="chat-markdown max-w-[85%] rounded-2xl bg-gray-100 text-gray-800 px-4 py-2 text-sm">
+        {Markdown.to_html(@entry.text)}
+      </div>
     </div>
     """
   end
