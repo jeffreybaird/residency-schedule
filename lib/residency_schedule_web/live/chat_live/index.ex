@@ -6,6 +6,8 @@ defmodule ResidencyScheduleWeb.ChatLive.Index do
   """
   use ResidencyScheduleWeb, :live_view
 
+  require Logger
+
   alias ResidencySchedule.Assistant.Chat
   alias ResidencySchedule.Assistant.Chat.{Conversation, Markdown, Quota, ToolCall, ToolResult}
   alias ResidencySchedule.Assistant.LocalDate
@@ -92,9 +94,15 @@ defmodule ResidencyScheduleWeb.ChatLive.Index do
     {:noreply, finish_turn(socket, conversation, describe_error(reason))}
   end
 
-  def handle_async(:turn, {:exit, _reason}, socket) do
+  def handle_async(:turn, {:exit, reason}, socket) do
+    Logger.error("chat turn crashed: " <> Exception.format_exit(reason))
+
     {:noreply,
-     finish_turn(socket, socket.assigns.conversation, "The assistant stopped unexpectedly.")}
+     finish_turn(
+       socket,
+       socket.assigns.conversation,
+       "The assistant stopped unexpectedly. The error has been logged."
+     )}
   end
 
   # ── Turn lifecycle ─────────────────────────────────────────────────────────

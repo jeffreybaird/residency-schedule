@@ -78,6 +78,19 @@ defmodule ResidencyScheduleWeb.ChatLiveTest do
       assert has_element?(view, "[data-kind=assistant]", "Back.")
     end
 
+    test "a crash inside the turn is reported and logged", %{conn: conn} do
+      Fake.script([fn _request -> raise "boom" end, {:text, "Recovered."}])
+      {:ok, view, _html} = live(conn, "/chat")
+
+      log = ExUnit.CaptureLog.capture_log(fn -> send_message(view, "Hi") end)
+      assert log =~ "chat turn crashed"
+      assert log =~ "boom"
+      assert has_element?(view, "#chat-error", "stopped unexpectedly")
+
+      send_message(view, "Again")
+      assert has_element?(view, "[data-kind=assistant]", "Recovered.")
+    end
+
     test "new chat clears the log", %{conn: conn} do
       Fake.script([{:text, "Hello."}])
       {:ok, view, _html} = live(conn, "/chat")
