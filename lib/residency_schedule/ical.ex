@@ -45,6 +45,17 @@ defmodule ResidencySchedule.Ical do
   end
 
   @doc """
+  Builds an iCal (VCALENDAR) string covering every academic year a resident
+  (person) appears in, so one subscription URL follows them through residency.
+
+  Exempt from doctest — hits the database. See `IcalTest`.
+  """
+  def build_for_person(person) do
+    segments = Rotations.effective_segments_for_person(person.id)
+    build_from_segments(segments, person.name)
+  end
+
+  @doc """
   Returns true if the given rotation type is a night shift.
 
       iex> ResidencySchedule.Ical.night_shift?("night_float")

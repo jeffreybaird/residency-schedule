@@ -3,6 +3,7 @@ defmodule ResidencyScheduleWeb.AuthController do
 
   alias ResidencySchedule.Accounts
   alias ResidencySchedule.Mailer
+  alias ResidencySchedule.Residents
 
   # ── Login page ───────────────────────────────────────────────────────────
 
@@ -176,14 +177,17 @@ defmodule ResidencyScheduleWeb.AuthController do
   # ── Set/unset home resident ────────────────────────────────────────────────
 
   @doc """
-  Sets the current user's home resident. Persists on the user record.
+  Sets the current user's home resident from the schedule resident page they
+  are viewing. The link is stored against the person, so it follows them into
+  later academic years and survives re-imports.
   """
   def set_home(conn, %{"resident_id" => resident_id}) do
     user_id = get_session(conn, :user_id)
     user = user_id && Accounts.get_user(user_id)
 
     if user do
-      Accounts.set_home_resident(user, String.to_integer(resident_id))
+      schedule_resident = Residents.get_resident!(String.to_integer(resident_id))
+      Accounts.set_home_resident(user, schedule_resident.resident_id)
     end
 
     redirect(conn, to: "/residents/#{resident_id}")

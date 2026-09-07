@@ -251,7 +251,7 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
     test "pre-filters to the user's assigned resident", %{conn: conn, user: user} do
       result = seed_schedule()
       [resident | _] = ResidencySchedule.Residents.list_residents_for_schedule(result.schedule_id)
-      ResidencySchedule.Accounts.set_home_resident(user, resident.id)
+      ResidencySchedule.Accounts.set_home_resident(user, resident.resident_id)
 
       {:ok, _view, html} = live(conn, "/")
       assert html =~ "Residents (1)"
@@ -288,8 +288,9 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
           }
         ])
 
-      # Home is pinned to the 2023 record; the 2026 view must still show them.
-      ResidencySchedule.Accounts.set_home_resident(user, sr_2023.id)
+      # Home is the person, shared by both years; the 2026 view must show them.
+      assert sr_2023.resident_id == sr_2026.resident_id
+      ResidencySchedule.Accounts.set_home_resident(user, sr_2023.resident_id)
 
       {:ok, _view, html} = live(conn, "/?date=2026-07-08&view=day")
       assert html =~ "Briar"
@@ -387,7 +388,7 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
          %{conn: conn, user: user} do
       result = seed_schedule()
       [resident | _] = ResidencySchedule.Residents.list_residents_for_schedule(result.schedule_id)
-      ResidencySchedule.Accounts.set_home_resident(user, resident.id)
+      ResidencySchedule.Accounts.set_home_resident(user, resident.resident_id)
 
       {:ok, view, html} = live(conn, "/calendar?date=2023-07-05")
       assert html =~ "Residents (1)"

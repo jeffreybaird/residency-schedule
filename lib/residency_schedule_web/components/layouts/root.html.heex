@@ -76,19 +76,20 @@
               Assistant
             </a>
           <% end %>
-          <%= if (user = @conn.assigns[:current_user]) && user.home_resident_id do %>
-            <% my_page_path = "/residents/#{user.home_resident_id}" %>
-            <%= if @conn.request_path == my_page_path do %>
-              <span class="px-3 py-1.5 rounded-md text-sm text-green-700 bg-green-50 font-medium">
-                {nav_home_label(user)}
-              </span>
-            <% else %>
-              <a
-                href={my_page_path}
-                class="px-3 py-1.5 rounded-md text-sm text-green-700 hover:bg-green-50 transition-colors"
-              >
-                {nav_home_label(user)}
-              </a>
+          <%= if user = @conn.assigns[:current_user] do %>
+            <%= if my_page_path = nav_home_path(user) do %>
+              <%= if @conn.request_path == my_page_path do %>
+                <span class="px-3 py-1.5 rounded-md text-sm text-green-700 bg-green-50 font-medium">
+                  {nav_home_label(user)}
+                </span>
+              <% else %>
+                <a
+                  href={my_page_path}
+                  class="px-3 py-1.5 rounded-md text-sm text-green-700 hover:bg-green-50 transition-colors"
+                >
+                  {nav_home_label(user)}
+                </a>
+              <% end %>
             <% end %>
           <% end %>
           <%= if ResidencySchedule.Accounts.User.admin?(@conn.assigns[:current_user]) do %>
@@ -157,19 +158,20 @@
                 Assistant
               </a>
             <% end %>
-            <%= if (user = @conn.assigns[:current_user]) && user.home_resident_id do %>
-              <% my_page_path = "/residents/#{user.home_resident_id}" %>
-              <%= if @conn.request_path == my_page_path do %>
-                <span class="block px-4 py-2 text-sm text-green-700 font-medium bg-green-50">
-                  {nav_home_label(user)}
-                </span>
-              <% else %>
-                <a
-                  href={my_page_path}
-                  class="block px-4 py-2 text-sm text-green-700 hover:bg-green-50"
-                >
-                  {nav_home_label(user)}
-                </a>
+            <%= if user = @conn.assigns[:current_user] do %>
+              <%= if my_page_path = nav_home_path(user) do %>
+                <%= if @conn.request_path == my_page_path do %>
+                  <span class="block px-4 py-2 text-sm text-green-700 font-medium bg-green-50">
+                    {nav_home_label(user)}
+                  </span>
+                <% else %>
+                  <a
+                    href={my_page_path}
+                    class="block px-4 py-2 text-sm text-green-700 hover:bg-green-50"
+                  >
+                    {nav_home_label(user)}
+                  </a>
+                <% end %>
               <% end %>
             <% end %>
             <%= if ResidencySchedule.Accounts.User.admin?(@conn.assigns[:current_user]) do %>

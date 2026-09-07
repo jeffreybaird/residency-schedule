@@ -6,7 +6,6 @@ defmodule ResidencySchedule.Residents.ScheduleResident do
     field :position_code, :string
     field :residency_year, :integer
     field :schedule_number, :integer
-    field :calendar_token, :string
 
     # Virtual field populated at query time from the associated Resident.name.
     # All code that previously accessed resident.name continues to work unchanged.
@@ -36,8 +35,7 @@ defmodule ResidencySchedule.Residents.ScheduleResident do
       :schedule_id,
       :position_code,
       :residency_year,
-      :schedule_number,
-      :calendar_token
+      :schedule_number
     ])
     |> validate_required([
       :resident_id,
@@ -48,7 +46,6 @@ defmodule ResidencySchedule.Residents.ScheduleResident do
     ])
     |> unique_constraint([:schedule_id, :position_code])
     |> unique_constraint([:schedule_id, :resident_id])
-    |> unique_constraint(:calendar_token)
   end
 
   @doc """

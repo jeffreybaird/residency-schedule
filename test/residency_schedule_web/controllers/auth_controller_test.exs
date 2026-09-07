@@ -194,7 +194,10 @@ defmodule ResidencyScheduleWeb.AuthControllerTest do
   describe "POST /set-home/:resident_id" do
     setup :authenticate_session
 
-    test "persists home_resident_id on user and redirects", %{conn: conn, user: user} do
+    test "stores the person behind the schedule resident and redirects", %{
+      conn: conn,
+      user: user
+    } do
       seed_schedule()
       resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
 
@@ -202,7 +205,19 @@ defmodule ResidencyScheduleWeb.AuthControllerTest do
       assert redirected_to(conn) == "/residents/#{resident.id}"
 
       updated_user = Accounts.get_user!(user.id)
-      assert updated_user.home_resident_id == resident.id
+      assert updated_user.home_resident_id == resident.resident_id
+    end
+
+    test "does not change the user when no session user exists", %{conn: conn} do
+      seed_schedule()
+      resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> post("/set-home/#{resident.id}")
+
+      assert redirected_to(conn) == "/residents/#{resident.id}"
     end
   end
 
@@ -212,7 +227,7 @@ defmodule ResidencyScheduleWeb.AuthControllerTest do
     test "clears home_resident_id on user and redirects", %{conn: conn, user: user} do
       seed_schedule()
       resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
-      Accounts.set_home_resident(user, resident.id)
+      Accounts.set_home_resident(user, resident.resident_id)
 
       conn = post(conn, "/unset-home", %{"resident_id" => to_string(resident.id)})
       assert redirected_to(conn) == "/residents/#{resident.id}"

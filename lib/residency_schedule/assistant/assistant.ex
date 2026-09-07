@@ -554,8 +554,11 @@ defmodule ResidencySchedule.Assistant do
 
   defp home_summary(nil), do: nil
 
-  defp home_summary(schedule_resident_id) do
-    resident_summary(Residents.get_resident!(schedule_resident_id), nil)
+  defp home_summary(person_id) do
+    case Residents.latest_appearance_for_person(person_id) do
+      nil -> nil
+      appearance -> resident_summary(appearance, appearance.schedule)
+    end
   end
 
   defp segment_summary(segment) do
