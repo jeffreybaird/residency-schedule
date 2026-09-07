@@ -27,10 +27,11 @@ defmodule ResidencySchedule.AssistantTest do
 
   describe "find_resident/2 and whoami/1" do
     test "resolves by first name", %{tiff: tiff} do
-      assert {:ok, %{id: id, position_code: "R3-1", schedule: "2026–2027"}} =
+      assert {:ok, %{person_id: person_id, position_code: "R3-1", schedule: "2026–2027"}} =
                Assistant.find_resident("tiff", "2026-07-10")
 
-      assert id == tiff.id
+      assert person_id == tiff.resident_id
+      refute Map.has_key?(elem(Assistant.find_resident("tiff", "2026-07-10"), 1), :id)
     end
 
     test "reports unknown and ambiguous names" do
@@ -58,9 +59,31 @@ defmodule ResidencySchedule.AssistantTest do
       assert {:error, :invalid_date} = Assistant.find_resident("tiff", "yesterday")
     end
 
+    test "whoami lists the loaded academic years with their dates", ctx do
+      seed_prior_year_for_clare(ctx)
+      assert {:ok, %{schedules: schedules}} = Assistant.whoami(ctx.clare_user)
+
+      assert schedules == [
+               %{
+                 academic_year: 2025,
+                 label: "2025–2026",
+                 start_date: ~D[2025-07-07],
+                 end_date: ~D[2025-07-27]
+               },
+               %{
+                 academic_year: 2026,
+                 label: "2026–2027",
+                 start_date: ~D[2026-07-06],
+                 end_date: ~D[2026-07-26]
+               }
+             ]
+    end
+
     test "whoami describes the home resident", ctx do
-      assert {:ok, %{role: :resident, home_resident: %{name: "Clare"}, today: %Date{}}} =
+      assert {:ok, %{role: :resident, home_resident: %{name: "Clare"} = home, today: %Date{}}} =
                Assistant.whoami(ctx.clare_user)
+
+      assert home.person_id == ctx.clare.resident_id
 
       assert {:ok, %{role: :admin, home_resident: nil}} = Assistant.whoami(ctx.admin)
     end
@@ -72,6 +95,21 @@ defmodule ResidencySchedule.AssistantTest do
       assert result.academic_year == 2026
       assert result.residency_year == nil
       assert Enum.map(result.residents, & &1.position_code) == ["R2-1", "R2-2", "R3-1"]
+    end
+
+    test "reports the person id, shared by every year the person appears in", ctx do
+      seed_prior_year_for_clare(ctx)
+
+      {:ok, %{residents: current}} = Assistant.list_residents(%{academic_year: 2026})
+      {:ok, %{residents: prior}} = Assistant.list_residents(%{academic_year: 2025})
+
+      clare_now = Enum.find(current, &(&1.name == "Clare"))
+      clare_then = Enum.find(prior, &(&1.name == "Clare"))
+
+      assert clare_now.person_id == ctx.clare.resident_id
+      assert clare_then.person_id == clare_now.person_id
+      assert clare_then.position_code != clare_now.position_code
+      refute Map.has_key?(clare_now, :id)
     end
 
     test "filters by residency year, accepting strings", _ctx do
@@ -327,6 +365,76 @@ defmodule ResidencySchedule.AssistantTest do
     test "unknown coworker" do
       assert {:error, {:resident_not_found, "Zed"}} =
                Assistant.shared_shifts("clare", "Zed", "2026-07-06")
+    end
+  end
+
+  describe "shifts_remaining/3 across academic years" do
+    setup ctx, do: seed_prior_year_for_clare(ctx)
+
+    test "counts every year the person appears in, by year", _ctx do
+      assert {:ok, result} = Assistant.shifts_remaining("clare", "2025-07-01")
+      assert result.count == 35
+
+      assert [
+               %{
+                 academic_year: 2025,
+                 schedule: "2025–2026",
+                 residency_year: 1,
+                 position_code: "R1-1",
+                 days: 14
+               },
+               %{
+                 academic_year: 2026,
+                 schedule: "2026–2027",
+                 residency_year: 2,
+                 position_code: "R2-1",
+                 days: 21
+               }
+             ] = result.by_year
+
+      assert Enum.find(result.by_rotation, &(&1.rotation_type == "oncology")).days == 7
+    end
+
+    test "a from date before any schedule still finds the person", _ctx do
+      assert {:ok, %{count: 35, by_year: [_, _]}} =
+               Assistant.shifts_remaining("clare", "2020-01-01")
+    end
+
+    test "the to date bounds the count to the earlier year", _ctx do
+      assert {:ok, %{count: 14, by_year: [%{academic_year: 2025}]}} =
+               Assistant.shifts_remaining("clare", "2025-07-01", "2025-12-31")
+    end
+
+    test "a range inside one year lists only that year", _ctx do
+      assert {:ok, %{count: 21, by_year: [%{academic_year: 2026}]}} =
+               Assistant.shifts_remaining("clare", "2026-07-06")
+    end
+
+    test "residents with one appearance are unaffected", _ctx do
+      assert {:ok, %{count: 21, by_year: [%{academic_year: 2026, days: 21}]}} =
+               Assistant.shifts_remaining("mary", "2026-07-06")
+    end
+  end
+
+  describe "resident_schedule/3 across academic years" do
+    setup ctx, do: seed_prior_year_for_clare(ctx)
+
+    test "returns segments from every year in date order, each naming its schedule", _ctx do
+      assert {:ok, %{segments: segments}} = Assistant.resident_schedule("clare", "2025-07-21")
+
+      assert Enum.map(segments, &{&1.schedule, &1.rotation_type}) == [
+               {"2025–2026", "night_float"},
+               {"2026–2027", "strong_obstetrics"},
+               {"2026–2027", "ambulatory"},
+               {"2026–2027", "night_float"}
+             ]
+    end
+
+    test "a range inside one year returns only that year", _ctx do
+      assert {:ok, %{segments: segments}} =
+               Assistant.resident_schedule("clare", "2026-07-14", "2026-07-21")
+
+      assert Enum.map(segments, & &1.schedule) == ["2026–2027", "2026–2027"]
     end
   end
 

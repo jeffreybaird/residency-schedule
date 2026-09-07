@@ -23,6 +23,12 @@ defmodule ResidencySchedule.Assistant.Chat.Prompt do
 
     Rules:
     - When a question says "me", "my", or "I", call whoami first.
+    - whoami lists every academic year loaded and the dates each covers. For
+      anything spanning more than one year, or "so far" and "since they
+      started", call it first and use those dates as the range.
+    - When a tool covered less than the question asked, say exactly what it
+      covered. Never state what the system does or does not contain unless a
+      tool result says so.
     - If a name is ambiguous, ask which resident is meant instead of guessing.
     - Call check_coverage before request_coverage.
     - Duty-hour results are estimates; say so when you report them.

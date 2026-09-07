@@ -111,6 +111,38 @@ defmodule ResidencySchedule.SchedulesTest do
     end
   end
 
+  describe "list_schedule_ranges/0" do
+    test "reports the first and last rotation dates per schedule, oldest first" do
+      fixtures = ResidencySchedule.ScheduleFixtures.seed_mini_schedule()
+      ResidencySchedule.ScheduleFixtures.seed_prior_year_for_clare(fixtures)
+
+      assert [
+               %{
+                 academic_year: 2025,
+                 label: "2025–2026",
+                 start_date: ~D[2025-07-07],
+                 end_date: ~D[2025-07-27]
+               },
+               %{
+                 academic_year: 2026,
+                 label: "2026–2027",
+                 start_date: ~D[2026-07-06],
+                 end_date: ~D[2026-07-26]
+               }
+             ] = Schedules.list_schedule_ranges()
+    end
+
+    test "a schedule without rotations has nil dates" do
+      {:ok, schedule} = Schedules.upsert_schedule(2030, "2030–2031")
+      assert [%{id: id, start_date: nil, end_date: nil}] = Schedules.list_schedule_ranges()
+      assert id == schedule.id
+    end
+
+    test "is empty with no schedules" do
+      assert Schedules.list_schedule_ranges() == []
+    end
+  end
+
   describe "latest_schedule/0" do
     test "returns nil when no schedules" do
       assert Schedules.latest_schedule() == nil
