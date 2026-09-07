@@ -275,11 +275,7 @@ defmodule ResidencySchedule.ChangeRequests do
       else: {:error, :forbidden}
   end
 
-  defp home_person_id(%User{home_resident_id: nil}), do: nil
-
-  defp home_person_id(%User{home_resident_id: id}) do
-    Repo.one(from(sr in ScheduleResident, where: sr.id == ^id, select: sr.resident_id))
-  end
+  defp home_person_id(%User{home_resident_id: person_id}), do: person_id
 
   defp insert_request(user, rotation, covering, attrs) do
     %ChangeRequest{}

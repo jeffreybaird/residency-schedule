@@ -42,18 +42,101 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       user: user,
       resident: resident
     } do
-      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(user, resident.id)
+      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(user, resident.resident_id)
       conn = get(conn, "/residents/#{resident.id}")
       assert html_response(conn, 200) =~ "My page"
+    end
+
+    test "nav home link points at the person's latest schedule appearance", %{
+      conn: conn,
+      user: user,
+      resident: resident
+    } do
+      {:ok, later} = ResidencySchedule.Schedules.upsert_schedule(2026, "2026–2027")
+
+      {:ok, later_sr} =
+        ResidencySchedule.Residents.insert_resident(later.id, %{
+          position_code: "R4-9",
+          residency_year: 4,
+          schedule_number: 9,
+          name: resident.name
+        })
+
+      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(user, resident.resident_id)
+      conn = get(conn, "/residents/#{resident.id}")
+      assert html_response(conn, 200) =~ ~s(href="/residents/#{later_sr.id}")
+    end
+
+    test "nav hides the home link when the person appears in no schedule", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, person} =
+        %ResidencySchedule.Residents.Resident{}
+        |> ResidencySchedule.Residents.Resident.changeset(%{
+          name: "Nobody Yet",
+          calendar_token: Ecto.UUID.generate()
+        })
+        |> ResidencySchedule.Repo.insert()
+
+      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(user, person.id)
+      conn = get(conn, "/")
+      refute html_response(conn, 200) =~ "My page"
     end
 
     test "shows Home badge when resident is home resident", %{conn: conn, user: user} do
       resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
 
-      ResidencySchedule.Accounts.set_home_resident(user, resident.id)
+      ResidencySchedule.Accounts.set_home_resident(user, resident.resident_id)
 
       {:ok, _view, html} = live(conn, "/residents/#{resident.id}")
       assert html =~ "✓ Home"
+    end
+
+    test "shows Home badge on every academic year of the same person", %{
+      conn: conn,
+      user: user,
+      resident: resident
+    } do
+      {:ok, later} = ResidencySchedule.Schedules.upsert_schedule(2026, "2026–2027")
+
+      {:ok, later_sr} =
+        ResidencySchedule.Residents.insert_resident(later.id, %{
+          position_code: "R4-9",
+          residency_year: 4,
+          schedule_number: 9,
+          name: resident.name
+        })
+
+      ResidencySchedule.Accounts.set_home_resident(user, resident.resident_id)
+
+      {:ok, _view, html} = live(conn, "/residents/#{later_sr.id}")
+      assert html =~ "✓ Home"
+    end
+
+    test "subscribe URL uses the person's token, shared across years", %{
+      conn: conn,
+      resident: resident,
+      html: html
+    } do
+      {:ok, later} = ResidencySchedule.Schedules.upsert_schedule(2026, "2026–2027")
+
+      {:ok, later_sr} =
+        ResidencySchedule.Residents.insert_resident(later.id, %{
+          position_code: "R4-9",
+          residency_year: 4,
+          schedule_number: 9,
+          name: resident.name
+        })
+
+      person =
+        ResidencySchedule.Repo.get!(ResidencySchedule.Residents.Resident, resident.resident_id)
+
+      feed_path = "/feed/#{person.calendar_token}/calendar.ics"
+      assert html =~ feed_path
+
+      {:ok, _view, later_html} = live(conn, "/residents/#{later_sr.id}")
+      assert later_html =~ feed_path
     end
 
     test "filters the rotation table to a selected service", %{view: view, resident: resident} do
@@ -255,7 +338,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       resident: resident,
       follower: follower
     } do
-      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(follower, resident.id)
+      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(follower, resident.resident_id)
       {:ok, _view, html} = live(conn, "/residents/#{resident.id}")
       assert html =~ "✓ Following"
     end
@@ -265,7 +348,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       resident: resident,
       follower: follower
     } do
-      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(follower, resident.id)
+      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(follower, resident.resident_id)
       conn = get(conn, "/residents/#{resident.id}")
       assert html_response(conn, 200) =~ "Following"
       refute html_response(conn, 200) =~ "My page"

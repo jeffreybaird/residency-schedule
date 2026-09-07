@@ -114,13 +114,23 @@ defmodule ResidencySchedule.AccountsTest do
       %{user: user, resident: resident}
     end
 
-    test "set_home_resident/2 persists home_resident_id", %{user: user, resident: resident} do
-      {:ok, updated} = Accounts.set_home_resident(user, resident.id)
-      assert updated.home_resident_id == resident.id
+    test "set_home_resident/2 persists the person id as home_resident_id", %{
+      user: user,
+      resident: resident
+    } do
+      {:ok, updated} = Accounts.set_home_resident(user, resident.resident_id)
+      assert updated.home_resident_id == resident.resident_id
+    end
+
+    test "get_user/1 preloads the home resident as a person", %{user: user, resident: resident} do
+      {:ok, _} = Accounts.set_home_resident(user, resident.resident_id)
+
+      %{home_resident: %ResidencySchedule.Residents.Resident{name: "Briar"}} =
+        Accounts.get_user(user.id)
     end
 
     test "clear_home_resident/1 sets home_resident_id to nil", %{user: user, resident: resident} do
-      {:ok, with_home} = Accounts.set_home_resident(user, resident.id)
+      {:ok, with_home} = Accounts.set_home_resident(user, resident.resident_id)
       {:ok, cleared} = Accounts.clear_home_resident(with_home)
       assert cleared.home_resident_id == nil
     end

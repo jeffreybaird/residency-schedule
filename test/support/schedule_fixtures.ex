@@ -43,7 +43,7 @@ defmodule ResidencySchedule.ScheduleFixtures do
           "#{String.downcase(schedule_resident.name)}-#{System.unique_integer([:positive])}@urmc.rochester.edu"
       })
 
-    {:ok, user} = Accounts.set_home_resident(user, schedule_resident.id)
+    {:ok, user} = Accounts.set_home_resident(user, schedule_resident.resident_id)
     user
   end
 

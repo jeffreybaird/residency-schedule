@@ -240,4 +240,74 @@ defmodule ResidencySchedule.ResidentsTest do
       assert Residents.list_resident_filter_options_for_year(1999) == []
     end
   end
+
+  describe "cross-year identity" do
+    setup %{r4: r4} do
+      {:ok, later} = Schedules.upsert_schedule(2024, "2024–2025")
+
+      {:ok, later_sr} =
+        Residents.insert_resident(later.id, %{
+          position_code: "R4-5",
+          residency_year: 4,
+          schedule_number: 5,
+          name: r4.name
+        })
+
+      %{later: later, later_sr: later_sr}
+    end
+
+    test "insert_resident/2 reuses the person record for the same name", %{
+      r4: r4,
+      later_sr: later_sr
+    } do
+      assert later_sr.resident_id == r4.resident_id
+      assert Repo.aggregate(ResidencySchedule.Residents.Resident, :count) == 2
+    end
+
+    test "list_appearances_for_person/1 returns every year oldest first", %{
+      r4: r4,
+      later_sr: later_sr
+    } do
+      appearances = Residents.list_appearances_for_person(r4.resident_id)
+      assert Enum.map(appearances, & &1.id) == [r4.id, later_sr.id]
+      assert Enum.map(appearances, & &1.schedule.academic_year) == [2023, 2024]
+      assert Enum.all?(appearances, &(&1.name == "Briar"))
+    end
+
+    test "list_appearances_for_person/1 returns an empty list for an unknown person" do
+      assert Residents.list_appearances_for_person(0) == []
+    end
+
+    test "latest_appearance_for_person/1 returns the most recent year", %{
+      r4: r4,
+      later_sr: later_sr
+    } do
+      latest = Residents.latest_appearance_for_person(r4.resident_id)
+      assert latest.id == later_sr.id
+      assert latest.schedule.academic_year == 2024
+      assert latest.name == "Briar"
+    end
+
+    test "latest_appearance_for_person/1 returns nil for a person in no schedule" do
+      assert Residents.latest_appearance_for_person(0) == nil
+    end
+
+    test "list_schedule_resident_ids_for_person/1 returns ids across years", %{
+      r4: r4,
+      later_sr: later_sr
+    } do
+      ids = Residents.list_schedule_resident_ids_for_person(r4.resident_id)
+      assert Enum.sort(ids) == Enum.sort([r4.id, later_sr.id])
+    end
+
+    test "list_schedule_resident_ids_for_person/1 returns an empty list for an unknown person" do
+      assert Residents.list_schedule_resident_ids_for_person(0) == []
+    end
+
+    test "get_resident!/1 preloads the person", %{r4: r4} do
+      loaded = Residents.get_resident!(r4.id)
+      assert loaded.resident.id == r4.resident_id
+      assert loaded.resident.calendar_token != nil
+    end
+  end
 end

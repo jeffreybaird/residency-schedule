@@ -646,6 +646,19 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
+  Effective rotation segments across every schedule appearance of one resident
+  (person), so a feed spans their whole career rather than one academic year.
+  Each element has the same shape as `effective_segments_for_resident/1`.
+
+  Exempt from doctest — hits the database. See `RotationsTest`.
+  """
+  def effective_segments_for_person(person_id) do
+    person_id
+    |> Residents.list_schedule_resident_ids_for_person()
+    |> Enum.flat_map(&effective_segments_for_resident/1)
+  end
+
+  @doc """
   Effective rotation segments for every resident in a schedule, keyed by
   schedule resident id, loaded with three queries instead of three per
   resident. Each value has the same shape as `effective_segments_for_resident/1`.

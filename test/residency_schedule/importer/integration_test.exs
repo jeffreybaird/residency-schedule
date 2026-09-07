@@ -28,6 +28,48 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
       assert first.rotations == second.rotations
     end
 
+    test "re-importing keeps the person record, its token, and users' home link" do
+      csv = File.read!("test/fixtures/sample.csv")
+      {:ok, _, _} = ScheduleImporter.import_csv(csv)
+
+      before = Residents.get_resident!(Residents.get_resident_by_position!("R4-1").id)
+
+      {:ok, user} =
+        ResidencySchedule.Accounts.create_user(%{email: "briar@urmc.rochester.edu"})
+
+      {:ok, _} = ResidencySchedule.Accounts.set_home_resident(user, before.resident_id)
+
+      {:ok, _, _} = ScheduleImporter.import_csv(csv)
+
+      after_import = Residents.get_resident!(Residents.get_resident_by_position!("R4-1").id)
+
+      refute after_import.id == before.id
+      assert after_import.resident_id == before.resident_id
+      assert after_import.resident.calendar_token == before.resident.calendar_token
+      assert ResidencySchedule.Accounts.get_user!(user.id).home_resident_id == before.resident_id
+    end
+
+    test "the same name in two academic years resolves to one person" do
+      {:ok, _, _} = ScheduleImporter.import_csv(File.read!("test/fixtures/sample.csv"))
+
+      {:ok, _, _} =
+        ScheduleImporter.import_csv(File.read!("test/fixtures/schedule_2024_2025.csv"))
+
+      people_by_name =
+        Residents.list_residents()
+        |> Enum.group_by(& &1.name)
+        |> Enum.filter(fn {_name, rows} -> length(rows) > 1 end)
+
+      assert people_by_name == []
+
+      shared =
+        Residents.list_residents()
+        |> Enum.map(&Residents.list_appearances_for_person(&1.id))
+        |> Enum.filter(&(length(&1) > 1))
+
+      assert shared != []
+    end
+
     test "importing a second academic year does not affect the first" do
       csv_2023 = File.read!("test/fixtures/sample.csv")
       csv_2026 = File.read!("test/fixtures/sample_2026.csv")

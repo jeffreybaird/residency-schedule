@@ -49,6 +49,61 @@ defmodule ResidencySchedule.IcalOverridesTest do
     %{sched: sched, isolde: isolde, nora: nora, rotation: clares_rotation}
   end
 
+  describe "build_for_person/1" do
+    test "includes events from every academic year of the person", %{isolde: isolde} do
+      {:ok, later} = Schedules.upsert_schedule(2024, "2024–2025")
+
+      {:ok, later_sr} =
+        Residents.insert_resident(later.id, %{
+          position_code: "R4-2",
+          residency_year: 4,
+          schedule_number: 2,
+          name: "Isolde"
+        })
+
+      {:ok, _} =
+        Rotations.insert_rotations(later_sr.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2024-07-01],
+            end_date: ~D[2024-07-14],
+            rotation_type: :vacation
+          }
+        ])
+
+      person =
+        ResidencySchedule.Repo.get!(ResidencySchedule.Residents.Resident, isolde.resident_id)
+
+      result = Ical.build_for_person(person)
+
+      assert result =~ "X-WR-CALNAME:Isolde"
+      assert result =~ "20230701"
+      assert result =~ "20240701"
+    end
+
+    test "excludes periods covered by someone else", %{
+      isolde: isolde,
+      nora: nora,
+      rotation: rot
+    } do
+      {:ok, _} =
+        ShiftOverrides.create_override(%{
+          rotation_id: rot.id,
+          covering_schedule_resident_id: nora.id,
+          override_start_date: ~D[2023-07-08],
+          override_end_date: ~D[2023-07-14]
+        })
+
+      person =
+        ResidencySchedule.Repo.get!(ResidencySchedule.Residents.Resident, isolde.resident_id)
+
+      result = Ical.build_for_person(person)
+
+      assert result =~ "20230701"
+      refute result =~ "20230710"
+    end
+  end
+
   describe "build/1" do
     test "covered period is excluded from original resident's iCal", %{
       isolde: isolde,

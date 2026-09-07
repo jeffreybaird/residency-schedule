@@ -588,6 +588,58 @@ defmodule ResidencySchedule.RotationsTest do
     end
   end
 
+  describe "effective_segments_for_person/1" do
+    test "concatenates segments across the person's academic years" do
+      {:ok, s2023} = Schedules.upsert_schedule(2023, "2023–2024")
+      {:ok, s2024} = Schedules.upsert_schedule(2024, "2024–2025")
+
+      {:ok, sr_2023} =
+        Residents.insert_resident(s2023.id, %{
+          position_code: "R3-1",
+          residency_year: 3,
+          schedule_number: 1,
+          name: "Career"
+        })
+
+      {:ok, sr_2024} =
+        Residents.insert_resident(s2024.id, %{
+          position_code: "R4-1",
+          residency_year: 4,
+          schedule_number: 1,
+          name: "Career"
+        })
+
+      {:ok, _} =
+        Rotations.insert_rotations(sr_2023.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-01],
+            end_date: ~D[2023-07-14],
+            rotation_type: :night_float
+          }
+        ])
+
+      {:ok, _} =
+        Rotations.insert_rotations(sr_2024.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2024-07-01],
+            end_date: ~D[2024-07-14],
+            rotation_type: :vacation
+          }
+        ])
+
+      segments = Rotations.effective_segments_for_person(sr_2023.resident_id)
+
+      assert Enum.sort(Enum.map(segments, & &1.start_date), Date) ==
+               [~D[2023-07-01], ~D[2024-07-01]]
+    end
+
+    test "returns an empty list for a person in no schedule" do
+      assert Rotations.effective_segments_for_person(0) == []
+    end
+  end
+
   describe "effective_segments_for_schedule/1" do
     test "matches the per-resident builder for every resident", %{schedule: sched} do
       ra = Residents.get_resident_by_position!("R4-1")

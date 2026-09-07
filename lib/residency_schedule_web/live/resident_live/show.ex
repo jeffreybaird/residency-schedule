@@ -16,11 +16,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     resident = Residents.get_resident!(String.to_integer(id))
     today = ResidencyScheduleWeb.ScheduleLive.Index.current_date()
 
-    appearances =
-      case Residents.list_by_canonical_name(resident.name) do
-        [] -> [resident]
-        list -> list
-      end
+    appearances = Residents.list_appearances_for_person(resident.resident_id)
 
     year_history =
       Enum.map(
@@ -54,7 +50,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
        resident: resident,
        year_history: year_history,
        multi_year?: length(year_history) > 1,
-       is_home_resident: home_resident_id == resident.id,
+       is_home_resident: home_resident_id == resident.resident_id,
        schedule_start: schedule_start,
        schedule_end: schedule_end,
        night_shift_counts: night_shift_counts,
@@ -334,7 +330,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             </a>
             <span class="text-gray-300 mx-1">·</span>
             <a
-              href={"/feed/#{@resident.calendar_token}/calendar.ics"}
+              href={"/feed/#{@resident.resident.calendar_token}/calendar.ics"}
               class="text-blue-600 hover:text-blue-800"
               title="Subscribe — paste this URL into Google Calendar's 'Add from URL' to get live updates"
               onclick="navigator.clipboard.writeText(window.location.origin + this.getAttribute('href')); event.preventDefault(); this.textContent = 'Copied!'; setTimeout(() => this.textContent = 'Subscribe URL', 1500);"

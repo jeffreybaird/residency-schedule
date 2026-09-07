@@ -27,10 +27,10 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   end
 
   # Pre-selects the user's assigned (home) resident so the calendar opens on
-  # their own schedule. Filters by the person (resident_id), so navigating into
-  # the next academic year keeps showing them. Users without an assigned
-  # resident see everyone.
-  defp default_resident_filter(%{home_resident: %{resident_id: resident_id}})
+  # their own schedule. The home link is the person, so navigating into the
+  # next academic year keeps showing them. Users without an assigned resident
+  # see everyone.
+  defp default_resident_filter(%{home_resident_id: resident_id})
        when is_integer(resident_id),
        do: [resident_id]
 

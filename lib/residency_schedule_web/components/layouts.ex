@@ -5,6 +5,8 @@ defmodule ResidencyScheduleWeb.Layouts do
   """
   use ResidencyScheduleWeb, :html
 
+  alias ResidencySchedule.Residents
+
   # Embed all files in layouts/* within this module.
   # The default root.html.heex file contains the HTML
   # skeleton of your application, namely HTML headers
@@ -15,6 +17,23 @@ defmodule ResidencyScheduleWeb.Layouts do
   # I follow" (e.g. a partner's schedule) for user-role accounts.
   defp nav_home_label(%{role: :resident}), do: "My page"
   defp nav_home_label(_user), do: "Following"
+
+  @doc """
+  Path of the nav link for the user's home resident: the person's most recent
+  schedule appearance, so the link moves forward each academic year. Returns
+  nil when the user has no home resident or that person appears in no schedule.
+
+      iex> ResidencyScheduleWeb.Layouts.nav_home_path(%ResidencySchedule.Accounts.User{home_resident_id: nil})
+      nil
+  """
+  def nav_home_path(%{home_resident_id: nil}), do: nil
+
+  def nav_home_path(%{home_resident_id: person_id}) do
+    case Residents.latest_appearance_for_person(person_id) do
+      nil -> nil
+      appearance -> "/residents/#{appearance.id}"
+    end
+  end
 
   @doc """
   Renders a red banner warning that the visible schedule is synthetic.

@@ -83,8 +83,9 @@ defmodule ResidencySchedule.Residents do
   end
 
   @doc """
-  Gets a single schedule resident by id. Preloads rotations ordered by start_date and
-  the schedule association. The virtual name field is populated from the associated Resident.
+  Gets a single schedule resident by id. Preloads rotations ordered by start_date,
+  the schedule association, and the resident (person) association. The virtual
+  name field is populated from the associated Resident.
   Raises if not found. Exempt from doctest — hits the database.
   """
   def get_resident!(id) do
@@ -94,7 +95,7 @@ defmodule ResidencySchedule.Residents do
       join: r in assoc(sr, :resident),
       where: sr.id == ^id,
       preload: [rotations: ^rotations_query, schedule: []],
-      select: %{sr | name: r.name}
+      select: %{sr | name: r.name, resident: r}
     )
     |> Repo.one!()
   end
@@ -113,25 +114,46 @@ defmodule ResidencySchedule.Residents do
   end
 
   @doc """
-  Returns all schedule appearances for a resident with the given canonical name,
-  ordered by academic year ascending. Each result includes the schedule preloaded.
-  Exempt from doctest — hits the database.
+  Returns every schedule appearance of one resident (person), ordered by
+  academic year ascending. Each result includes the schedule preloaded and the
+  virtual name field populated.
+  Exempt from doctest — hits the database. See `ResidentsTest`.
   """
-  def list_by_canonical_name(canonical_name) do
-    from(sr in ScheduleResident,
-      join: r in assoc(sr, :resident),
-      join: s in assoc(sr, :schedule),
-      where: r.name == ^canonical_name,
-      order_by: [asc: s.academic_year],
-      preload: [:schedule],
-      select: %{sr | name: r.name}
-    )
+  def list_appearances_for_person(person_id) do
+    person_id
+    |> appearances_query()
+    |> order_by([sr, r, s], asc: s.academic_year)
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns the resident's (person's) most recent schedule appearance, with the
+  schedule preloaded and the virtual name field populated, or nil when the
+  person appears in no schedule.
+  Exempt from doctest — hits the database. See `ResidentsTest`.
+  """
+  def latest_appearance_for_person(person_id) do
+    person_id
+    |> appearances_query()
+    |> order_by([sr, r, s], desc: s.academic_year)
+    |> limit(1)
+    |> Repo.one()
+  end
+
+  @doc """
+  Returns the ids of every schedule appearance of one resident (person).
+  Exempt from doctest — hits the database. See `ResidentsTest`.
+  """
+  def list_schedule_resident_ids_for_person(person_id) do
+    from(sr in ScheduleResident, where: sr.resident_id == ^person_id, select: sr.id)
     |> Repo.all()
   end
 
   @doc """
   Finds or creates a Resident (person) by name, then inserts a ScheduleResident
-  for the given schedule. Automatically assigns a unique calendar_token.
+  for the given schedule. A newly created person is assigned a unique
+  calendar_token; an existing person keeps theirs, so the same name across
+  academic years resolves to one record.
   Returns `{:ok, schedule_resident}` or `{:error, changeset}`.
   Exempt from doctest — hits the database.
   """
@@ -145,8 +167,7 @@ defmodule ResidencySchedule.Residents do
              schedule_id: schedule_id,
              position_code: Map.get(attrs, :position_code),
              residency_year: Map.get(attrs, :residency_year),
-             schedule_number: Map.get(attrs, :schedule_number),
-             calendar_token: Ecto.UUID.generate()
+             schedule_number: Map.get(attrs, :schedule_number)
            })
            |> Repo.insert() do
         {:ok, sr} -> {:ok, %{sr | name: person.name}}
@@ -156,20 +177,11 @@ defmodule ResidencySchedule.Residents do
   end
 
   @doc """
-  Gets a schedule resident by their unique calendar token. Preloads rotations ordered by start_date.
-  The virtual name field is populated from the associated Resident. Raises if not found.
-  Exempt from doctest — hits the database.
+  Gets a resident (person) by their unique calendar token. Raises if not found.
+  Exempt from doctest — hits the database. See `CalendarTokenTest`.
   """
-  def get_resident_by_token!(token) do
-    rotations_query = from(r in ResidencySchedule.Rotations.Rotation, order_by: r.start_date)
-
-    from(sr in ScheduleResident,
-      join: r in assoc(sr, :resident),
-      where: sr.calendar_token == ^token,
-      preload: [rotations: ^rotations_query],
-      select: %{sr | name: r.name}
-    )
-    |> Repo.one!()
+  def get_person_by_token!(token) do
+    Repo.get_by!(Resident, calendar_token: token)
   end
 
   @doc """
@@ -194,21 +206,28 @@ defmodule ResidencySchedule.Residents do
     |> Repo.delete_all()
   end
 
-  defp find_or_create_person(nil) do
-    %Resident{}
-    |> Resident.changeset(%{name: nil})
-    |> Repo.insert()
+  defp appearances_query(person_id) do
+    from(sr in ScheduleResident,
+      join: r in assoc(sr, :resident),
+      join: s in assoc(sr, :schedule),
+      where: sr.resident_id == ^person_id,
+      preload: [schedule: s],
+      select: %{sr | name: r.name}
+    )
   end
+
+  defp find_or_create_person(nil), do: create_person(nil)
 
   defp find_or_create_person(name) do
     case Repo.get_by(Resident, name: name) do
-      nil ->
-        %Resident{}
-        |> Resident.changeset(%{name: name})
-        |> Repo.insert()
-
-      person ->
-        {:ok, person}
+      nil -> create_person(name)
+      person -> {:ok, person}
     end
+  end
+
+  defp create_person(name) do
+    %Resident{}
+    |> Resident.changeset(%{name: name, calendar_token: Ecto.UUID.generate()})
+    |> Repo.insert()
   end
 end

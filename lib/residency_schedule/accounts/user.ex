@@ -10,7 +10,7 @@ defmodule ResidencySchedule.Accounts.User do
     field :denied, :boolean, default: false
     field :tour_completed, :boolean, default: false
 
-    belongs_to :home_resident, ResidencySchedule.Residents.ScheduleResident
+    belongs_to :home_resident, ResidencySchedule.Residents.Resident
 
     timestamps(type: :utc_datetime)
   end
