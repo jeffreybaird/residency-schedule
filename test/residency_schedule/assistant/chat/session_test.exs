@@ -200,6 +200,10 @@ defmodule ResidencySchedule.Assistant.Chat.SessionTest do
       ref = Process.monitor(pid)
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1_000
       assert Session.whereis(user) == nil
+
+      assert %{entries: []} = Session.state(user)
+      assert is_pid(Session.whereis(user))
+      assert Session.whereis(user) != pid
     end
 
     test "a busy session does not time out", %{user: user} do

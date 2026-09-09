@@ -228,7 +228,13 @@ defmodule ResidencySchedule.Assistant.Chat.Session do
     state |> finish_turn({:error, :crashed, state.conversation}) |> noreply()
   end
 
-  def handle_info(:timeout, %{task: nil} = state), do: {:stop, :normal, state}
+  # Leaving the registry before stopping means a request that arrives as the
+  # session goes idle starts a fresh one instead of reaching a dead pid.
+  def handle_info(:timeout, %{task: nil, user: user} = state) do
+    Registry.unregister(@registry, user.id)
+    {:stop, :normal, state}
+  end
+
   def handle_info(_other, state), do: noreply(state)
 
   # ── Turns ─────────────────────────────────────────────────────────────────
