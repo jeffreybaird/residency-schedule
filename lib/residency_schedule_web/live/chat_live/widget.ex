@@ -1,43 +1,35 @@
 defmodule ResidencyScheduleWeb.ChatLive.Widget do
   @moduledoc """
   The chat assistant, rendered by the `:site` live layout as a launcher button
-  in the bottom-right corner that opens a floating panel. Each turn runs in a
-  task so the socket keeps rendering text as it streams; tool calls that
-  change data pause for the user's approval before they run.
+  in the bottom-right corner that opens a floating panel.
 
-  The layout renders it sticky, so live navigation between signed-in pages
-  keeps the widget and its conversation; a full page load starts a fresh one.
+  The conversation itself lives in `Chat.Session`, one process per user on
+  the server. The widget subscribes to it, renders whatever it broadcasts,
+  and forwards the user's messages and approvals to it. That is what lets a
+  reload, a second tab, or a closed panel mid-reply pick up where the chat
+  was; only whether the panel is open belongs to this page.
+
+  The layout renders it sticky, so live navigation keeps the widget itself.
   Chat being off renders nothing.
   """
   use ResidencyScheduleWeb, :live_view
 
   on_mount {ResidencyScheduleWeb.UserAuth, :ensure_authenticated}
 
-  require Logger
-
   alias ResidencySchedule.Assistant.Chat
-  alias ResidencySchedule.Assistant.Chat.{Conversation, Markdown, Quota, ToolCall, ToolResult}
-  alias ResidencySchedule.Assistant.LocalDate
-  alias ResidencyScheduleWeb.MCP.Toolbox
+  alias ResidencySchedule.Assistant.Chat.{Markdown, Session, ToolResult}
 
   @impl true
   def mount(_params, _session, socket) do
     user = socket.assigns.current_user
-    today = LocalDate.today()
+    enabled = Chat.enabled?()
+
+    if enabled and connected?(socket), do: Session.subscribe(user)
 
     {:ok,
-     assign(socket,
-       enabled: Chat.enabled?(),
-       open: false,
-       conversation: Conversation.new(toolbox: Toolbox, user: user),
-       entries: [],
-       next_id: 1,
-       busy: false,
-       pending: [],
-       remaining: remaining(user, today),
-       today: today,
-       error: nil
-     )}
+     socket
+     |> assign(enabled: enabled, open: false)
+     |> assign_session(if enabled, do: Session.state(user), else: idle_view())}
   end
 
   # ── Events ─────────────────────────────────────────────────────────────────
@@ -47,169 +39,49 @@ defmodule ResidencyScheduleWeb.ChatLive.Widget do
   def handle_event("close", _params, socket), do: {:noreply, assign(socket, open: false)}
 
   def handle_event("send", %{"message" => text}, socket) do
-    text = String.trim(text)
-
-    if text == "" or not accepting?(socket),
-      do: {:noreply, socket},
-      else: {:noreply, start_turn(socket, text)}
+    if socket.assigns.enabled, do: Session.send(socket.assigns.current_user, text)
+    {:noreply, socket}
   end
 
   def handle_event("approve", _params, socket) do
-    {:noreply, decide(socket, &Conversation.approve/2)}
+    Session.approve(socket.assigns.current_user)
+    {:noreply, socket}
   end
 
   def handle_event("deny", _params, socket) do
-    {:noreply, decide(socket, &Conversation.deny/2)}
+    Session.deny(socket.assigns.current_user)
+    {:noreply, socket}
   end
 
   def handle_event("reset", _params, socket) do
-    {:noreply,
-     assign(socket,
-       conversation: Conversation.new(toolbox: Toolbox, user: socket.assigns.current_user),
-       entries: [],
-       pending: [],
-       error: nil
-     )}
+    Session.reset(socket.assigns.current_user)
+    {:noreply, socket}
   end
 
-  # ── Streaming events from the turn task ────────────────────────────────────
+  # ── Session broadcasts ─────────────────────────────────────────────────────
 
   @impl true
-  def handle_info({:chat_event, {:text_delta, text}}, socket) do
-    {:noreply, append_text(socket, text)}
-  end
+  def handle_info({:chat_session, view}, socket), do: {:noreply, assign_session(socket, view)}
 
-  def handle_info({:chat_event, {:tool_call, %ToolCall{} = call}}, socket) do
-    {:noreply, add_entry(socket, %{kind: :tool, call: call, result: nil})}
-  end
-
-  def handle_info(
-        {:chat_event, {:tool_result, %ToolCall{} = call, %ToolResult{} = result}},
-        socket
-      ) do
-    {:noreply, update_entries(socket, &finish_tool(&1, call.id, result))}
-  end
-
-  def handle_info({:chat_event, {:approval_required, calls}}, socket) do
-    {:noreply, assign(socket, pending: calls)}
-  end
-
-  def handle_info({:chat_event, _other}, socket), do: {:noreply, socket}
-
-  @impl true
-  def handle_async(:turn, {:ok, {:ok, conversation}}, socket) do
-    {:noreply, finish_turn(socket, conversation, nil)}
-  end
-
-  def handle_async(:turn, {:ok, {:error, reason, conversation}}, socket) do
-    {:noreply, finish_turn(socket, conversation, describe_error(reason))}
-  end
-
-  def handle_async(:turn, {:exit, reason}, socket) do
-    Logger.error("chat turn crashed: " <> Exception.format_exit(reason))
-
-    {:noreply,
-     finish_turn(
-       socket,
-       socket.assigns.conversation,
-       "The assistant stopped unexpectedly. The error has been logged."
-     )}
-  end
-
-  # ── Turn lifecycle ─────────────────────────────────────────────────────────
-
-  defp accepting?(%{assigns: assigns}) do
-    assigns.enabled and not assigns.busy and assigns.pending == []
-  end
-
-  defp start_turn(socket, text) do
-    case Quota.consume(socket.assigns.current_user, socket.assigns.today) do
-      {:ok, remaining} ->
-        socket
-        |> assign(remaining: remaining, error: nil)
-        |> add_entry(%{kind: :user, text: text})
-        |> run_turn(&Conversation.send(&1, text, &2))
-
-      {:error, :limit_reached} ->
-        assign(socket, remaining: 0, error: limit_message())
-    end
-  end
-
-  defp decide(socket, decision) do
-    if socket.assigns.pending == [] or socket.assigns.busy do
-      socket
-    else
-      socket
-      |> assign(pending: [], error: nil)
-      |> run_turn(decision)
-    end
-  end
-
-  defp run_turn(socket, turn) do
-    conversation = socket.assigns.conversation
-    on_event = event_forwarder(self())
-
-    socket
-    |> assign(busy: true)
-    |> start_async(:turn, fn -> turn.(conversation, on_event) end)
-  end
-
-  defp event_forwarder(pid), do: fn event -> send(pid, {:chat_event, event}) end
-
-  defp finish_turn(socket, conversation, error) do
-    socket
-    |> assign(
-      conversation: conversation,
-      busy: false,
-      pending: conversation.pending,
-      error: error
+  defp assign_session(socket, view) do
+    assign(socket,
+      entries: view.entries,
+      busy: view.busy,
+      pending: view.pending,
+      remaining: view.remaining,
+      error: view.error && describe_error(view.error)
     )
-    |> update_entries(&reject_empty_text/1)
   end
 
-  # ── Entries ────────────────────────────────────────────────────────────────
-
-  defp add_entry(socket, entry) do
-    id = socket.assigns.next_id
-
-    socket
-    |> update(:entries, &(&1 ++ [Map.put(entry, :id, id)]))
-    |> assign(next_id: id + 1)
-  end
-
-  defp update_entries(socket, fun), do: update(socket, :entries, fun)
-
-  defp append_text(socket, text) do
-    case List.last(socket.assigns.entries) do
-      %{kind: :assistant} ->
-        update_entries(
-          socket,
-          &List.update_at(&1, -1, fn entry -> %{entry | text: entry.text <> text} end)
-        )
-
-      _other ->
-        add_entry(socket, %{kind: :assistant, text: text})
-    end
-  end
-
-  defp finish_tool(entries, call_id, result) do
-    Enum.map(entries, fn
-      %{kind: :tool, call: %ToolCall{id: ^call_id}} = entry -> %{entry | result: result}
-      entry -> entry
-    end)
-  end
-
-  defp reject_empty_text(entries) do
-    Enum.reject(entries, &match?(%{kind: :assistant, text: ""}, &1))
-  end
+  defp idle_view, do: %{entries: [], busy: false, pending: [], remaining: 0, error: nil}
 
   # ── Presentation ───────────────────────────────────────────────────────────
 
-  defp remaining(%{id: nil}, _today), do: 0
-  defp remaining(user, today), do: Quota.remaining(user, today)
-
-  defp limit_message,
+  defp describe_error(:limit_reached),
     do: "You have used today's #{Chat.daily_limit()} messages. Try again tomorrow."
+
+  defp describe_error(:crashed),
+    do: "The assistant stopped unexpectedly. The error has been logged."
 
   defp describe_error(:max_tool_rounds),
     do: "The assistant used too many tools for one message. Try a narrower question."

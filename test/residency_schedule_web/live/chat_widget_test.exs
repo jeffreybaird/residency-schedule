@@ -3,13 +3,22 @@ defmodule ResidencyScheduleWeb.ChatWidgetTest do
   import Phoenix.LiveViewTest
 
   alias ResidencySchedule.Assistant.Chat
-  alias ResidencySchedule.Assistant.Chat.{Providers.Fake, Quota, ToolCall}
+  alias ResidencySchedule.Assistant.Chat.{Providers.Fake, Quota, Session, ToolCall}
   alias ResidencySchedule.Assistant.LocalDate
   alias ResidencyScheduleWeb.ChatLive.Widget
 
   doctest Widget
 
   setup :authenticate_session
+
+  setup %{user: user} do
+    on_exit(fn ->
+      case Session.whereis(user) do
+        nil -> :ok
+        pid -> GenServer.stop(pid)
+      end
+    end)
+  end
 
   # Mounts the widget on its own and opens the panel, as a user would by
   # clicking the launcher.
@@ -21,7 +30,20 @@ defmodule ResidencyScheduleWeb.ChatWidgetTest do
 
   defp send_message(view, text) do
     view |> form("#chat-form", %{"message" => text}) |> render_submit()
-    render_async(view)
+    await_idle(view)
+  end
+
+  # The turn runs in the user's session process and reaches the widget as
+  # broadcasts, so wait until the widget stops showing it as working.
+  defp await_idle(view, tries \\ 300) do
+    html = render(view)
+
+    if html =~ ~s(id="chat-thinking") and tries > 0 do
+      Process.sleep(10)
+      await_idle(view, tries - 1)
+    else
+      html
+    end
   end
 
   describe "placement in the layout" do
@@ -100,6 +122,52 @@ defmodule ResidencyScheduleWeb.ChatWidgetTest do
 
       view |> element("#chat-launcher") |> render_click()
       assert has_element?(view, "[data-kind=assistant]", "Nora is on onc.")
+    end
+  end
+
+  describe "the conversation lives on the server" do
+    test "a reloaded page shows the same conversation", %{conn: conn} do
+      Fake.script([{:text, "Nora is on onc."}])
+      first = open_widget(conn)
+      send_message(first, "Who is on onc?")
+
+      reloaded = open_widget(conn)
+      assert has_element?(reloaded, "[data-kind=user]", "Who is on onc?")
+      assert has_element?(reloaded, "[data-kind=assistant]", "Nora is on onc.")
+      assert has_element?(reloaded, "#chat-remaining", "49 messages left")
+    end
+
+    test "a second tab follows along", %{conn: conn} do
+      Fake.script([{:text, "Hello."}])
+      first = open_widget(conn)
+      second = open_widget(conn)
+
+      send_message(first, "Hi")
+      await_idle(second)
+      assert has_element?(second, "[data-kind=assistant]", "Hello.")
+
+      first |> element("button", "New chat") |> render_click()
+      render(second)
+      refute has_element?(second, "[data-kind=user]")
+    end
+
+    test "the reply arrives even when the widget that asked is gone", %{conn: conn, user: user} do
+      Fake.script([
+        fn _request ->
+          Process.sleep(150)
+          {:text, "Still here."}
+        end
+      ])
+
+      first = open_widget(conn)
+      first |> form("#chat-form", %{"message" => "Hi"}) |> render_submit()
+      GenServer.stop(first.pid)
+
+      Session.subscribe(user)
+      assert_receive {:chat_session, %{busy: false}}, 2_000
+
+      later = open_widget(conn)
+      assert has_element?(later, "[data-kind=assistant]", "Still here.")
     end
   end
 
@@ -227,7 +295,7 @@ defmodule ResidencyScheduleWeb.ChatWidgetTest do
       assert has_element?(view, "#chat-form input[disabled]")
 
       view |> element("#chat-approval button", "Approve") |> render_click()
-      render_async(view)
+      await_idle(view)
       refute has_element?(view, "#chat-approval")
       assert has_element?(view, "[data-kind=tool][data-status=error]", "Request coverage failed")
       assert has_element?(view, "[data-kind=assistant]", "Filed.")
@@ -245,7 +313,7 @@ defmodule ResidencyScheduleWeb.ChatWidgetTest do
 
       send_message(view, "Cancel my request")
       view |> element("#chat-approval button", "Deny") |> render_click()
-      render_async(view)
+      await_idle(view)
 
       assert has_element?(
                view,

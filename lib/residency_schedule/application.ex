@@ -5,19 +5,23 @@ defmodule ResidencySchedule.Application do
 
   use Application
 
+  alias ResidencySchedule.Assistant.Chat.Session
+
   @impl true
   def start(_type, _args) do
-    children = [
-      ResidencyScheduleWeb.Telemetry,
-      ResidencySchedule.Repo,
-      {DNSCluster,
-       query: Application.get_env(:residency_schedule, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: ResidencySchedule.PubSub},
-      # Start a worker by calling: ResidencySchedule.Worker.start_link(arg)
-      # {ResidencySchedule.Worker, arg},
-      # Start to serve requests, typically the last entry
-      ResidencyScheduleWeb.Endpoint
-    ]
+    children =
+      [
+        ResidencyScheduleWeb.Telemetry,
+        ResidencySchedule.Repo,
+        {DNSCluster,
+         query: Application.get_env(:residency_schedule, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: ResidencySchedule.PubSub}
+      ] ++
+        Session.children() ++
+        [
+          # Start to serve requests, typically the last entry
+          ResidencyScheduleWeb.Endpoint
+        ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

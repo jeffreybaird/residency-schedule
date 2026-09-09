@@ -23,7 +23,9 @@ config :residency_schedule, :chat,
   model: "claude-sonnet-5",
   effort: "low",
   max_tokens: 16_000,
-  daily_message_limit: 50
+  daily_message_limit: 50,
+  # An idle server-side chat session is dropped after this long.
+  session_idle_ms: :timer.hours(2)
 
 # Configure the endpoint
 config :residency_schedule, ResidencyScheduleWeb.Endpoint,
