@@ -126,6 +126,26 @@ defmodule ResidencyScheduleWeb.ChatWidgetTest do
       refute has_element?(view, "[data-kind=assistant] b")
     end
 
+    test "renders bubbles with tight, industry-standard padding", %{conn: conn} do
+      Fake.script([{:text, "Nora is on onc."}])
+      view = open_widget(conn)
+
+      html = send_message(view, "Who is on onc?")
+      assert html =~ ~s(bg-blue-600 px-3 py-2)
+      assert html =~ ~s(bg-gray-100 px-3 py-2)
+    end
+
+    # A whitespace-pre-wrap bubble renders any template indentation around the
+    # interpolation as visible blank lines and leading spaces, which reads as
+    # oversized padding. The text must sit flush against the bubble edges.
+    test "the user bubble has no whitespace padding its text", %{conn: conn} do
+      Fake.script([{:text, "Sure."}])
+      view = open_widget(conn)
+
+      html = send_message(view, "Who is on onc?")
+      assert html =~ ~s(whitespace-pre-wrap">Who is on onc?</p>)
+    end
+
     test "ignores blank messages", %{conn: conn} do
       view = open_widget(conn)
       send_message(view, "   ")
