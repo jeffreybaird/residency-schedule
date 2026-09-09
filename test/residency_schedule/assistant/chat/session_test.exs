@@ -5,7 +5,17 @@ defmodule ResidencySchedule.Assistant.Chat.SessionTest do
 
   alias ResidencySchedule.Accounts
   alias ResidencySchedule.Assistant.Chat
-  alias ResidencySchedule.Assistant.Chat.{Providers.Fake, Quota, Session, ToolCall}
+
+  alias ResidencySchedule.Assistant.Chat.{
+    Providers.Fake,
+    Quota,
+    SavedSession,
+    Session,
+    Store,
+    ToolCall
+  }
+
+  alias ResidencyScheduleWeb.MCP.Toolbox
   alias ResidencySchedule.Assistant.LocalDate
 
   doctest Session
@@ -190,7 +200,56 @@ defmodule ResidencySchedule.Assistant.Chat.SessionTest do
       assert_receive {:chat_session, %{entries: [], error: nil, remaining: remaining}}
       assert remaining == Chat.daily_limit() - 1
     end
+
+    test "drops the saved chat too", %{user: user} do
+      Fake.script([{:text, "Hello."}])
+      :ok = Session.send(user, "Hi")
+      await_idle()
+      assert {:ok, _, _} = Store.load(user, base(user))
+
+      :ok = Session.reset(user)
+      assert Store.load(user, base(user)) == :none
+    end
   end
+
+  describe "the saved chat" do
+    test "comes back after the session process is gone and the model sees it", %{user: user} do
+      Fake.script([{:text, "Nora is on onc."}])
+      :ok = Session.send(user, "Who is on onc?")
+      await_idle()
+      stop_session(user)
+
+      assert %{entries: [%{text: "Who is on onc?"}, %{text: "Nora is on onc."}]} =
+               Session.state(user)
+
+      Fake.script([fn request -> {:text, "Seen #{length(request.messages)} messages."} end])
+      :ok = Session.send(user, "And tomorrow?")
+      assert %{entries: entries} = await_idle()
+      assert %{text: "Seen 3 messages."} = List.last(entries)
+    end
+
+    test "is written after every turn, pending approval included", %{user: user} do
+      seed_schedule(2026)
+      call = ToolCall.new("toolu_1", "request_coverage", %{"covering" => "Nora"})
+      Fake.script([{:tool_calls, nil, [call]}])
+
+      :ok = Session.send(user, "Cover me")
+      await_idle()
+      stop_session(user)
+
+      assert %{pending: [^call]} = Session.state(user)
+    end
+
+    test "an unreadable record starts fresh with a warning", %{user: user} do
+      Repo.insert!(%SavedSession{user_id: user.id, data: %{"version" => 99}})
+
+      log = ExUnit.CaptureLog.capture_log(fn -> assert %{entries: []} = Session.state(user) end)
+      assert log =~ "could not be read"
+    end
+  end
+
+  defp base(user),
+    do: ResidencySchedule.Assistant.Chat.Conversation.new(toolbox: Toolbox, user: user)
 
   describe "lifetime" do
     test "an idle session stops after the configured time", %{user: user} do

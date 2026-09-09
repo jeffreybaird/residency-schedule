@@ -151,6 +151,16 @@ defmodule ResidencyScheduleWeb.ChatWidgetTest do
       refute has_element?(second, "[data-kind=user]")
     end
 
+    test "the conversation is there after the session itself is gone", %{conn: conn, user: user} do
+      Fake.script([{:text, "Nora is on onc."}])
+      before = open_widget(conn)
+      send_message(before, "Who is on onc?")
+      GenServer.stop(Session.whereis(user))
+
+      after_restart = open_widget(conn)
+      assert has_element?(after_restart, "[data-kind=assistant]", "Nora is on onc.")
+    end
+
     test "the reply arrives even when the widget that asked is gone", %{conn: conn, user: user} do
       Fake.script([
         fn _request ->

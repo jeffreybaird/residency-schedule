@@ -10,9 +10,10 @@ defmodule ResidencySchedule.Assistant.Chat.Session do
   tab, a reloaded page) subscribes to the same session and renders the same
   state.
 
-  Nothing is written to the database. A restart of the application drops
-  every session, and an idle one is dropped after `:session_idle_ms` from the
-  `:chat` config.
+  The chat itself is saved through `Store` after every turn and loaded when
+  a session starts, so it comes back after a restart or after an idle session
+  is dropped (`:session_idle_ms` in the `:chat` config). Only the process is
+  temporary; the record stays until the user starts a new chat.
 
   Callers pass their `$callers` chain along with each request so the daily
   quota and tool runs inside the session can reach the caller's database
@@ -24,7 +25,7 @@ defmodule ResidencySchedule.Assistant.Chat.Session do
   require Logger
 
   alias ResidencySchedule.Accounts.User
-  alias ResidencySchedule.Assistant.Chat.{Conversation, Quota, Transcript}
+  alias ResidencySchedule.Assistant.Chat.{Conversation, Quota, Store, Transcript}
   alias ResidencySchedule.Assistant.LocalDate
   alias ResidencyScheduleWeb.MCP.Toolbox
 
@@ -125,7 +126,8 @@ defmodule ResidencySchedule.Assistant.Chat.Session do
   def deny(%User{} = user), do: call(user, {:decide, &Conversation.deny/2, callers()})
 
   @doc """
-  Starts a fresh conversation, keeping the session and its quota count.
+  Starts a fresh conversation and drops the saved one, keeping the session
+  and its quota count.
 
   Exempt from doctest — changes a process. See `SessionTest`.
   """
@@ -160,12 +162,12 @@ defmodule ResidencySchedule.Assistant.Chat.Session do
 
   @impl true
   def init(%User{} = user) do
-    {:ok, fresh(%{user: user, remaining: nil, task: nil}), idle_ms()}
+    {:ok, fresh(%{user: user, remaining: nil, task: nil, loaded: false}), idle_ms()}
   end
 
   @impl true
   def handle_call({:state, callers}, _from, state) do
-    state = state |> adopt_callers(callers) |> ensure_remaining()
+    state = state |> adopt_callers(callers) |> ensure_loaded() |> ensure_remaining()
     reply(state, view(state))
   end
 
@@ -175,7 +177,7 @@ defmodule ResidencySchedule.Assistant.Chat.Session do
   def handle_call({:send, "", _callers}, _from, state), do: reply(state, {:error, :empty})
 
   def handle_call({:send, text, callers}, _from, state) do
-    state = adopt_callers(state, callers)
+    state = state |> adopt_callers(callers) |> ensure_loaded()
 
     case Quota.consume(state.user, LocalDate.today()) do
       {:ok, remaining} ->
@@ -203,6 +205,7 @@ defmodule ResidencySchedule.Assistant.Chat.Session do
   def handle_call({:decide, decision, callers}, _from, state) do
     state
     |> adopt_callers(callers)
+    |> ensure_loaded()
     |> Map.put(:error, nil)
     |> run_turn(decision)
     |> reply(:ok)
@@ -211,7 +214,10 @@ defmodule ResidencySchedule.Assistant.Chat.Session do
   def handle_call(:reset, _from, %{task: task} = state) when not is_nil(task),
     do: reply(state, {:error, :busy})
 
-  def handle_call(:reset, _from, state), do: state |> fresh() |> broadcast() |> reply(:ok)
+  def handle_call(:reset, _from, state) do
+    Store.clear(state.user)
+    state |> fresh() |> Map.put(:loaded, true) |> broadcast() |> reply(:ok)
+  end
 
   @impl true
   def handle_info({:chat_event, event}, state) do
@@ -256,7 +262,37 @@ defmodule ResidencySchedule.Assistant.Chat.Session do
     state
     |> Map.merge(%{conversation: conversation, task: nil, error: error})
     |> update_transcript(&Transcript.drop_empty/1)
+    |> save()
     |> broadcast()
+  end
+
+  # ── Storage ───────────────────────────────────────────────────────────────
+
+  defp save(%{user: user, conversation: conversation, transcript: transcript} = state) do
+    case Store.save(user, conversation, transcript) do
+      :ok -> :ok
+      {:error, changeset} -> Logger.error("chat session not saved: " <> inspect(changeset.errors))
+    end
+
+    state
+  end
+
+  # Loading waits for the first request rather than happening in init, so
+  # it runs with the caller's chain and the record is read only when wanted.
+  defp ensure_loaded(%{loaded: true} = state), do: state
+
+  defp ensure_loaded(%{user: user, conversation: base} = state) do
+    case Store.load(user, base) do
+      {:ok, conversation, transcript} ->
+        %{state | conversation: conversation, transcript: transcript, loaded: true}
+
+      :none ->
+        %{state | loaded: true}
+
+      {:error, :unreadable} ->
+        Logger.warning("chat session for user #{user.id} could not be read; starting fresh")
+        %{state | loaded: true}
+    end
   end
 
   # ── State ─────────────────────────────────────────────────────────────────
