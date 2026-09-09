@@ -380,9 +380,7 @@ defmodule ResidencyScheduleWeb.ChatLive.Widget do
   defp entry(%{entry: %{kind: :user}} = assigns) do
     ~H"""
     <div id={"entry-#{@entry.id}"} data-kind="user" class="flex justify-end">
-      <p class="max-w-[85%] rounded-2xl bg-blue-600 text-white px-4 py-2 text-sm whitespace-pre-wrap">
-        {@entry.text}
-      </p>
+      <p class="max-w-[85%] rounded-2xl bg-blue-600 px-3 py-2 text-sm text-white whitespace-pre-wrap">{@entry.text}</p>
     </div>
     """
   end
@@ -390,7 +388,7 @@ defmodule ResidencyScheduleWeb.ChatLive.Widget do
   defp entry(%{entry: %{kind: :assistant}} = assigns) do
     ~H"""
     <div id={"entry-#{@entry.id}"} data-kind="assistant" class="flex justify-start">
-      <div class="chat-markdown max-w-[85%] rounded-2xl bg-gray-100 text-gray-800 px-4 py-2 text-sm">
+      <div class="chat-markdown max-w-[85%] rounded-2xl bg-gray-100 px-3 py-2 text-sm text-gray-800">
         {Markdown.to_html(@entry.text)}
       </div>
     </div>
