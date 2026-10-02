@@ -9,6 +9,20 @@ defmodule ResidencyScheduleWeb.EditLive.Index do
 
   @assignment_fields [:rotation_type, :start_date, :end_date]
   @abbreviations %{
+    "leave_of_absence" => "LOA",
+    "admin" => "ADMIN",
+    "admin_mfm" => "ADMIN/MFM",
+    "cob" => "COB",
+    "gog_colpo" => "GOG/Colpo",
+    "mfm" => "MFM",
+    "mfm_pain" => "MFM/pain",
+    "mfm_pm" => "MFM PM",
+    "orientation" => "Orient",
+    "oncology_orientation" => "ONC (orient)",
+    "highland_obstetrics_orientation" => "HHOB (orient)",
+    "strong_gynecology_orientation" => "GYN (orient)",
+    "highland_gynecology_orientation" => "HGYN (orient)",
+    "strong_obstetrics_orientation" => "OB (orient)",
     "ambulatory" => "AMB",
     "away_rotation" => "AWAY",
     "elective" => "Elec",

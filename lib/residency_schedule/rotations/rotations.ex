@@ -9,6 +9,20 @@ defmodule ResidencySchedule.Rotations do
   alias ResidencySchedule.ShiftOverrides
 
   @rotation_labels %{
+    "leave_of_absence" => "Leave of Absence",
+    "admin" => "Admin Day",
+    "admin_mfm" => "Admin / MFM Clinic",
+    "cob" => "COB Clinic",
+    "gog_colpo" => "GOG / Colposcopy Clinic",
+    "mfm" => "MFM Clinic",
+    "mfm_pain" => "MFM / Pain Clinic",
+    "mfm_pm" => "MFM Perimenopausal Clinic",
+    "orientation" => "Orientation",
+    "oncology_orientation" => "Oncology Orientation",
+    "highland_obstetrics_orientation" => "Obstetrics – Highland Orientation",
+    "strong_gynecology_orientation" => "Gynecology – Strong Memorial Orientation",
+    "highland_gynecology_orientation" => "Gynecology – Highland Orientation",
+    "strong_obstetrics_orientation" => "Obstetrics – Strong Orientation",
     "ambulatory" => "Ambulatory",
     "away_rotation" => "Away Rotation",
     "elective" => "Elective",
@@ -34,6 +48,20 @@ defmodule ResidencySchedule.Rotations do
   }
 
   @rotation_colors %{
+    "leave_of_absence" => "bg-slate-300 text-slate-900",
+    "admin" => "bg-stone-300 text-stone-900",
+    "admin_mfm" => "bg-teal-200 text-teal-900",
+    "cob" => "bg-teal-600 text-white",
+    "gog_colpo" => "bg-teal-700 text-white",
+    "mfm" => "bg-purple-500 text-white",
+    "mfm_pain" => "bg-purple-600 text-white",
+    "mfm_pm" => "bg-purple-700 text-white",
+    "orientation" => "bg-amber-300 text-amber-900",
+    "oncology_orientation" => "bg-rose-200 text-rose-900",
+    "highland_obstetrics_orientation" => "bg-cyan-200 text-cyan-900",
+    "strong_gynecology_orientation" => "bg-blue-200 text-blue-900",
+    "highland_gynecology_orientation" => "bg-fuchsia-200 text-fuchsia-900",
+    "strong_obstetrics_orientation" => "bg-blue-100 text-blue-900",
     "strong_obstetrics" => "bg-blue-500 text-white",
     "strong_gynecology" => "bg-blue-400 text-white",
     "strong_weekend_days" => "bg-blue-300 text-gray-800",
@@ -565,15 +593,18 @@ defmodule ResidencySchedule.Rotations do
   end
 
   # Days off: not a shift at all.
-  @non_working_rotations ~w(vacation post_call)
+  @non_working_rotations ~w(vacation post_call leave_of_absence)
 
   # Working days, but the resident is alone: no other resident is on the same
   # service, so these never count as shared shifts.
-  @solo_rotations ~w(float swing away_rotation ambulatory elective)
+  @solo_rotations ~w(float swing away_rotation ambulatory elective admin admin_mfm
+    cob gog_colpo mfm mfm_pain mfm_pm orientation oncology_orientation
+    highland_obstetrics_orientation strong_gynecology_orientation
+    highland_gynecology_orientation strong_obstetrics_orientation)
 
   @doc """
   Returns true when a rotation type is a working day (a "shift"). Every
-  rotation counts except vacation and post-call; float is a shift.
+  rotation counts except vacation, post-call and leave of absence; float is a shift.
 
       iex> ResidencySchedule.Rotations.working_day?("float")
       true
@@ -586,7 +617,8 @@ defmodule ResidencySchedule.Rotations do
   @doc """
   Returns true when a rotation type can have more than one resident on the
   same service at once, so two residents on it together share a shift.
-  Float, swing, away, ambulatory, and elective are working days but solo.
+  Float, swing, away, ambulatory, elective, admin, specialty clinics and
+  orientation assignments are working days but solo.
 
       iex> ResidencySchedule.Rotations.shared_service?("strong_obstetrics")
       true
@@ -616,7 +648,7 @@ defmodule ResidencySchedule.Rotations do
   Rotation types that are days off rather than shifts.
 
       iex> ResidencySchedule.Rotations.non_working_rotation_types()
-      ["vacation", "post_call"]
+      ["vacation", "post_call", "leave_of_absence"]
   """
   def non_working_rotation_types, do: @non_working_rotations
 

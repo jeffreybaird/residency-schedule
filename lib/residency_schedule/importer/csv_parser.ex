@@ -26,6 +26,20 @@ defmodule ResidencySchedule.Importer.CsvParser do
   @resident_row_pattern ~r/^R([1-4])-(\d+)$/
 
   @rotation_abbreviations %{
+    "loa" => :leave_of_absence,
+    "admin" => :admin,
+    "admin/mfm" => :admin_mfm,
+    "cob" => :cob,
+    "gog/colpo" => :gog_colpo,
+    "mfm" => :mfm,
+    "mfm/pain" => :mfm_pain,
+    "mfm pm" => :mfm_pm,
+    "orient" => :orientation,
+    "onc (orient)" => :oncology_orientation,
+    "hhob (orient)" => :highland_obstetrics_orientation,
+    "gyn (orient)" => :strong_gynecology_orientation,
+    "hgyn (orient)" => :highland_gynecology_orientation,
+    "ob (orient)" => :strong_obstetrics_orientation,
     "amb" => :ambulatory,
     "away" => :away_rotation,
     "elective" => :elective,
@@ -180,7 +194,7 @@ defmodule ResidencySchedule.Importer.CsvParser do
   defp collect_date_update(_value, nil, _code, updates, warnings), do: {updates, warnings}
 
   defp collect_date_update(value, {index, start, finish}, code, updates, warnings) do
-    case {Map.get(@rotation_abbreviations, String.downcase(value)), String.upcase(value)} do
+    case {Map.get(@rotation_abbreviations, normalize_rotation_key(value)), String.upcase(value)} do
       {nil, label} when label != "OFF" ->
         {updates, warnings ++ [{code, index, value}]}
 
@@ -371,7 +385,7 @@ defmodule ResidencySchedule.Importer.CsvParser do
 
         true ->
           {slot_index, start_date, end_date} = slots_by_col[col_idx]
-          key = String.downcase(trimmed)
+          key = normalize_rotation_key(trimmed)
 
           collect_rotation(
             key,
@@ -422,6 +436,13 @@ defmodule ResidencySchedule.Importer.CsvParser do
 
   defp reject_empty_cells(cells) do
     Enum.reject(cells, &(&1 == "" or is_nil(&1)))
+  end
+
+  defp normalize_rotation_key(value) do
+    value
+    |> String.trim()
+    |> String.replace(~r/\s+-\s+till 8p$/i, "")
+    |> String.downcase()
   end
 
   defp collect_rotation(

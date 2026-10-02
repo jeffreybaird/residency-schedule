@@ -8,7 +8,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   @strong_night_types ~w[night_float strong_weekend_nights]
   @highland_night_types ~w[highland_night_float highland_weekend_nights]
   @night_shift_types @strong_night_types ++ @highland_night_types
-  @non_shift_types ~w[vacation]
+  @non_shift_types ~w[vacation leave_of_absence]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do

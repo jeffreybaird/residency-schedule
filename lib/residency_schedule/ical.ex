@@ -4,7 +4,7 @@ defmodule ResidencySchedule.Ical do
   alias ResidencySchedule.Rotations
 
   @night_shift_types ~w[night_float strong_weekend_nights highland_night_float highland_weekend_nights]
-  @all_day_types ~w[vacation post_call float]
+  @all_day_types ~w[vacation post_call float leave_of_absence]
 
   @doc """
   Builds an iCal (VCALENDAR) string from a list of effective segments for a resident.

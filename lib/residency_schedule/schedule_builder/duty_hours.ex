@@ -20,6 +20,11 @@ defmodule ResidencySchedule.ScheduleBuilder.DutyHours do
     highland_weekend_nights
     highland_weekend_days
     highland_night_float
+    oncology_orientation
+    highland_obstetrics_orientation
+    strong_gynecology_orientation
+    highland_gynecology_orientation
+    strong_obstetrics_orientation
   )a
 
   @nine_hour_rotations ~w(
@@ -29,16 +34,24 @@ defmodule ResidencySchedule.ScheduleBuilder.DutyHours do
     elective
     swing
     ultrasound
+    cob
+    gog_colpo
+    mfm
+    mfm_pain
+    mfm_pm
+    orientation
   )a
 
   @hours_by_name Map.new(@twelve_hour_rotations, &{Atom.to_string(&1), 12})
                  |> Map.merge(Map.new(@nine_hour_rotations, &{Atom.to_string(&1), 9}))
+                 |> Map.put("admin_mfm", 6)
 
   @doc """
   Returns the daily hours for a given rotation type, as an atom or the string
   form stored in the database.
 
-  Returns 12 for 12-hour shifts, 9 for 9-hour shifts, and 0 for off-service.
+  Returns 12 for clinical shifts and their orientations, 9 for daytime clinics
+  and general orientation, 6 for ADMIN/MFM, and 0 for admin and off-service.
 
       iex> ResidencySchedule.ScheduleBuilder.DutyHours.hours_for_rotation("night_float")
       12
@@ -60,6 +73,7 @@ defmodule ResidencySchedule.ScheduleBuilder.DutyHours do
 
   def hours_for_rotation(rotation_type) when rotation_type in @twelve_hour_rotations, do: 12
   def hours_for_rotation(rotation_type) when rotation_type in @nine_hour_rotations, do: 9
+  def hours_for_rotation(:admin_mfm), do: 6
   def hours_for_rotation(_), do: 0
 
   @doc """
