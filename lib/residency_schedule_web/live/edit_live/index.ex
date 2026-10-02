@@ -44,6 +44,7 @@ defmodule ResidencyScheduleWeb.EditLive.Index do
      assign(socket,
        schedules: schedules,
        builder_state: nil,
+       load_error: nil,
        filter_year: nil,
        picker: nil,
        save_state: :idle,
@@ -57,19 +58,27 @@ defmodule ResidencyScheduleWeb.EditLive.Index do
   @impl true
   def handle_event("load_schedule", %{"schedule_id" => id}, socket) do
     schedule_id = String.to_integer(id)
-    {:ok, state} = ScheduleBuilder.load_from_schedule(schedule_id)
-    r1_suggestions = ScheduleBuilder.prior_year_names_for_level(state.academic_year, 1)
 
-    {:noreply,
-     assign(socket,
-       builder_state: state,
-       filter_year: nil,
-       picker: nil,
-       save_state: :idle,
-       r1_name_suggestions: r1_suggestions,
-       duplicate_name_indices: duplicate_name_indices(state),
-       history: []
-     )}
+    case ScheduleBuilder.load_from_schedule(schedule_id) do
+      {:ok, state} ->
+        r1_suggestions = ScheduleBuilder.prior_year_names_for_level(state.academic_year, 1)
+
+        {:noreply,
+         assign(socket,
+           builder_state: state,
+           load_error: nil,
+           filter_year: nil,
+           picker: nil,
+           save_state: :idle,
+           r1_name_suggestions: r1_suggestions,
+           duplicate_name_indices: duplicate_name_indices(state),
+           history: []
+         )}
+
+      {:error, reason} ->
+        {:noreply,
+         assign(socket, builder_state: nil, picker: nil, history: [], load_error: reason)}
+    end
   end
 
   @impl true
@@ -230,6 +239,9 @@ defmodule ResidencyScheduleWeb.EditLive.Index do
         <% end %>
 
         <%!-- Warning status / resolve button --%>
+        <p :if={@load_error} id="edit-load-error" role="alert" class="mb-4 text-sm text-red-700">
+          {@load_error}
+        </p>
         <%= if @builder_state do %>
           <% duty_count = length(@builder_state.duty_warnings) %>
           <% cov_count = length(@builder_state.coverage_warnings) %>

@@ -1,0 +1,25 @@
+Date-update importer verification — 2026-10-02
+
+Preferred artifact: 2026-winter-float-update-dates.csv
+Use Update dates and select the existing 2026–2027 schedule.
+Actual parser: 32 residents, 382 assignments, 172 OFF cells, 10 Back-Up warnings.
+All 382 assignment date/type tuples match the PDF-derived source and requested mappings.
+No server import, commit, push, or deployment performed.
+
+Final full suite: mix test --max-cases 1
+Seed 49226; 171 doctests, 1178 tests, 0 failures; exit 0.
+The serial run avoids cross-run database deadlocks seen when independent test processes overlapped.
+Focused importer/UI regressions: independent reviewer 20 tests, 0 failures, seed 103444.
+Coverage plus importer tests: 3 doctests, 32 tests, 0 failures, seed 809292.
+Chat whitespace regression suite: 2 doctests, 26 tests, 0 failures, seed 986401.
+Compile warnings-as-errors, formatting, unused dependency lock check and git diff --check passed.
+Accepted test hashes:
+f13eb2070c8f0747f294e1a0b3ca63d694ea6ec4f17408b1b5fcd16b4bb74804 test/residency_schedule/importer/date_update_test.exs
+e9b0f2d3a2b0e38b96252a78546ae80c550906426eb5eaa27888d937298700da test/residency_schedule_web/live/date_update_upload_test.exs
+
+Strict Credo scan did not pass: 93 existing findings (15 warnings, 22 refactoring, 36 readability, 20 design). New importer nesting/alias findings corrected; no lint rules disabled.
+Compatible dependency security upgrades applied; see security-review.txt for checked advisory IDs, patched versions, exposure and audit limitations.
+
+Date-updated schedules containing concurrent overlapping shifts are displayed with both types in the grid. The single-assignment editor safely refuses such schedules with an explanatory error; further date imports remain available. Coverage-linked rotations cannot be changed by date imports; the whole patch is rejected atomically.
+
+Native agent thread limit prevented spawning/resuming the designated implementer/runner. The human explicitly authorized root source implementation with accepted tests frozen. Spec writer owned all test additions/corrections; reviewer accepted them and independently recorded red/green/review evidence. Root recorded the final full-suite result. No .agent-audit/bash.jsonl exists; hook activation is unverified.

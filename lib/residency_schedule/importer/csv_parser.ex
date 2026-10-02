@@ -14,7 +14,14 @@ defmodule ResidencySchedule.Importer.CsvParser do
 
   alias ResidencySchedule.Importer.NameNormalizer
 
-  defstruct [:position_code, :residency_year, :schedule_number, :name, :rotations]
+  defstruct [
+    :position_code,
+    :residency_year,
+    :schedule_number,
+    :name,
+    :rotations,
+    date_updates: []
+  ]
 
   @resident_row_pattern ~r/^R([1-4])-(\d+)$/
 
@@ -67,6 +74,129 @@ defmodule ResidencySchedule.Importer.CsvParser do
     end
   rescue
     e -> {:error, Exception.message(e)}
+  end
+
+  @doc """
+  Parses a date update using literal source dates and the selected roster year.
+  Blank and unknown cells preserve existing assignments; OFF explicitly clears.
+  Highland weekend nights retain their Saturday-only shift boundary.
+
+      iex> csv = Enum.join([",Dates,2026-12-14", ",,2026-12-14", ",,", "R1-1,Resident,HNF"], <<10>>)
+      iex> {:ok, [resident], []} = ResidencySchedule.Importer.CsvParser.parse_date_update(csv, 2026)
+      iex> hd(resident.rotations).start_date
+      ~D[2026-12-14]
+  """
+  def parse_date_update(csv_binary, academic_year) do
+    rows = decode_rows(csv_binary)
+
+    with {:ok, slots} <- update_slots(rows, academic_year),
+         :ok <- unique_update_residents(rows) do
+      rows
+      |> Enum.filter(&resident_row?/1)
+      |> Enum.reduce({[], []}, fn row, {residents, warnings} ->
+        {resident, new_warnings} = build_date_update(row, slots, academic_year)
+        {[resident | residents], warnings ++ new_warnings}
+      end)
+      |> then(fn {residents, warnings} -> {:ok, Enum.reverse(residents), warnings} end)
+    end
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
+  defp update_slots(rows, year) when is_integer(year) and year in 1..9998 do
+    starts = Map.new(parse_indexed_date_columns(Enum.at(rows, 0, [])))
+    ends = Map.new(parse_indexed_date_columns(Enum.at(rows, 1, [])))
+
+    slots =
+      starts
+      |> Enum.sort_by(&elem(&1, 0))
+      |> Enum.with_index()
+      |> Enum.map(fn {{column, start}, index} ->
+        {column, {index, start, Map.get(ends, column)}}
+      end)
+
+    first = Date.new!(year, 7, 1)
+    last = Date.new!(year + 1, 6, 30)
+    ranges = Enum.map(slots, fn {_, {_, start, finish}} -> {start, finish} end)
+
+    cond do
+      slots == [] or Enum.sort(Map.keys(starts)) != Enum.sort(Map.keys(ends)) ->
+        {:error, "Each update column needs matching start and end dates"}
+
+      Enum.any?(ranges, fn {start, finish} ->
+        Date.compare(start, finish) == :gt or Date.compare(start, first) == :lt or
+            Date.compare(finish, last) == :gt
+      end) ->
+        {:error, "Update dates must be ordered and inside the selected July–June academic year"}
+
+      overlapping_update_slots?(ranges) ->
+        {:error, "Update date columns must not overlap"}
+
+      true ->
+        {:ok, Map.new(slots)}
+    end
+  end
+
+  defp update_slots(_rows, _year),
+    do: {:error, "Select an existing academic year for date updates"}
+
+  defp overlapping_update_slots?(ranges) do
+    ranges
+    |> Enum.sort_by(fn {start, _} -> Date.to_gregorian_days(start) end)
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.any?(fn [{_, finish}, {start, _}] -> Date.compare(start, finish) != :gt end)
+  end
+
+  defp unique_update_residents(rows) do
+    codes = rows |> Enum.filter(&resident_row?/1) |> Enum.map(&hd/1)
+
+    if length(codes) == length(Enum.uniq(codes)),
+      do: :ok,
+      else: {:error, "Duplicate resident positions in update"}
+  end
+
+  defp build_date_update(row, slots, year) do
+    {resident, _} = build_resident(row, %{}, year)
+
+    {updates, warnings} =
+      row
+      |> Enum.drop(2)
+      |> Enum.with_index()
+      |> Enum.reduce({[], []}, fn {cell, column}, {updates, warnings} ->
+        collect_date_update(
+          String.trim(cell),
+          Map.get(slots, column),
+          resident.position_code,
+          updates,
+          warnings
+        )
+      end)
+
+    updates = Enum.reverse(updates)
+    rotations = updates |> Enum.map(& &1.rotation) |> Enum.reject(&is_nil/1)
+    {%{resident | rotations: rotations, date_updates: updates}, warnings}
+  end
+
+  defp collect_date_update("", _slot, _code, updates, warnings), do: {updates, warnings}
+  defp collect_date_update(_value, nil, _code, updates, warnings), do: {updates, warnings}
+
+  defp collect_date_update(value, {index, start, finish}, code, updates, warnings) do
+    case {Map.get(@rotation_abbreviations, String.downcase(value)), String.upcase(value)} do
+      {nil, label} when label != "OFF" ->
+        {updates, warnings ++ [{code, index, value}]}
+
+      {type, _} ->
+        rotation = date_update_rotation(type, index, start, finish)
+        update = %{start_date: start, end_date: finish, rotation: rotation}
+        {[update | updates], warnings}
+    end
+  end
+
+  defp date_update_rotation(nil, _index, _start, _finish), do: nil
+
+  defp date_update_rotation(type, index, start, finish) do
+    finish = if type == :highland_weekend_nights, do: start, else: finish
+    %{slot_index: index, start_date: start, end_date: finish, rotation_type: type}
   end
 
   @doc """

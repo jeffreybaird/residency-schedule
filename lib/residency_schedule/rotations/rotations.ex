@@ -80,6 +80,42 @@ defmodule ResidencySchedule.Rotations do
     |> Enum.sort_by(fn {slot_index, _, _} -> slot_index end)
   end
 
+  @doc """
+  Partitions rotation ranges into nonoverlapping display dates, independent of imported column numbers.
+
+      iex> rotations = [%{start_date: ~D[2026-12-01], end_date: ~D[2026-12-10]}, %{start_date: ~D[2026-12-04], end_date: ~D[2026-12-05]}]
+      iex> ResidencySchedule.Rotations.date_slots(rotations)
+      [{0, ~D[2026-12-01], ~D[2026-12-03]}, {1, ~D[2026-12-04], ~D[2026-12-05]}, {2, ~D[2026-12-06], ~D[2026-12-10]}]
+  """
+  def date_slots(rotations) do
+    rotations
+    |> Enum.flat_map(&[&1.start_date, Date.add(&1.end_date, 1)])
+    |> Enum.uniq()
+    |> Enum.sort(Date)
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.filter(fn [start, _] ->
+      Enum.any?(
+        rotations,
+        &(Date.compare(&1.start_date, start) != :gt and Date.compare(&1.end_date, start) != :lt)
+      )
+    end)
+    |> Enum.with_index()
+    |> Enum.map(fn {[start, next], index} -> {index, start, Date.add(next, -1)} end)
+  end
+
+  @doc """
+  Returns date-based display slots for a schedule, including split rotation boundaries.
+  Exempt from doctest — hits the database.
+  """
+  def list_schedule_date_slots(schedule_id) do
+    from(r in Rotation,
+      join: sr in assoc(r, :schedule_resident),
+      where: sr.schedule_id == ^schedule_id
+    )
+    |> Repo.all()
+    |> date_slots()
+  end
+
   defp canonical_slot_range(entries) do
     entries
     |> Enum.map(fn {_slot_index, start_date, end_date} -> {start_date, end_date} end)
@@ -309,36 +345,39 @@ defmodule ResidencySchedule.Rotations do
         range_start,
         range_end
       ) do
+    list_unassigned_coworkers(schedule_id, range_start, range_end, slot_index)
+  end
+
+  @doc """
+  Lists residents unassigned on the actual dates, independent of source column indices.
+  Exempt from doctest — hits the database.
+  """
+  def list_off_coworker_rows_in_range(schedule_id, range_start, range_end) do
+    list_unassigned_coworkers(schedule_id, range_start, range_end, nil)
+  end
+
+  defp list_unassigned_coworkers(schedule_id, range_start, range_end, slot_index) do
     srs = Residents.list_residents_for_schedule(schedule_id)
 
-    busy_intervals =
+    query =
       from(r in Rotation,
         join: sr in assoc(r, :schedule_resident),
         where: sr.schedule_id == ^schedule_id,
-        where: r.slot_index == ^slot_index,
         where: r.start_date <= ^range_end and r.end_date >= ^range_start,
         select: {sr.id, r.start_date, r.end_date}
       )
+
+    query = if is_nil(slot_index), do: query, else: where(query, [r], r.slot_index == ^slot_index)
+
+    busy_intervals =
+      query
       |> Repo.all()
       |> Enum.group_by(&elem(&1, 0), fn {_, s, e} -> {s, e} end)
 
     range_start
     |> Date.range(range_end)
     |> Enum.reduce(%{}, fn date, acc ->
-      Enum.reduce(srs, acc, fn sr, acc2 ->
-        intervals = Map.get(busy_intervals, sr.id, [])
-
-        busy? =
-          Enum.any?(intervals, fn {s, e} ->
-            Date.compare(date, s) != :lt and Date.compare(date, e) != :gt
-          end)
-
-        if busy? do
-          acc2
-        else
-          Map.update(acc2, sr.id, MapSet.new([date]), &MapSet.put(&1, date))
-        end
-      end)
+      Enum.reduce(srs, acc, &accumulate_off_dates(&1, &2, date, busy_intervals))
     end)
     |> Enum.map(fn {sr_id, dates} ->
       sr = Enum.find(srs, &(&1.id == sr_id))
@@ -352,6 +391,19 @@ defmodule ResidencySchedule.Rotations do
       }
     end)
     |> Enum.sort_by(&{&1.resident.residency_year, &1.resident.schedule_number})
+  end
+
+  defp accumulate_off_dates(resident, acc, date, busy_intervals) do
+    busy? =
+      busy_intervals
+      |> Map.get(resident.id, [])
+      |> Enum.any?(fn {start, finish} ->
+        Date.compare(date, start) != :lt and Date.compare(date, finish) != :gt
+      end)
+
+    if busy?,
+      do: acc,
+      else: Map.update(acc, resident.id, MapSet.new([date]), &MapSet.put(&1, date))
   end
 
   @doc """

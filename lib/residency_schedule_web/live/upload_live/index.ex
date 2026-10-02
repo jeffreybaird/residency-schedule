@@ -12,7 +12,15 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(upload_result: nil, warnings: [], error: nil, review: nil)
+      |> assign(
+        upload_result: nil,
+        warnings: [],
+        error: nil,
+        review: nil,
+        import_mode: "replace_year",
+        target_academic_year: "",
+        schedules: Schedules.list_schedules()
+      )
       |> allow_upload(:schedule_csv,
         accept: :any,
         max_entries: 1,
@@ -23,8 +31,8 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
   end
 
   @impl true
-  def handle_event("validate", _params, socket) do
-    {:noreply, socket}
+  def handle_event("validate", params, socket) do
+    {:noreply, assign_import_options(socket, params)}
   end
 
   @impl true
@@ -35,10 +43,13 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
   # Step 1: parse the file and propose a link for every row. Nothing is
   # written until the admin confirms the links in step 2.
   @impl true
-  def handle_event("save", _params, socket) do
+  def handle_event("save", params, socket) do
+    socket = assign_import_options(socket, params)
+    options = import_options(socket)
+
     result =
       consume_uploaded_entries(socket, :schedule_csv, fn %{path: path}, _entry ->
-        {:ok, path |> File.read!() |> ScheduleImporter.prepare()}
+        {:ok, path |> File.read!() |> ScheduleImporter.prepare(options)}
       end)
 
     # consume_uploaded_entries unwraps {:ok, value} → returns [value]
@@ -62,9 +73,13 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
   @impl true
   def handle_event("confirm", params, socket) do
     review = socket.assigns.review
-    links = ResidentLinker.links_from_params(review.proposals, Map.get(params, "link", %{}))
 
-    case ScheduleImporter.commit(review.parsed, review.academic_year, links) do
+    links =
+      if review.mode == :update_dates,
+        do: review.links,
+        else: ResidentLinker.links_from_params(review.proposals, Map.get(params, "link", %{}))
+
+    case ScheduleImporter.commit(review.parsed, review.academic_year, links, mode: review.mode) do
       {:ok, %{schedule_id: schedule_id} = summary} ->
         socket =
           socket
@@ -87,6 +102,8 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
     proposals = prepared.proposals
 
     %{
+      mode: Map.get(prepared, :mode, :replace_year),
+      date_range: Map.get(prepared, :date_range),
       parsed: prepared.parsed,
       academic_year: prepared.academic_year,
       label: Schedules.academic_year_label(prepared.academic_year),
@@ -102,16 +119,32 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
     ~H"""
     <div class="max-w-4xl mx-auto py-12 px-4">
       <h1 class="text-3xl font-bold text-gray-800 mb-2">Confirm Residents</h1>
-      <p class="text-gray-600 mb-6">
-        {@review.label} · {length(@review.proposals)} rows.
-        Each row is matched to an existing resident where possible so their record carries
-        across academic years. Check every link before importing.
-        <%= if @review.replaces_existing? do %>
-          <span class="font-medium text-yellow-800">
-            A schedule for {@review.label} already exists and will be replaced.
-          </span>
-        <% end %>
-      </p>
+      <%= if @review.mode == :update_dates do %>
+        <div id="date-update-review" class="rounded-md bg-blue-50 px-4 py-3 mb-6 text-blue-900">
+          <p class="font-medium">Update dates in {@review.label}</p>
+          <p>
+            {elem(@review.date_range, 0)} through {elem(@review.date_range, 1)} · {length(
+              @review.proposals
+            )} residents.
+          </p>
+          <p>Assignments on other dates and residents not in this file are preserved.
+            OFF clears an assignment. Blank and unrecognized cells are preserved.</p>
+          <p>
+            Existing resident links are locked. Rotations with coverage requests or overrides cannot be changed.
+          </p>
+        </div>
+      <% else %>
+        <p class="text-gray-600 mb-6">
+          {@review.label} · {length(@review.proposals)} rows.
+          Each row is matched to an existing resident where possible so their record carries
+          across academic years. Check every link before importing.
+          <%= if @review.replaces_existing? do %>
+            <span class="font-medium text-yellow-800">
+              A schedule for {@review.label} already exists and will be replaced.
+            </span>
+          <% end %>
+        </p>
+      <% end %>
 
       <%= if @error do %>
         <div class="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
@@ -140,25 +173,29 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
                   </span>
                 </td>
                 <td class="py-2">
-                  <select
-                    name={"link[#{proposal.position_code}]"}
-                    class="border border-gray-300 rounded-md text-sm px-2 py-1 w-full max-w-xs"
-                  >
-                    <option
-                      value="new"
-                      selected={Map.get(@review.links, proposal.position_code) == :new}
+                  <%= if @review.mode == :update_dates do %>
+                    <span class="text-gray-700">{proposal.name} (existing resident)</span>
+                  <% else %>
+                    <select
+                      name={"link[#{proposal.position_code}]"}
+                      class="border border-gray-300 rounded-md text-sm px-2 py-1 w-full max-w-xs"
                     >
-                      New resident: {proposal.name}
-                    </option>
-                    <%= for person <- @review.people do %>
                       <option
-                        value={person.id}
-                        selected={Map.get(@review.links, proposal.position_code) == person.id}
+                        value="new"
+                        selected={Map.get(@review.links, proposal.position_code) == :new}
                       >
-                        {person.name}
+                        New resident: {proposal.name}
                       </option>
-                    <% end %>
-                  </select>
+                      <%= for person <- @review.people do %>
+                        <option
+                          value={person.id}
+                          selected={Map.get(@review.links, proposal.position_code) == person.id}
+                        >
+                          {person.name}
+                        </option>
+                      <% end %>
+                    </select>
+                  <% end %>
                 </td>
               </tr>
             <% end %>
@@ -168,7 +205,9 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
         <%= if length(@warnings) > 0 do %>
           <div class="rounded-md bg-yellow-50 border border-yellow-200 px-4 py-3">
             <p class="text-sm font-medium text-yellow-800 mb-2">
-              {length(@warnings)} unrecognized abbreviation(s) will be skipped:
+              {length(@warnings)} unrecognized abbreviation(s). {if @review.mode == :update_dates,
+                do: "Existing assignments on those dates will be preserved:",
+                else: "These assignments will be skipped:"}
             </p>
             <ul class="text-sm text-yellow-700 list-disc list-inside space-y-0.5">
               <%= for {code, _idx, val} <- Enum.take(@warnings, 20) do %>
@@ -204,6 +243,26 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
       <h1 class="text-3xl font-bold text-gray-800 mb-8">Upload Schedule</h1>
 
       <.form for={%{}} phx-submit="save" phx-change="validate" class="space-y-6">
+        <.input
+          type="select"
+          id="import-mode"
+          name="mode"
+          label="Import mode"
+          value={@import_mode}
+          options={[{"Replace year", "replace_year"}, {"Update dates", "update_dates"}]}
+        />
+        <.input
+          type="select"
+          id="target-academic-year"
+          name="academic_year"
+          label="Target academic year (for date updates)"
+          value={@target_academic_year}
+          prompt="Select an existing schedule"
+          options={Enum.map(@schedules, &{&1.label, Integer.to_string(&1.academic_year)})}
+        />
+        <p class="text-sm text-gray-600">Update dates fills in FLOAT periods using a partial CSV.
+          Only recognized assignments and explicit OFF cells change existing dates.
+          Replace year replaces the complete schedule.</p>
         <div
           class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors"
           phx-drop-target={@uploads.schedule_csv.ref}
@@ -272,6 +331,35 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
     </div>
     """
   end
+
+  defp assign_import_options(socket, params) do
+    assign(socket,
+      import_mode: Map.get(params, "mode", socket.assigns.import_mode),
+      target_academic_year: Map.get(params, "academic_year", socket.assigns.target_academic_year)
+    )
+  end
+
+  defp import_options(socket) do
+    case socket.assigns.import_mode do
+      "update_dates" ->
+        [mode: :update_dates, academic_year: parse_year(socket.assigns.target_academic_year)]
+
+      "replace_year" ->
+        [mode: :replace_year]
+
+      _ ->
+        [mode: :invalid]
+    end
+  end
+
+  defp parse_year(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {year, ""} -> year
+      _ -> nil
+    end
+  end
+
+  defp parse_year(_value), do: nil
 
   defp confidence_label(%{confidence: :exact}), do: "Exact name"
   defp confidence_label(%{confidence: :alias}), do: "Roster alias"

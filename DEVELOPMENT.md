@@ -128,11 +128,16 @@ This should pass cleanly before every push. CI enforces the same checks.
 
 After starting the server:
 
-1. Navigate to [http://localhost:4000/admin/upload](http://localhost:4000/admin/upload)
-2. Select a CSV file exported from the residency schedule spreadsheet
-3. Click **Import Schedule**
+1. Navigate to [http://localhost:4000/admin/upload](http://localhost:4000/admin/upload).
+2. Select **Replace year** for a complete schedule, or **Update dates** for a partial schedule such as winter float assignments.
+3. For **Update dates**, select the existing academic year explicitly. January 2027 assignments belong to 2026–2027.
+4. Select the CSV and click **Import Schedule**. Review the year, dates, warnings, and resident matches, then confirm.
 
-The importer derives the academic year automatically from the dates in the file (e.g. dates starting in July 2026 → `2026–2027`). Re-importing the same year replaces existing data without duplication.
+**Replace year** derives the year from the file and replaces every schedule resident and rotation in that year. **Update dates** keeps existing resident identities and replaces only the supplied residents' recognized assignments on their source date ranges. A longer existing rotation is split to preserve dates before and after the update. Residents absent from the file are preserved. Date-updated schedules with overlapping shifts remain visible in the grid, but the editor refuses to load them because it supports one assignment per cell; use date imports for further changes.
+
+In date updates, `OFF` explicitly removes assignments on that date range. Blank, omitted, and unrecognized cells preserve existing assignments; review the warnings, since unresolved labels leave `FLOAT` placeholders in place. Use literal dates for Highland night float in update mode. Highland weekend nights retain the Saturday-only rule; an uploaded Saturday–Sunday HWN cell clears the stale Sunday assignment. Duplicate resident positions, overlapping or invalid date columns, and dates outside the selected July–June year are rejected before saving.
+
+Date updates cannot alter a rotation referenced by a coverage request or override, even if that coverage is on a different part of the rotation. The update is rejected atomically to preserve coverage history. The existing **Replace year** operation remains a whole-year replacement.
 
 ### Expected CSV format
 

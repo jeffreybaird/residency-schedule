@@ -1,0 +1,40 @@
+Preferred file for the new importer: 2026-winter-float-update-dates.csv
+Choose Update dates, then select the existing 2026–2027 schedule. This file contains only 2026-12-14 through 2027-01-10, with literal dates, OFF values, canonical resident names and the requested AMB mappings. Do not use it in Replace year mode.
+Back-Up (10 assignments) remains unresolved: update mode warns and preserves the existing assignment on those dates. Blank cells also preserve existing assignments; OFF clears them. Existing coverage-linked rotations cause atomic rejection.
+The full-year file below is retained for the old importer and is based on the local repository snapshot, not newer server changes.
+
+Legacy whole-year conversion (superseded by preferred date-update file above)
+
+Legacy upload: 2026-2027-with-winter-float-upload.csv
+Base: data/2026-2027-continuous.csv from this local checkout.
+This is a whole-year replacement, not a patch to any newer server changes.
+Winter window: 2026-12-14 through 2027-01-10. All 32 residents are matched to data/roster.csv position codes.
+
+User mappings: COB, GOG/Colpo, MFM, MFM/Pain -> AMB in the winter window.
+Back-Up remains exact text: 10 winter assignments will be warned and skipped by the uploader. See unsupported-winter-assignments.csv for people and dates.
+OFF and empty PDF cells -> empty upload cells (no assignment).
+The extra suffix is removed from rotation labels; 12 annotations are preserved in winter-annotations.csv.
+Highland night float: dedicated input columns compensate for the parser shifting HNF starts back one day. Some dedicated raw start dates are one day after their end dates; the verified parsed dates are correct. Do not manually alter those columns.
+Highland weekend nights follow the existing parser rule: Saturday only for a Saturday-Sunday block.
+
+2026-winter-float-source.csv is a literal extraction with full PDF names and original labels. Use it for review, not uploading: it lacks the rest of the year and does not compensate for HNF parsing.
+
+Verification: the actual CsvParser accepted 32 residents and 3006 rotation entries. All 382 recognized winter entries exactly match the extracted dates and requested mappings after parsing. Parsed assignments outside the winter window are identical to the base file. No database import was performed.
+
+The base file already contains 117 unsupported entries outside winter, which this conversion preserves. The uploader reports 127 warnings total (117 inherited plus 10 winter Back-Up entries). Existing unsupported labels/counts:
+ADMIN/MFM: 2
+COB: 2
+GOG/Colpo: 1
+GOG/colpo: 1
+GYN (orient): 5
+HGYN (orient): 4
+HHOB (orient): 6
+MFM: 2
+MFM PM: 2
+MFM/pain: 1
+OB (orient): 6
+OFF: 81
+ONC (orient): 2
+Orient: 2
+
+Date-update verification: actual parse_date_update/2 accepted 32 residents, 382 recognized assignments, 172 explicit OFF cells and 10 Back-Up warnings. Every recognized assignment matches the PDF-derived dates and requested mappings. No server import was performed.

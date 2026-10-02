@@ -1,0 +1,118 @@
+Security review — 2026-10-02
+
+Baseline checks: mix hex.audit initially failed because the sandbox denied
+Mix.PubSub TCP sockets (:eperm). Elevated rerun exited 0: "No retired packages
+found". mix help hex.audit confirms this checks package retirement, not all
+security advisories. Current GitHub public advisory API ecosystem=erlang was
+checked with cursor pagination (100 + 21 entries), plus Bandit's maintainer
+security advisories, which include newer entries absent from that listing.
+No .agent-audit/bash.jsonl existed at initial review. This is not proof that
+desktop audit hooks are active. No source/test edits were made by the reviewer.
+
+PRE-EXISTING findings against initial mix.lock:
+
+Phoenix 1.8.5:
+- GHSA-6983-jfq8-485w / CVE-2026-56811: unbounded channel joins DoS;
+  affected >=1.8.0-rc.0,<1.8.9; patched 1.8.9. Public WebSocket/LongPoll
+  transports are exposure conditions.
+- GHSA-63mc-hw7g-86rr / CVE-2026-56812: Presence client Object.prototype
+  key collisions; affected >=1.8.0-rc.0,<1.8.9; patched 1.8.9.
+  Requires attacker-controlled presence keys; no direct Presence use found.
+- GHSA-628h-q48j-jr6q / CVE-2026-32689: LongPoll NDJSON memory DoS;
+  affected >=1.8.0,<1.8.6; patched 1.8.6. LongPoll is enabled in endpoint.ex.
+
+Plug 1.19.1:
+- GHSA-j43x-5hjq-rgxf / CVE-2026-54892: nested parameter CPU DoS;
+  affected >=1.19.0,<1.19.3; patched 1.19.3. Reachable parameter parsing
+  can expose unauthenticated endpoints.
+- GHSA-468c-vq7p-gh64 / CVE-2026-8468: multipart header memory DoS;
+  affected >=1.19.0,<1.19.2; patched 1.19.2. Requires multipart parsing.
+
+Bandit 1.10.3:
+- GHSA-rf5q-vwxw-gmrf / CVE-2026-39806: chunked trailers pin worker;
+  affected >=1.6.0,<1.11.1; patched 1.11.1.
+- GHSA-9q9q-324x-93r2 / CVE-2026-39803: chunked body bypasses size cap;
+  affected >=1.4.0,<1.11.1; patched 1.11.1.
+- GHSA-q6v9-r226-v65f / CVE-2026-42788: HTTP/2 frame memory DoS;
+  affected >=0.3.5,<1.11.0; patched 1.11.0.
+- GHSA-c67r-gc9j-2qf7 / CVE-2026-39805: duplicate Content-Length smuggling;
+  affected <1.11.0; patched 1.11.0. Requires disagreement with front proxy.
+- GHSA-pf94-94m9-536p / CVE-2026-42786: WebSocket continuation memory DoS;
+  affected >=0.5.0,<1.11.0; patched 1.11.0. WebSockets are used by LiveView.
+- GHSA-375f-4r2h-f99j / CVE-2026-39807: client scheme trusted on plaintext;
+  affected >=1.0.0,<1.11.0; patched 1.11.0. Direct plaintext reachability
+  and proxy request handling determine exposure; deployment not verified.
+- GHSA-frh3-6pv6-rc8j / CVE-2026-39804: compressed WebSocket memory DoS;
+  affected >=0.5.8,<1.11.0; patched 1.11.0. Requires compress:true;
+  no opt-in found and Phoenix defaults to false.
+- GHSA-x3gh-xhj4-3vq8: HTTP/2 CR/LF/NUL header values passed unvalidated;
+  maintainer says affected <=1.12.4; patched "none yet". HTTP/2 exposure
+  and downstream header use remain uncertain.
+
+Additional Bandit upgrade considerations from maintainer advisories:
+- GHSA-vg8x-66vg-5pxh: quadratic WebSocket reassembly CPU;
+  affected >=1.11.0,<1.12.1; patched 1.12.1. Do not upgrade into that range.
+- GHSA-xj8g-532w-jv94: HTTP/2 window starvation pins Plug processes;
+  affected field lists 1.12.4, no patch listed. Older-version exposure uncertain.
+- GHSA-9q5m-g6v3-6772: HTTP/2 decoded header list limit absent;
+  affected field lists 1.12.0, no patch listed. Older-version exposure uncertain.
+- GHSA-rhh8-5xw9-c3gm: unmasked WebSocket frames buffered without size cap;
+  affected field lists 1.12.0, no patch listed. Older-version exposure uncertain.
+
+Mint 1.7.1 (via Finch/Req):
+- GHSA-g586-ccqf-7x4r / CVE-2026-48862: HTTP/2 push streams memory DoS;
+  affected >=0.2.0,<1.9.0; patched 1.9.0.
+- GHSA-2p26-p43x-fhp8 / CVE-2026-49754: HTTP/2 CONTINUATION memory DoS;
+  affected <1.9.0; patched 1.9.0.
+- GHSA-mjqx-c6f6-7rc2 / CVE-2026-49753: signed Content-Length parsing;
+  affected <1.9.0; patched 1.9.0. Response smuggling needs intermediary
+  disagreement and a shared connection.
+- GHSA-2pg6-44cx-c49v / CVE-2026-48861: method/target request-line CRLF;
+  affected <1.9.0; patched 1.9.0. Requires attacker-controlled method/target.
+  Application uses Req for Anthropic API; malicious-server/control conditions
+  have not been demonstrated. Dependency condition remains relevant.
+
+Req 0.5.17:
+- GHSA-px9f-whj3-246m / CVE-2026-49756: multipart name/filename/type injection;
+  affected >=0.5.3,<0.6.0; patched 0.6.0. Current app sends JSON, not multipart.
+- GHSA-655f-mp8p-96gv / CVE-2026-49755: archive/compression memory expansion;
+  affected >=0.1.0,<0.6.1; patched 0.6.1. Requires hostile response content
+  with decoding enabled. Current app streams trusted API; uncertainty remains.
+
+Postgrex 0.22.0:
+- GHSA-r73h-97w8-m54h / CVE-2026-32687: Notifications channel SQL injection;
+  affected >=0.16.0,<0.22.2; patched 0.22.2. No Notifications use found;
+  Ecto does not use it by default. Transitive use not exhaustively verified.
+
+Decimal 2.3.0:
+- GHSA-rhv4-8758-jx7v / CVE-2026-32686: extreme exponents cause memory DoS;
+  affected >=0.1.0,<3.0.0; patched 3.0.0. No direct Decimal use found.
+  Untrusted numeric parsing/arithmetic is the exposure condition. Major-version
+  upgrade compatibility must be assessed; significant API work needs permission.
+
+Phoenix LiveView 1.1.26 is outside GHSA-5cgh-g58j-m9cq's affected range
+>=1.2.2,<1.2.7 (patched 1.2.7). Older historical advisories matched by name
+were outside current locked versions.
+
+Sources: https://api.github.com/advisories?ecosystem=erlang&per_page=100
+and https://github.com/mtrudel/bandit/security/advisories.
+Each identifier's primary record is https://github.com/advisories/<GHSA-ID>;
+maintainer-only records are under the Bandit security/advisories path.
+
+Follow-up after compatible dependency solver updates:
+Phoenix 1.8.15, Plug 1.20.3, Req 0.7.4, Mint 1.11.0, Postgrex 0.22.4,
+Decimal 3.1.1, Ecto 3.14.2, ecto_sql 3.14.0, Bandit 1.12.5.
+Current GitHub general advisory data and Bandit maintainer data refreshed.
+These versions are outside the affected ranges reported above. No additional
+affected dependency found in the checked data. mix hex.audit rerun exited 0:
+"No retired packages found". The retirement-only limitation still applies.
+
+Bandit's maintainer advisory patched-version fields are stale: its fetched
+package CHANGELOG.md documents 1.12.5 fixing GHSA-xj8g-532w-jv94 and
+GHSA-x3gh-xhj4-3vq8, and 1.12.2 fixing GHSA-rhh8-5xw9-c3gm and
+GHSA-9q5m-g6v3-6772. Therefore the previously recorded "no patch"/exposure
+uncertainties are resolved for the new lock by release evidence:
+https://github.com/mtrudel/bandit/blob/1.12.5/CHANGELOG.md
+
+No comprehensive claim about application security or deployment exposure is
+made by this dependency review. Final implementation/test evidence is separate.

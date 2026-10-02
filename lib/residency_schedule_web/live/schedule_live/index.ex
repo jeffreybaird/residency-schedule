@@ -448,13 +448,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   defp build_rotation_lookup(schedule_residents) do
-    schedule_residents
-    |> Enum.flat_map(fn sr ->
-      Enum.map(sr.rotations, fn rot ->
-        {{sr.schedule_id, rot.slot_index}, rot}
-      end)
-    end)
-    |> Map.new()
+    Map.new(schedule_residents, &{&1.schedule_id, &1.rotations})
   end
 
   defp residents_by_year(unified_residents, filter_year, viewed_aca_year) do
@@ -503,10 +497,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   defp build_slots(residents) do
     residents
-    |> Enum.flat_map(fn r -> r.rotations end)
-    |> Enum.map(fn rot -> {rot.slot_index, rot.start_date, rot.end_date} end)
-    |> Enum.uniq_by(&elem(&1, 0))
-    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.flat_map(& &1.rotations)
+    |> Rotations.date_slots()
   end
 
   @doc false
@@ -520,7 +512,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   @doc """
   Groups consecutive slots into merged cells based on rotation type. Works with
-  the unified all_slots list and a rotation lookup keyed by {schedule_id, slot_index}.
+  the unified all_slots list and rotations grouped by schedule ID. Legacy column-keyed lookups are also accepted.
 
       iex> all_slots = [{1, 0, ~D[2023-07-03], ~D[2023-07-09], true}, {1, 1, ~D[2023-07-10], ~D[2023-07-16], false}]
       iex> lookup = %{{1, 0} => %{rotation_type: "float", end_date: ~D[2023-07-09]}, {1, 1} => %{rotation_type: "float", end_date: ~D[2023-07-16]}}
@@ -530,19 +522,39 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   """
   def cell_groups_unified(all_slots, rotation_lookup) do
     all_slots
-    |> Enum.map(fn {schedule_id, idx, _start, _end, _first?} ->
-      Map.get(rotation_lookup, {schedule_id, idx})
+    |> Enum.map(fn {schedule_id, idx, start, _end, _first?} ->
+      case Map.get(rotation_lookup, schedule_id) do
+        nil ->
+          Map.get(rotation_lookup, {schedule_id, idx})
+
+        rotations ->
+          rotations
+          |> Enum.filter(
+            &(Date.compare(&1.start_date, start) != :gt and
+                Date.compare(&1.end_date, start) != :lt)
+          )
+          |> Enum.sort_by(& &1.rotation_type)
+          |> combine_concurrent_rotations()
+      end
     end)
-    |> Enum.chunk_by(fn
-      nil -> :blank
-      r -> r.rotation_type
-    end)
+    |> Enum.chunk_by(&rotation_cell_key/1)
     |> Enum.map(fn group ->
       colspan = length(group)
       rotation = Enum.find(group, &(&1 != nil))
       {colspan, rotation}
     end)
   end
+
+  defp combine_concurrent_rotations([]), do: nil
+  defp combine_concurrent_rotations([rotation]), do: rotation
+
+  defp combine_concurrent_rotations(rotations) do
+    %{rotations: rotations, end_date: rotations |> Enum.map(& &1.end_date) |> Enum.max(Date)}
+  end
+
+  defp rotation_cell_key(nil), do: :blank
+  defp rotation_cell_key(%{rotations: rotations}), do: Enum.map(rotations, & &1.rotation_type)
+  defp rotation_cell_key(rotation), do: rotation.rotation_type
 
   @doc false
   def cell_groups(slots, rotations) do
@@ -563,6 +575,13 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   defp render_rotation_cell(nil, _past) do
     Phoenix.HTML.raw(~s(<span class="text-gray-200">–</span>))
+  end
+
+  defp render_rotation_cell(%{rotations: rotations}, past) do
+    rotations
+    |> Enum.map(&render_rotation_cell(&1, past))
+    |> Enum.map(&Phoenix.HTML.safe_to_string/1)
+    |> Phoenix.HTML.raw()
   end
 
   defp render_rotation_cell(rotation, past) do

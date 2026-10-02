@@ -82,8 +82,10 @@ defmodule ResidencySchedule.ScheduleBuilder do
   Loads an existing schedule from the database into builder state.
 
   Converts the DB residents and their rotations into the in-memory builder
-  format, generating a fresh slot calendar for the schedule's academic year.
-  Returns `{:ok, builder_state}`.
+  format. Legacy schedules use the annual slot calendar; date updates retain
+  their literal date boundaries when loaded and saved.
+  Returns `{:ok, builder_state}`. Date-updated schedules with overlapping shifts
+  return `{:error, reason}` because the editor supports one assignment per cell.
 
   Exempt from doctest — hits the database.
   """
@@ -91,20 +93,70 @@ defmodule ResidencySchedule.ScheduleBuilder do
     schedule = Schedules.get_schedule!(schedule_id)
     db_residents = Residents.list_residents_for_schedule(schedule_id)
     builder_residents = Enum.map(db_residents, &resident_to_builder_map/1)
-    slots = SlotCalendar.build_slots(schedule.academic_year)
+
+    rotations_by_resident =
+      Map.new(db_residents, &{&1.id, Rotations.list_rotations_for_resident(&1.id)})
+
+    literal_dates? =
+      Enum.any?(rotations_by_resident, fn {_, rotations} ->
+        indices = Enum.map(rotations, & &1.slot_index)
+        Enum.any?(indices, &(&1 < 0)) or length(indices) != length(Enum.uniq(indices))
+      end)
+
+    if literal_dates? and
+         Enum.any?(rotations_by_resident, fn {_, rotations} ->
+           overlapping_rotations?(rotations)
+         end) do
+      {:error,
+       "This schedule has overlapping shifts that the editor cannot represent safely. Use Update dates to change specific days."}
+    else
+      load_builder_state(
+        schedule,
+        db_residents,
+        builder_residents,
+        rotations_by_resident,
+        literal_dates?
+      )
+    end
+  end
+
+  defp overlapping_rotations?(rotations) do
+    rotations
+    |> Enum.sort_by(&Date.to_gregorian_days(&1.start_date))
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.any?(fn [first, second] -> Date.compare(first.end_date, second.start_date) != :lt end)
+  end
+
+  defp load_builder_state(
+         schedule,
+         db_residents,
+         builder_residents,
+         rotations_by_resident,
+         literal_dates?
+       ) do
+    slots =
+      if literal_dates?,
+        do: literal_builder_slots(Map.values(rotations_by_resident) |> List.flatten()),
+        else: SlotCalendar.build_slots(schedule.academic_year)
+
     slot_set = MapSet.new(slots, & &1.slot_index)
 
     assignments =
       db_residents
       |> Enum.with_index()
       |> Enum.flat_map(fn {resident, res_idx} ->
-        resident.id
-        |> Rotations.list_rotations_for_resident()
-        |> build_assignments_for_resident(res_idx, slot_set)
+        rotations = Map.fetch!(rotations_by_resident, resident.id)
+
+        if literal_dates?,
+          do: dated_assignments(rotations, res_idx, slots),
+          else: build_assignments_for_resident(rotations, res_idx, slot_set)
       end)
       |> Map.new()
 
-    state = BuilderState.new(schedule.academic_year, builder_residents, slots, assignments)
+    state =
+      BuilderState.new(schedule.academic_year, builder_residents, slots, assignments)
+      |> Map.put(:literal_dates?, literal_dates?)
+
     {:ok, state}
   end
 
@@ -193,7 +245,10 @@ defmodule ResidencySchedule.ScheduleBuilder do
   Exempt from doctest — hits the database.
   """
   def save(state) do
-    parsed_residents = build_parsed_residents(state)
+    parsed_residents =
+      state
+      |> build_parsed_residents()
+      |> preserve_literal_slot_markers(Map.get(state, :literal_dates?, false))
 
     case ScheduleImporter.persist(parsed_residents, state.academic_year) do
       {:ok, result} -> {:ok, result}
@@ -357,6 +412,46 @@ defmodule ResidencySchedule.ScheduleBuilder do
       schedule_number: resident.schedule_number,
       name: resident.name
     }
+  end
+
+  defp literal_builder_slots(rotations) do
+    rotations
+    |> Rotations.date_slots()
+    |> Enum.map(fn {index, start, finish} ->
+      %{
+        slot_index: index,
+        start_date: start,
+        end_date: finish,
+        is_weekend: Date.day_of_week(start) in [6, 7] and Date.day_of_week(finish) in [6, 7]
+      }
+    end)
+  end
+
+  defp dated_assignments(rotations, resident_index, slots) do
+    Enum.flat_map(slots, fn slot ->
+      case Enum.find(
+             rotations,
+             &(Date.compare(&1.start_date, slot.start_date) != :gt and
+                 Date.compare(&1.end_date, slot.start_date) != :lt)
+           ) do
+        nil ->
+          []
+
+        rotation ->
+          [{{resident_index, slot.slot_index}, String.to_existing_atom(rotation.rotation_type)}]
+      end
+    end)
+  end
+
+  defp preserve_literal_slot_markers(parsed, false), do: parsed
+
+  defp preserve_literal_slot_markers(parsed, true) do
+    Enum.map(parsed, fn resident ->
+      %{
+        resident
+        | rotations: Enum.map(resident.rotations, &%{&1 | slot_index: -&1.slot_index - 1})
+      }
+    end)
   end
 
   defp build_assignments_for_resident(rotations, res_idx, slot_set) do

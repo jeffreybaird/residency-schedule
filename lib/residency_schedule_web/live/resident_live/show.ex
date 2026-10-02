@@ -139,24 +139,17 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     type = params["rotation-type"] || params["rotation_type"]
     sd = params["start-date"] || params["start_date"]
     ed = params["end-date"] || params["end_date"]
-    slot_raw = params["slot-index"] || params["slot_index"]
 
     # The row carries its own schedule (entries span multiple academic years),
     # so coworkers are looked up in that entry's schedule, not the page's.
     schedule_id = coworker_schedule_id(params, socket.assigns.resident.schedule_id)
 
     cond do
-      type == "off" and is_binary(sd) and is_binary(ed) and is_binary(slot_raw) ->
+      type == "off" and is_binary(sd) and is_binary(ed) ->
         with {:ok, start_d} <- Date.from_iso8601(sd),
-             {:ok, end_d} <- Date.from_iso8601(ed),
-             {slot_idx, ""} <- Integer.parse(slot_raw) do
+             {:ok, end_d} <- Date.from_iso8601(ed) do
           coworker_rows =
-            Rotations.list_off_coworker_rows_for_slot_in_range(
-              schedule_id,
-              slot_idx,
-              start_d,
-              end_d
-            )
+            Rotations.list_off_coworker_rows_in_range(schedule_id, start_d, end_d)
 
           {:noreply,
            assign(socket,
@@ -877,14 +870,15 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     ]
 
   defp compute_off_slots(rotations, schedule_slots) do
-    resident_slot_indices = MapSet.new(rotations, & &1.slot_index)
-
     schedule_slots
-    |> Enum.reject(fn {slot_index, _start, _end} ->
-      MapSet.member?(resident_slot_indices, slot_index)
+    |> Enum.reject(fn {_index, start, _finish} ->
+      Enum.any?(
+        rotations,
+        &(Date.compare(&1.start_date, start) != :gt and Date.compare(&1.end_date, start) != :lt)
+      )
     end)
-    |> Enum.map(fn {slot_index, start_date, end_date} ->
-      %{slot_index: slot_index, start_date: start_date, end_date: end_date, rotation_type: "off"}
+    |> Enum.map(fn {index, start, finish} ->
+      %{slot_index: index, start_date: start, end_date: finish, rotation_type: "off"}
     end)
   end
 
@@ -914,7 +908,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     rotations = Rotations.list_rotations_for_resident(schedule_resident.id)
 
     off_slots =
-      compute_off_slots(rotations, Rotations.list_schedule_slots(schedule_resident.schedule_id))
+      compute_off_slots(
+        rotations,
+        Rotations.list_schedule_date_slots(schedule_resident.schedule_id)
+      )
 
     entries =
       schedule_resident.id
