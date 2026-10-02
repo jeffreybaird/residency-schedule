@@ -21,7 +21,7 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderStateTest do
     test "immediately computes warnings on creation" do
       # No assignments → all coverage constraints violated
       state = BuilderState.new(2026, [@resident], [@slot], %{})
-      assert length(state.coverage_warnings) > 0
+      assert [_ | _] = state.coverage_warnings
     end
 
     test "no coverage warnings when all required rotations are assigned" do
@@ -90,7 +90,7 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderStateTest do
       # Adding a vacation doesn't satisfy any coverage requirement
       updated = BuilderState.update_assignments(state, 0, 0, :vacation)
       # Coverage warnings should be same or more (not fewer from a vacation assignment)
-      assert length(updated.coverage_warnings) >= 0
+      assert is_list(updated.coverage_warnings)
       assert is_list(updated.duty_warnings)
       # Recomputation ran (same state structure is returned)
       assert Map.has_key?(updated, :duty_warnings)
@@ -231,7 +231,7 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderStateTest do
       }
 
       result = BuilderState.recompute_warnings(state)
-      assert length(result.coverage_warnings) > 0
+      assert [_ | _] = result.coverage_warnings
     end
 
     test "returns placement warnings when a rotation is on the wrong slot type" do

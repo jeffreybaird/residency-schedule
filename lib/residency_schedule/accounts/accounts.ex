@@ -4,9 +4,9 @@ defmodule ResidencySchedule.Accounts do
   """
 
   import Ecto.Query
-  alias ResidencySchedule.Repo
-  alias ResidencySchedule.Accounts.User
   alias ResidencySchedule.Accounts.MagicLinkToken
+  alias ResidencySchedule.Accounts.User
+  alias ResidencySchedule.Repo
 
   # ── User CRUD ���─────────────────────────────────────────────────────────────
 
@@ -191,14 +191,7 @@ defmodule ResidencySchedule.Accounts do
       if demoting_last_admin?(user, role) do
         Repo.rollback(:last_admin)
       else
-        user
-        |> User.role_changeset(%{role: role})
-        |> approve_on_admin_promotion(role)
-        |> Repo.update()
-        |> case do
-          {:ok, updated} -> updated
-          {:error, changeset} -> Repo.rollback(changeset)
-        end
+        update_role_or_rollback(user, role)
       end
     end)
   end
@@ -462,5 +455,16 @@ defmodule ResidencySchedule.Accounts do
       where: t.expires_at < ^cutoff or (not is_nil(t.used_at) and t.used_at < ^cutoff)
     )
     |> Repo.delete_all()
+  end
+
+  defp update_role_or_rollback(user, role) do
+    user
+    |> User.role_changeset(%{role: role})
+    |> approve_on_admin_promotion(role)
+    |> Repo.update()
+    |> case do
+      {:ok, updated} -> updated
+      {:error, changeset} -> Repo.rollback(changeset)
+    end
   end
 end

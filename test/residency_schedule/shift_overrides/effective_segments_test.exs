@@ -1,7 +1,7 @@
 defmodule ResidencySchedule.EffectiveSegmentsTest do
   use ResidencySchedule.DataCase, async: true
 
-  alias ResidencySchedule.{Schedules, Residents, Rotations, ShiftOverrides}
+  alias ResidencySchedule.{Residents, Rotations, Schedules, ShiftOverrides}
 
   setup do
     {:ok, sched} = Schedules.upsert_schedule(2023, "2023–2024")

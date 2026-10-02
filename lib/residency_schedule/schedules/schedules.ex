@@ -1,8 +1,10 @@
 defmodule ResidencySchedule.Schedules do
+  @moduledoc "Manages academic-year schedules."
+
   import Ecto.Query
   alias ResidencySchedule.Repo
-  alias ResidencySchedule.Schedules.Schedule
   alias ResidencySchedule.Residents
+  alias ResidencySchedule.Schedules.Schedule
 
   @doc """
   Returns all schedules ordered by academic_year ascending (oldest first).

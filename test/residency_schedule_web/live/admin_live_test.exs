@@ -2,7 +2,7 @@ defmodule ResidencyScheduleWeb.AdminLiveTest do
   use ResidencyScheduleWeb.ConnCase
   import Phoenix.LiveViewTest
 
-  alias ResidencySchedule.{Schedules, Residents, Rotations}
+  alias ResidencySchedule.{Residents, Rotations, Schedules}
 
   describe "access control" do
     test "redirects to /login when not logged in", %{conn: conn} do

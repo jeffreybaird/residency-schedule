@@ -6,7 +6,7 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderState do
   All mutations return a new state with warnings recomputed.
   """
 
-  alias ResidencySchedule.ScheduleBuilder.{DutyHours, Coverage}
+  alias ResidencySchedule.ScheduleBuilder.{Coverage, DutyHours}
 
   @doc """
   Builds the initial builder state from generated components.
@@ -111,10 +111,7 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderState do
         state.residents
         |> Enum.with_index()
         |> Enum.map(fn {res, i} ->
-          case Enum.find_index(year_indices, &(&1 == i)) do
-            nil -> res
-            year_idx -> %{res | name: Enum.at(new_year_names, year_idx)}
-          end
+          rename_year_resident(res, i, year_indices, new_year_names)
         end)
 
       %{state | residents: updated_residents}
@@ -180,5 +177,12 @@ defmodule ResidencySchedule.ScheduleBuilder.BuilderState do
         coverage_warnings: coverage_warnings,
         placement_warnings: placement_warnings
     }
+  end
+
+  defp rename_year_resident(resident, index, year_indices, names) do
+    case Enum.find_index(year_indices, &(&1 == index)) do
+      nil -> resident
+      year_index -> %{resident | name: Enum.at(names, year_index)}
+    end
   end
 end

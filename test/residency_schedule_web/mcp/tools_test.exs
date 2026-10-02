@@ -4,6 +4,7 @@ defmodule ResidencyScheduleWeb.MCP.ToolsTest do
   import ResidencySchedule.ScheduleFixtures
 
   alias ResidencySchedule.ChangeRequests
+  alias ResidencyScheduleWeb.MCP.Build
   alias ResidencyScheduleWeb.MCP.Tools
 
   doctest Tools
@@ -96,7 +97,7 @@ defmodule ResidencyScheduleWeb.MCP.ToolsTest do
       %{structuredContent: %{server: server, home_resident: %{name: "Clare"}}} =
         call("whoami", %{}, ctx.clare_user)
 
-      assert server.build == ResidencyScheduleWeb.MCP.Build.sha()
+      assert server.build == Build.sha()
       assert server.tool_count == length(Tools.definitions())
       assert "list_residents" in server.tools
       assert "shared_shift_matrix" in server.tools

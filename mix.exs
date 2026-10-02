@@ -91,7 +91,12 @@ defmodule ResidencySchedule.MixProject do
         "esbuild residency_schedule --minify",
         "phx.digest"
       ],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: [
+        "format --force",
+        "compile --warnings-as-errors",
+        "deps.unlock --unused",
+        "test"
+      ]
     ]
   end
 end

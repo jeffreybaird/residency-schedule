@@ -252,7 +252,10 @@ defmodule ResidencyScheduleWeb.ChatLive.Widget do
   defp entry(%{entry: %{kind: :user}} = assigns) do
     ~H"""
     <div id={"entry-#{@entry.id}"} data-kind="user" class="flex justify-end">
-      <p class="max-w-[85%] rounded-2xl bg-blue-600 px-3 py-2 text-sm text-white whitespace-pre-wrap">{@entry.text}</p>
+      <p
+        phx-no-format
+        class="max-w-[85%] rounded-2xl bg-blue-600 px-3 py-2 text-sm text-white whitespace-pre-wrap"
+      >{@entry.text}</p>
     </div>
     """
   end

@@ -1,6 +1,8 @@
 defmodule ResidencyScheduleTest do
   use ResidencyScheduleWeb.ConnCase, async: false
 
+  alias ResidencySchedule.Accounts.User
+
   doctest ResidencySchedule
 
   describe "demo_mode?/0" do
@@ -21,7 +23,7 @@ defmodule ResidencyScheduleTest do
 
   describe "demo_user/0" do
     test "is a resident, so admin checks refuse it" do
-      refute ResidencySchedule.Accounts.User.admin?(ResidencySchedule.demo_user())
+      refute User.admin?(ResidencySchedule.demo_user())
     end
 
     test "is approved, so the auth layer treats it as a valid session" do

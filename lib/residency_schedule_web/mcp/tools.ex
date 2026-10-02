@@ -9,6 +9,7 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
 
   alias ResidencySchedule.Accounts.User
   alias ResidencySchedule.{Assistant, ChangeRequests}
+  alias ResidencyScheduleWeb.MCP.Build
 
   @date_desc "ISO 8601 date (YYYY-MM-DD). Defaults to today in America/New_York."
 
@@ -308,7 +309,7 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
     with {:ok, identity} <- Assistant.whoami(user) do
       {:ok,
        Map.put(identity, :server, %{
-         build: ResidencyScheduleWeb.MCP.Build.sha(),
+         build: Build.sha(),
          tool_count: length(definitions()),
          tools: Enum.map(definitions(), & &1.name)
        })}

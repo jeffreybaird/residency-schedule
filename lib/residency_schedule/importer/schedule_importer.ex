@@ -8,13 +8,14 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   find_or_create semantics ensure each physical person has exactly one row.
   """
 
-  alias ResidencySchedule.Repo
   alias ResidencySchedule.Importer.CsvParser
+  alias ResidencySchedule.Importer.DateUpdater
   alias ResidencySchedule.Importer.ResidentLinker
-  alias ResidencySchedule.Schedules
+  alias ResidencySchedule.Repo
   alias ResidencySchedule.Residents
-  alias ResidencySchedule.Rotations
   alias ResidencySchedule.Residents.ScheduleResident
+  alias ResidencySchedule.Rotations
+  alias ResidencySchedule.Schedules
 
   import Ecto.Query
 
@@ -75,6 +76,70 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
     case ResidentLinker.validate(links, parsed_residents, Residents.list_residents()) do
       {:ok, links} -> persist(parsed_residents, academic_year, links)
       {:error, messages} -> {:error, Enum.join(messages, "; ")}
+    end
+  end
+
+  @doc """
+  Imports a CSV using either whole-year replacement or selected date updates.
+  Date updates require an existing explicit academic year.
+  Exempt from doctest — hits the database.
+  """
+  def import_csv(csv_binary, options) do
+    case Keyword.get(options, :mode, :replace_year) do
+      :replace_year ->
+        import_csv(csv_binary)
+
+      :update_dates ->
+        with {:ok, prepared} <- prepare(csv_binary, options),
+             links = ResidentLinker.links_from_params(prepared.proposals, %{}),
+             {:ok, result} <- commit(prepared.parsed, prepared.academic_year, links, options) do
+          {:ok, result, prepared.warnings}
+        end
+
+      _ ->
+        {:error, "Unknown import mode"}
+    end
+  end
+
+  @doc """
+  Prepares an import in the requested mode without writing to the database.
+  Date updates lock each row to its existing schedule resident identity.
+  Exempt from doctest — hits the database.
+  """
+  def prepare(csv_binary, options) do
+    case Keyword.get(options, :mode, :replace_year) do
+      :replace_year ->
+        prepare(csv_binary)
+
+      :update_dates ->
+        year = Keyword.get(options, :academic_year)
+
+        with {:ok, parsed, warnings} <- CsvParser.parse_date_update(csv_binary, year),
+             {:ok, prepared} <- DateUpdater.prepare(parsed, year) do
+          {:ok,
+           Map.merge(prepared, %{
+             parsed: parsed,
+             warnings: warnings,
+             academic_year: year,
+             mode: :update_dates
+           })}
+        end
+
+      _ ->
+        {:error, "Unknown import mode"}
+    end
+  end
+
+  @doc """
+  Commits a confirmed import in the requested mode.
+  Date updates preserve schedule resident identities and all untouched dates.
+  Exempt from doctest — hits the database.
+  """
+  def commit(parsed, year, links, options) do
+    case Keyword.get(options, :mode, :replace_year) do
+      :replace_year -> commit(parsed, year, links)
+      :update_dates -> DateUpdater.commit(parsed, year, links)
+      _ -> {:error, "Unknown import mode"}
     end
   end
 

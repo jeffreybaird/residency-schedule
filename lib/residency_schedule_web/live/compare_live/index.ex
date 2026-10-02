@@ -1,9 +1,9 @@
 defmodule ResidencyScheduleWeb.CompareLive.Index do
   use ResidencyScheduleWeb, :live_view
 
-  alias ResidencySchedule.Schedules
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
+  alias ResidencySchedule.Schedules
 
   @impl true
   def mount(_params, _session, socket) do
@@ -437,11 +437,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
       case acc do
         [%{date_end: prev_end, rotation_type: prev_type} = range | rest]
         when prev_type == type ->
-          if Date.diff(date, prev_end) == 1 do
-            [%{range | date_end: date} | rest]
-          else
-            [%{date_start: date, date_end: date, rotation_type: type} | acc]
-          end
+          extend_day_range(date, type, prev_end, range, rest, acc)
 
         _ ->
           [%{date_start: date, date_end: date, rotation_type: type} | acc]
@@ -458,4 +454,12 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
 
   defp parse_id(""), do: nil
   defp parse_id(id), do: String.to_integer(id)
+
+  defp extend_day_range(date, type, prev_end, range, rest, acc) do
+    if Date.diff(date, prev_end) == 1 do
+      [%{range | date_end: date} | rest]
+    else
+      [%{date_start: date, date_end: date, rotation_type: type} | acc]
+    end
+  end
 end

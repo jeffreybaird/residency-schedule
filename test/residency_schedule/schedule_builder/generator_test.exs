@@ -1,7 +1,7 @@
 defmodule ResidencySchedule.ScheduleBuilder.GeneratorTest do
   use ExUnit.Case, async: true
 
-  alias ResidencySchedule.ScheduleBuilder.{Generator, ResidentRoster, SlotCalendar, Coverage}
+  alias ResidencySchedule.ScheduleBuilder.{Coverage, Generator, ResidentRoster, SlotCalendar}
 
   setup do
     residents = ResidentRoster.build_residents()

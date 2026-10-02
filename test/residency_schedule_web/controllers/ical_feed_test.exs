@@ -1,7 +1,7 @@
 defmodule ResidencyScheduleWeb.IcalFeedTest do
   use ResidencyScheduleWeb.ConnCase
 
-  alias ResidencySchedule.{Schedules, Residents, Rotations, Repo}
+  alias ResidencySchedule.{Repo, Residents, Rotations, Schedules}
   alias ResidencySchedule.Residents.Resident
 
   setup do

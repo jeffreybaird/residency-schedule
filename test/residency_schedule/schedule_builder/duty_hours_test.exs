@@ -154,7 +154,7 @@ defmodule ResidencySchedule.ScheduleBuilder.DutyHoursTest do
 
       residents = [%{residency_year: 1}]
       viols = DutyHours.violations(assignments, slots, residents)
-      assert length(viols) > 0
+      assert [_ | _] = viols
       assert hd(viols).resident_index == 0
       assert hd(viols).weekly_avg > 80
     end

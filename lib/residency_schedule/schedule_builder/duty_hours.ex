@@ -148,10 +148,7 @@ defmodule ResidencySchedule.ScheduleBuilder.DutyHours do
 
       window_all =
         Enum.filter(all_slots, fn s ->
-          cond do
-            not s.is_weekend -> s.slot_index in weekday_indices
-            s.is_weekend -> s.slot_index in weekday_adjacent_weekends
-          end
+          slot_in_window?(s, weekday_indices, weekday_adjacent_weekends)
         end)
 
       avg = weekly_avg_hours(res_idx, window_all, assignments)
@@ -162,5 +159,12 @@ defmodule ResidencySchedule.ScheduleBuilder.DutyHours do
         []
       end
     end)
+  end
+
+  defp slot_in_window?(slot, weekdays, weekends) do
+    cond do
+      not slot.is_weekend -> slot.slot_index in weekdays
+      slot.is_weekend -> slot.slot_index in weekends
+    end
   end
 end

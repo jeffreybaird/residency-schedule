@@ -206,19 +206,23 @@ defmodule ResidencySchedule.ScheduleBuilder.Coverage do
       Enum.flat_map(requirements, fn {rotation_type, required_count} ->
         actual = count_for_slot(assignments, slot.slot_index, rotation_type)
 
-        if actual < required_count do
-          [
-            %{
-              slot_index: slot.slot_index,
-              rotation_type: rotation_type,
-              actual: actual,
-              required: required_count
-            }
-          ]
-        else
-          []
-        end
+        coverage_shortfall(slot, rotation_type, actual, required_count)
       end)
     end)
+  end
+
+  defp coverage_shortfall(slot, rotation_type, actual, required_count) do
+    if actual < required_count do
+      [
+        %{
+          slot_index: slot.slot_index,
+          rotation_type: rotation_type,
+          actual: actual,
+          required: required_count
+        }
+      ]
+    else
+      []
+    end
   end
 end

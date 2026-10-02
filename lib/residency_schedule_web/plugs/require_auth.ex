@@ -1,4 +1,6 @@
 defmodule ResidencyScheduleWeb.Plugs.RequireAuth do
+  @moduledoc "Requires an authenticated session for protected routes."
+
   import Plug.Conn
   import Phoenix.Controller, only: [redirect: 2]
 

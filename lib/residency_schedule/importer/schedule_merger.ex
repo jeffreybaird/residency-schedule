@@ -218,11 +218,7 @@ defmodule ResidencySchedule.Importer.ScheduleMerger do
           base_value = trimmed(base_row, base_index)
           addon_value = trimmed(addon_row, addon_index)
 
-          if conflict?(base_value, addon_value) do
-            [%{position_code: code, name: name, date: date, base: base_value, addon: addon_value}]
-          else
-            []
-          end
+          build_conflict(code, name, date, base_value, addon_value)
       end
     end)
   end
@@ -294,6 +290,14 @@ defmodule ResidencySchedule.Importer.ScheduleMerger do
     |> case do
       {:ok, values} -> {:ok, Enum.reverse(values)}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp build_conflict(code, name, date, base_value, addon_value) do
+    if conflict?(base_value, addon_value) do
+      [%{position_code: code, name: name, date: date, base: base_value, addon: addon_value}]
+    else
+      []
     end
   end
 end

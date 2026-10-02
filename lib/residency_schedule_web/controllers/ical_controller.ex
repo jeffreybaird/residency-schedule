@@ -1,8 +1,8 @@
 defmodule ResidencyScheduleWeb.IcalController do
   use ResidencyScheduleWeb, :controller
 
-  alias ResidencySchedule.Residents
   alias ResidencySchedule.Ical
+  alias ResidencySchedule.Residents
 
   def show(conn, %{"id" => id}) do
     resident = Residents.get_resident!(String.to_integer(id))

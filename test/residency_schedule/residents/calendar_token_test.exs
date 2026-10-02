@@ -1,7 +1,7 @@
 defmodule ResidencySchedule.Residents.CalendarTokenTest do
   use ResidencySchedule.DataCase, async: true
 
-  alias ResidencySchedule.{Schedules, Residents, Repo}
+  alias ResidencySchedule.{Repo, Residents, Schedules}
   alias ResidencySchedule.Residents.Resident
 
   setup do

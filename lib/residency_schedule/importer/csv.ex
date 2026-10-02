@@ -29,8 +29,7 @@ defmodule ResidencySchedule.Importer.Csv do
   """
   def encode(rows) do
     rows
-    |> Enum.map(&encode_row/1)
-    |> Enum.join("\n")
+    |> Enum.map_join("\n", &encode_row/1)
     |> Kernel.<>("\n")
   end
 
@@ -48,7 +47,7 @@ defmodule ResidencySchedule.Importer.Csv do
   defp parse_char(",", {fields, current, false}), do: {[current | fields], "", false}
   defp parse_char(char, {fields, current, quoted?}), do: {fields, current <> char, quoted?}
 
-  defp encode_row(cells), do: cells |> Enum.map(&encode_cell/1) |> Enum.join(",")
+  defp encode_row(cells), do: Enum.map_join(cells, ",", &encode_cell/1)
 
   defp encode_cell(cell) do
     if String.contains?(cell, [",", "\"", "\n"]) do

@@ -3,6 +3,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
+  alias ResidencyScheduleWeb.ScheduleLive.Index, as: ScheduleIndex
 
   @strong_night_types ~w[night_float strong_weekend_nights]
   @highland_night_types ~w[highland_night_float highland_weekend_nights]
@@ -14,7 +15,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     current_user = socket.assigns.current_user
     home_resident_id = current_user && current_user.home_resident_id
     resident = Residents.get_resident!(String.to_integer(id))
-    today = ResidencyScheduleWeb.ScheduleLive.Index.current_date()
+    today = ScheduleIndex.current_date()
 
     appearances = Residents.list_appearances_for_person(resident.resident_id)
 
@@ -139,65 +140,12 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     type = params["rotation-type"] || params["rotation_type"]
     sd = params["start-date"] || params["start_date"]
     ed = params["end-date"] || params["end_date"]
-    slot_raw = params["slot-index"] || params["slot_index"]
 
     # The row carries its own schedule (entries span multiple academic years),
     # so coworkers are looked up in that entry's schedule, not the page's.
     schedule_id = coworker_schedule_id(params, socket.assigns.resident.schedule_id)
 
-    cond do
-      type == "off" and is_binary(sd) and is_binary(ed) and is_binary(slot_raw) ->
-        with {:ok, start_d} <- Date.from_iso8601(sd),
-             {:ok, end_d} <- Date.from_iso8601(ed),
-             {slot_idx, ""} <- Integer.parse(slot_raw) do
-          coworker_rows =
-            Rotations.list_off_coworker_rows_for_slot_in_range(
-              schedule_id,
-              slot_idx,
-              start_d,
-              end_d
-            )
-
-          {:noreply,
-           assign(socket,
-             shift_coworkers_modal: %{
-               rotation_type: "off",
-               start_date: start_d,
-               end_date: end_d,
-               coworker_rows: coworker_rows
-             }
-           )}
-        else
-          _ -> {:noreply, socket}
-        end
-
-      is_binary(type) and type != "off" and is_binary(sd) and is_binary(ed) ->
-        with {:ok, start_d} <- Date.from_iso8601(sd),
-             {:ok, end_d} <- Date.from_iso8601(ed) do
-          coworker_rows =
-            Rotations.list_effective_coworker_rows_for_type_in_range(
-              schedule_id,
-              type,
-              start_d,
-              end_d
-            )
-
-          {:noreply,
-           assign(socket,
-             shift_coworkers_modal: %{
-               rotation_type: type,
-               start_date: start_d,
-               end_date: end_d,
-               coworker_rows: coworker_rows
-             }
-           )}
-        else
-          _ -> {:noreply, socket}
-        end
-
-      true ->
-        {:noreply, socket}
-    end
+    open_coworker_modal(type, sd, ed, schedule_id, socket)
   end
 
   @impl true
@@ -877,14 +825,15 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     ]
 
   defp compute_off_slots(rotations, schedule_slots) do
-    resident_slot_indices = MapSet.new(rotations, & &1.slot_index)
-
     schedule_slots
-    |> Enum.reject(fn {slot_index, _start, _end} ->
-      MapSet.member?(resident_slot_indices, slot_index)
+    |> Enum.reject(fn {_index, start, _finish} ->
+      Enum.any?(
+        rotations,
+        &(Date.compare(&1.start_date, start) != :gt and Date.compare(&1.end_date, start) != :lt)
+      )
     end)
-    |> Enum.map(fn {slot_index, start_date, end_date} ->
-      %{slot_index: slot_index, start_date: start_date, end_date: end_date, rotation_type: "off"}
+    |> Enum.map(fn {index, start, finish} ->
+      %{slot_index: index, start_date: start, end_date: finish, rotation_type: "off"}
     end)
   end
 
@@ -914,7 +863,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     rotations = Rotations.list_rotations_for_resident(schedule_resident.id)
 
     off_slots =
-      compute_off_slots(rotations, Rotations.list_schedule_slots(schedule_resident.schedule_id))
+      compute_off_slots(
+        rotations,
+        Rotations.list_schedule_date_slots(schedule_resident.schedule_id)
+      )
 
     entries =
       schedule_resident.id
@@ -1115,8 +1067,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
   defp compute_shifts_remaining(rotations, today) do
     rotations
-    |> Enum.reject(fn r -> r.rotation_type in @non_shift_types end)
-    |> Enum.reject(fn r -> Date.compare(r.end_date, today) == :lt end)
+    |> Enum.reject(fn r ->
+      r.rotation_type in @non_shift_types or Date.compare(r.end_date, today) == :lt
+    end)
     |> Enum.map(fn r ->
       effective_start = Enum.max([r.start_date, today], Date)
       Date.diff(r.end_date, effective_start) + 1
@@ -1152,5 +1105,55 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       {type, days}
     end)
     |> Enum.sort_by(fn {type, _} -> Enum.find_index(@night_shift_types, &(&1 == type)) end)
+  end
+
+  defp open_coworker_modal(type, sd, ed, schedule_id, socket) do
+    cond do
+      type == "off" and is_binary(sd) and is_binary(ed) ->
+        with {:ok, start_d} <- Date.from_iso8601(sd),
+             {:ok, end_d} <- Date.from_iso8601(ed) do
+          coworker_rows =
+            Rotations.list_off_coworker_rows_in_range(schedule_id, start_d, end_d)
+
+          {:noreply,
+           assign(socket,
+             shift_coworkers_modal: %{
+               rotation_type: "off",
+               start_date: start_d,
+               end_date: end_d,
+               coworker_rows: coworker_rows
+             }
+           )}
+        else
+          _ -> {:noreply, socket}
+        end
+
+      is_binary(type) and type != "off" and is_binary(sd) and is_binary(ed) ->
+        with {:ok, start_d} <- Date.from_iso8601(sd),
+             {:ok, end_d} <- Date.from_iso8601(ed) do
+          coworker_rows =
+            Rotations.list_effective_coworker_rows_for_type_in_range(
+              schedule_id,
+              type,
+              start_d,
+              end_d
+            )
+
+          {:noreply,
+           assign(socket,
+             shift_coworkers_modal: %{
+               rotation_type: type,
+               start_date: start_d,
+               end_date: end_d,
+               coworker_rows: coworker_rows
+             }
+           )}
+        else
+          _ -> {:noreply, socket}
+        end
+
+      true ->
+        {:noreply, socket}
+    end
   end
 end

@@ -117,6 +117,7 @@ defmodule ResidencySchedule.ChangeRequests do
       request
       |> ChangeRequest.review_changeset(review_attrs(admin, :denied, note))
       |> Repo.update()
+      |> reload_request()
       |> broadcast(:denied)
     end
   end
@@ -191,6 +192,9 @@ defmodule ResidencySchedule.ChangeRequests do
   end
 
   # ── Private: broadcasting ──────────────────────────────────────────────────
+
+  defp reload_request({:ok, request}), do: {:ok, get_request(request.id)}
+  defp reload_request(error), do: error
 
   defp broadcast({:ok, request} = result, event) do
     Phoenix.PubSub.broadcast(ResidencySchedule.PubSub, @topic, {:change_request, event, request})
