@@ -1,10 +1,11 @@
 defmodule ResidencyScheduleWeb.CalendarLive.Index do
   use ResidencyScheduleWeb, :live_view
 
-  alias ResidencySchedule.Schedules
-  alias ResidencySchedule.Rotations
   alias ResidencySchedule.Residents
+  alias ResidencySchedule.Rotations
+  alias ResidencySchedule.Schedules
   alias ResidencySchedule.ShiftOverrides
+  alias ResidencyScheduleWeb.ScheduleLive.Index, as: ScheduleIndex
 
   @impl true
   def mount(_params, _session, socket) do
@@ -535,7 +536,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     {range_start, range_end} = visible_range(socket.assigns.view_mode, focus_date)
     rotations = Rotations.list_rotations_in_range_all_schedules(range_start, range_end)
     overrides = ShiftOverrides.list_overrides_in_range(range_start, range_end)
-    academic_year = ResidencyScheduleWeb.ScheduleLive.Index.current_academic_year(focus_date)
+    academic_year = ScheduleIndex.current_academic_year(focus_date)
 
     assign(socket,
       rotation_index: index_by_date(rotations, & &1.start_date, & &1.end_date),

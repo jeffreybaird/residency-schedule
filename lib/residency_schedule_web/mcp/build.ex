@@ -5,6 +5,7 @@ defmodule ResidencyScheduleWeb.MCP.Build do
   and reads `"dev"` for local builds.
   """
 
+  alias ResidencyScheduleWeb.MCP.Tools
   @sha System.get_env("GITHUB_SHA", "dev") |> String.slice(0, 7)
 
   @doc """
@@ -23,6 +24,6 @@ defmodule ResidencyScheduleWeb.MCP.Build do
       true
   """
   def version do
-    "#{length(ResidencyScheduleWeb.MCP.Tools.definitions())} tools @ #{@sha}"
+    "#{length(Tools.definitions())} tools @ #{@sha}"
   end
 end

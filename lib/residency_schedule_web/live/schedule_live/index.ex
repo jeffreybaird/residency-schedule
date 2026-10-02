@@ -2,9 +2,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   use ResidencyScheduleWeb, :live_view
 
   alias ResidencySchedule.Accounts
-  alias ResidencySchedule.Schedules
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
+  alias ResidencySchedule.Schedules
 
   # Fixed pixel width for the sticky name column — must match left-[Xpx] values below.
   @name_col_px 148

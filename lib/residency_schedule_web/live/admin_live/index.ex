@@ -5,9 +5,9 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
 
   alias ResidencySchedule.Accounts
   alias ResidencySchedule.ChangeRequests
-  alias ResidencySchedule.Schedules
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
+  alias ResidencySchedule.Schedules
   alias ResidencySchedule.ShiftOverrides
 
   @impl true
@@ -125,7 +125,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
            )}
 
         {:error, changeset} ->
-          msg = changeset.errors |> Enum.map_join(", ", fn {f, {m, _}} -> "#{f}: #{m}" end)
+          msg = format_changeset_errors(changeset)
           {:noreply, assign(socket, override_error: msg, override_success: nil)}
       end
     else
@@ -833,4 +833,8 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
   defp date_value(nil), do: ""
   defp date_value(%Date{} = d), do: Date.to_iso8601(d)
   defp date_value(_), do: ""
+
+  defp format_changeset_errors(changeset) do
+    Enum.map_join(changeset.errors, ", ", fn {field, {message, _}} -> "#{field}: #{message}" end)
+  end
 end

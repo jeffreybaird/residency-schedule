@@ -75,11 +75,7 @@ defmodule ResidencySchedule.ScheduleBuilder.Generator do
   defp build_queues(residents) do
     Enum.flat_map(@backbone, fn {rotation_type, allowed_years} ->
       Enum.map(allowed_years, fn year ->
-        indices =
-          residents
-          |> Enum.with_index()
-          |> Enum.filter(fn {r, _} -> r.residency_year == year end)
-          |> Enum.map(fn {_, i} -> i end)
+        indices = resident_indices_for_year(residents, year)
 
         {{rotation_type, year}, :queue.from_list(indices)}
       end)
@@ -196,16 +192,7 @@ defmodule ResidencySchedule.ScheduleBuilder.Generator do
     |> Enum.with_index()
     |> Enum.reduce(assignments, fn {_resident, res_idx}, asgn ->
       Enum.reduce(weekday_to_weekend, asgn, fn {wd_idx, we_idx}, a ->
-        case Map.get(a, {res_idx, wd_idx}) do
-          nil ->
-            a
-
-          rotation_type ->
-            case Map.get(@weekend_map, rotation_type) do
-              nil -> a
-              weekend_type -> Map.put(a, {res_idx, we_idx}, weekend_type)
-            end
-        end
+        assign_weekend(a, res_idx, wd_idx, we_idx)
       end)
     end)
   end
@@ -220,5 +207,26 @@ defmodule ResidencySchedule.ScheduleBuilder.Generator do
       Enum.map(targets, fn {rotation_type, count} -> {{res_idx, rotation_type}, count} end)
     end)
     |> Map.new()
+  end
+
+  defp resident_indices_for_year(residents, year) do
+    residents
+    |> Enum.with_index()
+    |> Enum.filter(fn {resident, _} -> resident.residency_year == year end)
+    |> Enum.map(fn {_, index} -> index end)
+  end
+
+  defp assign_weekend(assignments, resident_index, weekday_index, weekend_index) do
+    case Map.get(assignments, {resident_index, weekday_index}) do
+      nil -> assignments
+      rotation_type -> put_weekend(assignments, resident_index, weekend_index, rotation_type)
+    end
+  end
+
+  defp put_weekend(assignments, resident_index, weekend_index, rotation_type) do
+    case Map.get(@weekend_map, rotation_type) do
+      nil -> assignments
+      weekend_type -> Map.put(assignments, {resident_index, weekend_index}, weekend_type)
+    end
   end
 end

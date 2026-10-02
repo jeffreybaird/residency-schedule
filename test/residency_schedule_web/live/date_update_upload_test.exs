@@ -180,7 +180,7 @@ defmodule ResidencyScheduleWeb.DateUpdateUploadTest do
            end)
   end
 
-  test "editor reports overlapping assignments without editable cells or database writes",
+  test "editor displays overlapping assignments at their actual dates without database writes",
        context do
     first =
       context.schedule_id
@@ -207,7 +207,9 @@ defmodule ResidencyScheduleWeb.DateUpdateUploadTest do
     |> form("form[phx-submit='load_schedule']", %{"schedule_id" => to_string(context.schedule_id)})
     |> render_submit()
 
-    assert has_element?(view, "#edit-load-error", "overlapping")
+    refute has_element?(view, "#edit-load-error")
+    assert has_element?(view, "#editor-grid")
+    assert has_element?(view, "[data-start-date='2026-12-10'][data-end-date='2026-12-13']", "HNF")
     assert has_element?(view, "form[phx-submit='load_schedule']")
     refute has_element?(view, "[phx-click='open_picker']")
     assert Residents.get_resident!(first.id) == before

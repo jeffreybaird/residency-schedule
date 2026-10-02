@@ -1,7 +1,7 @@
 defmodule ResidencySchedule.SchedulesTest do
   use ResidencySchedule.DataCase, async: true
 
-  alias ResidencySchedule.{Schedules, Residents}
+  alias ResidencySchedule.{Residents, Schedules}
 
   describe "academic_year_label/1" do
     test "formats a start year into an en-dash range label" do

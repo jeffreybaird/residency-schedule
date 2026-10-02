@@ -1,8 +1,9 @@
 defmodule ResidencySchedule.Importer.IntegrationTest do
   use ResidencySchedule.DataCase
 
+  alias ResidencySchedule.Importer.ResidentLinker
   alias ResidencySchedule.Importer.ScheduleImporter
-  alias ResidencySchedule.{Schedules, Residents}
+  alias ResidencySchedule.{Residents, Schedules}
 
   describe "full pipeline: CSV binary → database rows" do
     test "imports all residents and rotations from the 2023 fixture" do
@@ -17,7 +18,7 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
       pos = Residents.get_resident_by_position!("R4-1")
       briar = Residents.get_resident!(pos.id)
       assert briar.name == "Briar"
-      assert length(briar.rotations) > 0
+      assert [_ | _] = briar.rotations
     end
 
     test "re-importing the same CSV replaces data without duplication" do
@@ -78,8 +79,8 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
 
       assert Schedules.get_by_year!(2023).label == "2023–2024"
       assert Schedules.get_by_year!(2026).label == "2026–2027"
-      assert length(Residents.list_residents_for_schedule(Schedules.get_by_year!(2023).id)) > 0
-      assert length(Residents.list_residents_for_schedule(Schedules.get_by_year!(2026).id)) > 0
+      assert [_ | _] = Residents.list_residents_for_schedule(Schedules.get_by_year!(2023).id)
+      assert [_ | _] = Residents.list_residents_for_schedule(Schedules.get_by_year!(2026).id)
     end
 
     test "year rollover is corrected — January dates show year+1" do
@@ -125,8 +126,8 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
       assert length(Residents.list_residents()) == people_before
 
       by_confidence = Enum.group_by(prepared.proposals, & &1.confidence)
-      assert length(by_confidence[:exact]) > 0
-      assert length(by_confidence[:none]) > 0
+      assert [_ | _] = by_confidence[:exact]
+      assert [_ | _] = by_confidence[:none]
       assert Enum.all?(by_confidence[:exact], &(&1.proposed_id != nil))
     end
 
@@ -138,7 +139,7 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
       {:ok, prepared} =
         ScheduleImporter.prepare(File.read!("test/fixtures/schedule_2024_2025.csv"))
 
-      links = ResidencySchedule.Importer.ResidentLinker.links_from_params(prepared.proposals, %{})
+      links = ResidentLinker.links_from_params(prepared.proposals, %{})
       people_before = Residents.list_residents()
 
       assert {:ok, %{schedule_id: schedule_id}} =
@@ -167,7 +168,7 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
       refute Enum.any?(prepared.proposals, &(&1.proposed_id == briar.resident_id))
 
       links =
-        ResidencySchedule.Importer.ResidentLinker.links_from_params(prepared.proposals, %{
+        ResidentLinker.links_from_params(prepared.proposals, %{
           unmatched.position_code => to_string(briar.resident_id)
         })
 
@@ -190,7 +191,7 @@ defmodule ResidencySchedule.Importer.IntegrationTest do
       matched = Enum.find(prepared.proposals, &(&1.confidence == :exact))
 
       links =
-        ResidencySchedule.Importer.ResidentLinker.links_from_params(prepared.proposals, %{
+        ResidentLinker.links_from_params(prepared.proposals, %{
           matched.position_code => "new"
         })
 

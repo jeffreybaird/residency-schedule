@@ -526,8 +526,8 @@ defmodule ResidencySchedule.RotationsTest do
   end
 
   describe "filter_rotations_by_residents/2" do
-    alias ResidencySchedule.Rotations.Rotation
     alias ResidencySchedule.Residents.ScheduleResident
+    alias ResidencySchedule.Rotations.Rotation
 
     test "keeps only rotations for the given resident (person) ids" do
       rots = [

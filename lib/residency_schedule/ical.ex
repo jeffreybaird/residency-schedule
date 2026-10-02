@@ -1,4 +1,6 @@
 defmodule ResidencySchedule.Ical do
+  @moduledoc "Renders resident schedules as iCalendar feeds."
+
   alias ResidencySchedule.Rotations
 
   @night_shift_types ~w[night_float strong_weekend_nights highland_night_float highland_weekend_nights]

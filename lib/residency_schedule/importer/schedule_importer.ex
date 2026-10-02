@@ -8,14 +8,14 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   find_or_create semantics ensure each physical person has exactly one row.
   """
 
-  alias ResidencySchedule.Repo
-  alias ResidencySchedule.Importer.DateUpdater
   alias ResidencySchedule.Importer.CsvParser
+  alias ResidencySchedule.Importer.DateUpdater
   alias ResidencySchedule.Importer.ResidentLinker
-  alias ResidencySchedule.Schedules
+  alias ResidencySchedule.Repo
   alias ResidencySchedule.Residents
-  alias ResidencySchedule.Rotations
   alias ResidencySchedule.Residents.ScheduleResident
+  alias ResidencySchedule.Rotations
+  alias ResidencySchedule.Schedules
 
   import Ecto.Query
 

@@ -7,6 +7,7 @@ defmodule ResidencySchedule.Assistant.Chat.SessionTest do
   alias ResidencySchedule.Assistant.Chat
 
   alias ResidencySchedule.Assistant.Chat.{
+    Conversation,
     Providers.Fake,
     Quota,
     SavedSession,
@@ -15,8 +16,8 @@ defmodule ResidencySchedule.Assistant.Chat.SessionTest do
     ToolCall
   }
 
-  alias ResidencyScheduleWeb.MCP.Toolbox
   alias ResidencySchedule.Assistant.LocalDate
+  alias ResidencyScheduleWeb.MCP.Toolbox
 
   doctest Session
 
@@ -249,7 +250,7 @@ defmodule ResidencySchedule.Assistant.Chat.SessionTest do
   end
 
   defp base(user),
-    do: ResidencySchedule.Assistant.Chat.Conversation.new(toolbox: Toolbox, user: user)
+    do: Conversation.new(toolbox: Toolbox, user: user)
 
   describe "lifetime" do
     test "an idle session stops after the configured time", %{user: user} do

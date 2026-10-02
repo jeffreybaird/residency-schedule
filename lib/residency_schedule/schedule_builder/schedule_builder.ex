@@ -11,16 +11,16 @@ defmodule ResidencySchedule.ScheduleBuilder do
   """
 
   alias ResidencySchedule.ScheduleBuilder.{
-    SlotCalendar,
-    ResidentRoster,
     BuilderState,
-    DutyHours,
     Coverage,
+    DutyHours,
+    ResidentRoster,
+    SlotCalendar,
     TemplateLoader
   }
 
   alias ResidencySchedule.Importer.{CsvParser, ScheduleImporter}
-  alias ResidencySchedule.{Schedules, Residents, Rotations}
+  alias ResidencySchedule.{Residents, Rotations, Schedules}
 
   @doc """
   Generates a new draft schedule for the given academic year using the
@@ -52,9 +52,7 @@ defmodule ResidencySchedule.ScheduleBuilder do
         # Strip FLOAT from template — calendar-computed positions override it
         |> Enum.reject(fn {_slot_idx, rotation_type} -> rotation_type == :float end)
         |> Enum.flat_map(fn {slot_idx, rotation_type} ->
-          if slot_idx in slot_set and slot_idx not in float_slots,
-            do: [{{res_idx, slot_idx}, rotation_type}],
-            else: []
+          template_assignment(res_idx, slot_idx, rotation_type, slot_set, float_slots)
         end)
       end)
       |> Map.new()
@@ -381,10 +379,7 @@ defmodule ResidencySchedule.ScheduleBuilder do
       prior_schedule ->
         name_map = build_name_map(prior_schedule.id)
 
-        Enum.map(residents, fn r ->
-          bumped_name = Map.get(name_map, {r.residency_year, r.schedule_number})
-          if bumped_name, do: %{r | name: bumped_name}, else: r
-        end)
+        Enum.map(residents, &apply_carried_name(&1, name_map))
     end
   end
 
@@ -505,5 +500,16 @@ defmodule ResidencySchedule.ScheduleBuilder do
       end
     end)
     |> Enum.sort_by(& &1.slot_index)
+  end
+
+  defp template_assignment(resident_index, slot_index, rotation_type, slots, float_slots) do
+    if slot_index in slots and slot_index not in float_slots,
+      do: [{{resident_index, slot_index}, rotation_type}],
+      else: []
+  end
+
+  defp apply_carried_name(resident, name_map) do
+    bumped_name = Map.get(name_map, {resident.residency_year, resident.schedule_number})
+    if bumped_name, do: %{resident | name: bumped_name}, else: resident
   end
 end

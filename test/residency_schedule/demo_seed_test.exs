@@ -121,8 +121,9 @@ defmodule ResidencySchedule.DemoSeedTest do
   defp unshared_cross_class_pairs(residents) do
     residents
     |> pair_combinations()
-    |> Enum.reject(fn {a, b} -> a.residency_year == b.residency_year end)
-    |> Enum.reject(fn {a, b} -> shares_a_rotation?(a, b) end)
+    |> Enum.reject(fn {a, b} ->
+      a.residency_year == b.residency_year or shares_a_rotation?(a, b)
+    end)
     |> Enum.map(fn {a, b} -> {a.position_code, b.position_code} end)
   end
 

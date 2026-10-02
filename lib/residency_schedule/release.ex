@@ -1,4 +1,7 @@
 defmodule ResidencySchedule.Release do
+  @moduledoc "Provides database tasks for application releases."
+
+  alias ResidencySchedule.Importer.ScheduleImporter
   @app :residency_schedule
 
   @doc """
@@ -86,7 +89,7 @@ defmodule ResidencySchedule.Release do
   defp import_demo_csv do
     demo_csv_path()
     |> File.read!()
-    |> ResidencySchedule.Importer.ScheduleImporter.import_csv()
+    |> ScheduleImporter.import_csv()
   end
 
   defp repos do

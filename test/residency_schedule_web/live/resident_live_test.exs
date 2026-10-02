@@ -2,6 +2,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
   use ResidencyScheduleWeb.ConnCase
   import Phoenix.LiveViewTest
 
+  alias ResidencySchedule.Residents.Resident
   alias ResidencySchedule.Rotations
 
   setup :authenticate_session
@@ -72,8 +73,8 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       user: user
     } do
       {:ok, person} =
-        %ResidencySchedule.Residents.Resident{}
-        |> ResidencySchedule.Residents.Resident.changeset(%{
+        %Resident{}
+        |> Resident.changeset(%{
           name: "Nobody Yet",
           calendar_token: Ecto.UUID.generate()
         })
@@ -130,7 +131,7 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
         })
 
       person =
-        ResidencySchedule.Repo.get!(ResidencySchedule.Residents.Resident, resident.resident_id)
+        ResidencySchedule.Repo.get!(Resident, resident.resident_id)
 
       feed_path = "/feed/#{person.calendar_token}/calendar.ics"
       assert html =~ feed_path

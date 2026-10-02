@@ -65,7 +65,7 @@ defmodule ResidencySchedule.ScheduleBuilder.IntegrationTest do
       {:ok, state} = ScheduleBuilder.load_from_schedule(schedule.id)
 
       assert state.academic_year == schedule.academic_year
-      assert length(state.residents) > 0
+      assert [_ | _] = state.residents
       assert map_size(state.assignments) > 0
     end
 

@@ -2,6 +2,8 @@ defmodule ResidencyScheduleWeb.UploadLiveTest do
   use ResidencyScheduleWeb.ConnCase
   import Phoenix.LiveViewTest
 
+  alias ResidencySchedule.Importer.ScheduleImporter
+
   describe "unauthenticated access" do
     test "redirects to /login when not logged in", %{conn: conn} do
       conn = get(conn, "/admin/upload")
@@ -90,7 +92,7 @@ defmodule ResidencyScheduleWeb.UploadLiveTest do
 
     test "an admin override links a row to the chosen person", %{view: view} do
       fixture = "test/fixtures/schedule_2024_2025.csv"
-      {:ok, prepared} = ResidencySchedule.Importer.ScheduleImporter.prepare(File.read!(fixture))
+      {:ok, prepared} = ScheduleImporter.prepare(File.read!(fixture))
       unmatched = Enum.find(prepared.proposals, &(&1.confidence == :none))
       # Briar graduates after 2023, so linking an unmatched 2024 row to them is a free choice.
       briar = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
@@ -115,7 +117,7 @@ defmodule ResidencyScheduleWeb.UploadLiveTest do
 
     test "a rejected choice writes nothing and stays selected for correction", %{view: view} do
       fixture = "test/fixtures/schedule_2024_2025.csv"
-      {:ok, prepared} = ResidencySchedule.Importer.ScheduleImporter.prepare(File.read!(fixture))
+      {:ok, prepared} = ScheduleImporter.prepare(File.read!(fixture))
       matched = Enum.find(prepared.proposals, &(&1.confidence == :exact))
       upload_and_submit(view, fixture)
 

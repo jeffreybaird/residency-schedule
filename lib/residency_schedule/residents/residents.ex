@@ -1,4 +1,6 @@
 defmodule ResidencySchedule.Residents do
+  @moduledoc "Manages resident identities and their schedule appearances."
+
   import Ecto.Query
   alias ResidencySchedule.Repo
   alias ResidencySchedule.Residents.Resident

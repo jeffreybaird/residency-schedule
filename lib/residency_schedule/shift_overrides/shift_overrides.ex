@@ -1,10 +1,12 @@
 defmodule ResidencySchedule.ShiftOverrides do
+  @moduledoc "Manages approved coverage overrides."
+
   import Ecto.Query
 
   alias ResidencySchedule.Repo
-  alias ResidencySchedule.ShiftOverrides.ShiftOverride
-  alias ResidencySchedule.Rotations.Rotation
   alias ResidencySchedule.Residents.ScheduleResident
+  alias ResidencySchedule.Rotations.Rotation
+  alias ResidencySchedule.ShiftOverrides.ShiftOverride
 
   @doc """
   Creates a shift override.

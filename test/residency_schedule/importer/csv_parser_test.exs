@@ -70,7 +70,7 @@ defmodule ResidencySchedule.Importer.CsvParserTest do
     test "parses the sample fixture with no hard failure" do
       csv = File.read!("test/fixtures/sample.csv")
       assert {:ok, residents, _warnings} = CsvParser.parse(csv)
-      assert length(residents) > 0
+      assert [_ | _] = residents
     end
 
     test "all parsed residents have a non-empty name" do
@@ -95,7 +95,7 @@ defmodule ResidencySchedule.Importer.CsvParserTest do
       briar = Enum.find(residents, &(&1.position_code == "R4-1"))
       assert briar != nil
       assert briar.name == "Briar"
-      assert length(briar.rotations) > 0
+      assert [_ | _] = briar.rotations
     end
 
     test "residency_year and schedule_number are integers" do
@@ -126,7 +126,7 @@ defmodule ResidencySchedule.Importer.CsvParserTest do
       csv = File.read!("test/fixtures/sample.csv")
       {:ok, _residents, warnings} = CsvParser.parse(csv)
       backtick_warnings = Enum.filter(warnings, fn {_code, _idx, val} -> val == "`" end)
-      assert length(backtick_warnings) > 0
+      assert [_ | _] = backtick_warnings
     end
 
     test "US cells parse as :ultrasound (introduced in 2025-2026 to replace USN)" do
@@ -253,7 +253,7 @@ defmodule ResidencySchedule.Importer.CsvParserTest do
         |> Enum.flat_map(& &1.rotations)
         |> Enum.filter(&(&1.rotation_type == :highland_night_float))
 
-      assert length(all_hnf) > 0
+      assert [_ | _] = all_hnf
 
       Enum.each(all_hnf, fn rot ->
         assert Date.day_of_week(rot.start_date) == 7,
@@ -270,7 +270,7 @@ defmodule ResidencySchedule.Importer.CsvParserTest do
         |> Enum.flat_map(& &1.rotations)
         |> Enum.filter(&(&1.rotation_type == :highland_weekend_nights))
 
-      assert length(all_hwn) > 0
+      assert [_ | _] = all_hwn
 
       Enum.each(all_hwn, fn rot ->
         assert rot.start_date == rot.end_date,

@@ -1,0 +1,64 @@
+Imported schedule editor verification — 2026-10-02
+
+Scope: Admin → Edit Schedule uses saved date ranges and original assignment IDs.
+Schedule generation remains separate. Assignment additions, edits, and deletions
+are staged; Save applies explicit differences atomically. Undo and Cancel do not
+write to the database. Untouched rows, identities, slots, and timestamps persist.
+
+Workflow evidence:
+- Native spec writer wrote context and LiveView tests, and narrowly revised the
+  prior overlapping-editor refusal test because the requested behavior changed.
+- Native reviewer accepted the contracts and subsequent test-only corrections.
+- Native runner established RED: 29 tests, 23 failures, seed 496302, exit 2.
+  Log: /private/tmp/editor-red.log.
+- Native runner established supplemental RED for duplicate operations:
+  3 tests, 1 failure, seed 501090, exit 2.
+  Log: /private/tmp/editor-supplemental-red.log.
+- Native implementer owned source edits. Tests were not weakened or modified
+  during implementation. Source and test owners formatted their owned files.
+- Native agent capacity prevented runner/reviewer reactivation for the final
+  stage. The parent performed read-only final verification and independently
+  reviewed the implementation written by the implementer. Parent made no source
+  or test edits for this feature.
+
+Final GREEN:
+mix test --max-cases 1
+171 doctests, 1204 tests, 0 failures, seed 505340, exit 0.
+Log: /private/tmp/editor-full-green.log.
+Implementer focused check: 32 tests, 0 failures, seed 339290.
+
+Final read-only checks passed:
+mix format --check-formatted
+mix compile --warnings-as-errors
+mix credo --strict (212 files, 1823 modules/functions, no issues)
+mix deps.unlock --check-unused
+mix hex.audit (no retired packages; this is not a comprehensive security audit)
+git diff --check
+
+Frozen accepted test SHA-256 values, verified after implementation:
+a517ff32c1e82c94f8255c33d0b8050158387fdfa7d7e78768836f62af9054ec  test/residency_schedule/schedule_editor_test.exs
+ad80d5e16b0fbf53b477773c3809c4f16847eef0c8bbe82329e58cde54d29ce5  test/residency_schedule_web/live/schedule_editor_live_test.exs
+aca03089ce49cd5895aad503030ed9dae0d482333d099fe914de6a87b249d4b3  test/residency_schedule_web/live/date_update_upload_test.exs
+
+Live localhost verification, no development Save or data mutation:
+- Loaded all 3006 assignments from the actual 2026–2027 uploaded schedule.
+- All displayed resident/rotation-label/start/end tuples match saved records.
+  Sorted tuple SHA-256 (3006 entries):
+  2b5ec373b364f5801e5524444e2e720a2f6f6e0ad61383e05ca1f042e8da3bf7
+- Winter HNF form shows literal December 14–18 dates.
+- Changed HNF to AMB in the draft; Cancel restored HNF and cleared the unsaved
+  state, retaining all 3006 assignments. Did not press Save in the dev app.
+- Screenshot: /private/tmp/residency-editor.jpg.
+
+Read-only final review found no additional implementation issues. Reviewed
+assignment scope, literal date projection, separate overlapping IDs, differential
+mutation, snapshot comparison, lock ordering, coverage-reference protection,
+atomic invalid/duplicate-operation rejection, malformed event handling, and
+baseline refresh after successful saves. Existing uncommitted lint work was
+preserved. No commit, push, deployment, or migration was performed.
+
+Dependency review: native reviewer refreshed all 121 GitHub Erlang advisories,
+Bandit maintainer advisories and 1.12.5 changelog on this date. Current locked
+versions resolve the prior findings recorded in security-review.txt; no new
+affected locked dependency found. No dependency changed in this editor fix.
+Application/deployment exposure is outside that dependency review.

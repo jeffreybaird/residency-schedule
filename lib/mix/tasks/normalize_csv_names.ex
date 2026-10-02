@@ -25,8 +25,7 @@ defmodule Mix.Tasks.NormalizeCsvNames do
     data_dir
     |> Path.join("*.csv")
     |> Path.wildcard()
-    |> Enum.reject(&String.contains?(Path.basename(&1), "name_mapping"))
-    |> Enum.reject(&String.contains?(Path.basename(&1), "template"))
+    |> Enum.reject(&String.contains?(Path.basename(&1), ["name_mapping", "template"]))
     |> Enum.each(&normalize_file/1)
   end
 
@@ -42,8 +41,7 @@ defmodule Mix.Tasks.NormalizeCsvNames do
   def normalize_content(content, academic_year) do
     content
     |> String.split("\n")
-    |> Enum.map(&normalize_line(&1, academic_year))
-    |> Enum.join("\n")
+    |> Enum.map_join("\n", &normalize_line(&1, academic_year))
   end
 
   defp academic_year_from_path(path) do

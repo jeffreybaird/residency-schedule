@@ -4,6 +4,7 @@ defmodule ResidencyScheduleWeb.MCP.ServerTest do
   import ResidencySchedule.ScheduleFixtures
 
   alias ResidencySchedule.Accounts.User
+  alias ResidencyScheduleWeb.MCP.Build
   alias ResidencyScheduleWeb.MCP.Server
 
   doctest Server
@@ -22,7 +23,7 @@ defmodule ResidencyScheduleWeb.MCP.ServerTest do
       assert result.protocolVersion == "2025-03-26"
       assert result.capabilities.tools.listChanged == false
       assert result.serverInfo.name == "residency-schedule"
-      assert result.serverInfo.version == ResidencyScheduleWeb.MCP.Build.version()
+      assert result.serverInfo.version == Build.version()
       assert result.serverInfo.version =~ "tools @"
     end
 

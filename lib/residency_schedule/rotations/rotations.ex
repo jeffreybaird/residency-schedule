@@ -1,9 +1,11 @@
 defmodule ResidencySchedule.Rotations do
+  @moduledoc "Queries rotations and their effective date assignments."
+
   import Ecto.Query
   alias ResidencySchedule.Repo
-  alias ResidencySchedule.Rotations.Rotation
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Residents.ScheduleResident
+  alias ResidencySchedule.Rotations.Rotation
   alias ResidencySchedule.ShiftOverrides
 
   @rotation_labels %{
@@ -252,36 +254,7 @@ defmodule ResidencySchedule.Rotations do
       if MapSet.member?(covering_today, rot.schedule_resident_id) do
         []
       else
-        case Map.get(override_by_rotation, rot.id) do
-          nil ->
-            [
-              %{
-                resident: rot.schedule_resident,
-                rotation_type: rot.rotation_type,
-                overridden: false,
-                covered_by: nil,
-                is_coverage: false
-              }
-            ]
-
-          override ->
-            [
-              %{
-                resident: rot.schedule_resident,
-                rotation_type: rot.rotation_type,
-                overridden: true,
-                covered_by: override.covering_schedule_resident,
-                is_coverage: false
-              },
-              %{
-                resident: override.covering_schedule_resident,
-                rotation_type: rot.rotation_type,
-                overridden: false,
-                covered_by: nil,
-                is_coverage: true
-              }
-            ]
-        end
+        effective_rotation_rows(rot, override_by_rotation)
       end
     end)
     |> Enum.sort_by(fn e ->
@@ -987,5 +960,38 @@ defmodule ResidencySchedule.Rotations do
   """
   def all_rotation_types do
     Map.keys(@rotation_labels)
+  end
+
+  defp effective_rotation_rows(rot, override_by_rotation) do
+    case Map.get(override_by_rotation, rot.id) do
+      nil ->
+        [
+          %{
+            resident: rot.schedule_resident,
+            rotation_type: rot.rotation_type,
+            overridden: false,
+            covered_by: nil,
+            is_coverage: false
+          }
+        ]
+
+      override ->
+        [
+          %{
+            resident: rot.schedule_resident,
+            rotation_type: rot.rotation_type,
+            overridden: true,
+            covered_by: override.covering_schedule_resident,
+            is_coverage: false
+          },
+          %{
+            resident: override.covering_schedule_resident,
+            rotation_type: rot.rotation_type,
+            overridden: false,
+            covered_by: nil,
+            is_coverage: true
+          }
+        ]
+    end
   end
 end

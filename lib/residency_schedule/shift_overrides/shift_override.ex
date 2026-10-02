@@ -2,8 +2,8 @@ defmodule ResidencySchedule.ShiftOverrides.ShiftOverride do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias ResidencySchedule.Rotations.Rotation
   alias ResidencySchedule.Residents.ScheduleResident
+  alias ResidencySchedule.Rotations.Rotation
 
   schema "shift_overrides" do
     belongs_to :rotation, Rotation

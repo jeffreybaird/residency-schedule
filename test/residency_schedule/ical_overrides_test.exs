@@ -1,7 +1,7 @@
 defmodule ResidencySchedule.IcalOverridesTest do
   use ResidencySchedule.DataCase, async: true
 
-  alias ResidencySchedule.{Schedules, Residents, Rotations, ShiftOverrides, Ical}
+  alias ResidencySchedule.{Ical, Residents, Rotations, Schedules, ShiftOverrides}
 
   setup do
     {:ok, sched} = Schedules.upsert_schedule(2023, "2023–2024")

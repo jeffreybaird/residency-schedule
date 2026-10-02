@@ -139,17 +139,7 @@ defmodule ResidencyScheduleWeb.AuthController do
       password = Map.get(params, "password", "")
 
       if password != "" do
-        case Accounts.set_password(user, password) do
-          {:ok, updated_user} ->
-            conn
-            |> delete_session(:verified_user_id)
-            |> log_in_user(updated_user)
-
-          {:error, _changeset} ->
-            conn
-            |> put_flash(:error, "Password must be at least 8 characters.")
-            |> render(:show, step: :set_password, email: user.email)
-        end
+        set_password_or_render_error(conn, user, password)
       else
         # User clicked "skip"
         conn
@@ -239,6 +229,20 @@ defmodule ResidencyScheduleWeb.AuthController do
     case get_session(conn, :return_to) do
       "/oauth/authorize" <> _rest = path -> path
       _other -> "/"
+    end
+  end
+
+  defp set_password_or_render_error(conn, user, password) do
+    case Accounts.set_password(user, password) do
+      {:ok, updated_user} ->
+        conn
+        |> delete_session(:verified_user_id)
+        |> log_in_user(updated_user)
+
+      {:error, _changeset} ->
+        conn
+        |> put_flash(:error, "Password must be at least 8 characters.")
+        |> render(:show, step: :set_password, email: user.email)
     end
   end
 end

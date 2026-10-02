@@ -3,8 +3,8 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
 
   on_mount {ResidencyScheduleWeb.UserAuth, :ensure_admin}
 
-  alias ResidencySchedule.ScheduleBuilder
   alias ResidencySchedule.Rotations
+  alias ResidencySchedule.ScheduleBuilder
 
   # Fixed pixel widths for sticky label columns — must match left-[Xpx] values below.
   @id_col_px 72

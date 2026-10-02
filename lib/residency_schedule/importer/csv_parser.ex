@@ -68,9 +68,8 @@ defmodule ResidencySchedule.Importer.CsvParser do
   def parse(csv_binary) do
     rows = decode_rows(csv_binary)
 
-    with {:ok, slots, academic_year} <- extract_slots(rows),
-         {:ok, residents, warnings} <- extract_residents(rows, slots, academic_year) do
-      {:ok, residents, warnings}
+    with {:ok, slots, academic_year} <- extract_slots(rows) do
+      extract_residents(rows, slots, academic_year)
     end
   rescue
     e -> {:error, Exception.message(e)}
@@ -374,24 +373,16 @@ defmodule ResidencySchedule.Importer.CsvParser do
           {slot_index, start_date, end_date} = slots_by_col[col_idx]
           key = String.downcase(trimmed)
 
-          case Map.get(@rotation_abbreviations, key) do
-            nil ->
-              warning = {position_code, slot_index, trimmed}
-              {rotations, [warning | warnings]}
-
-            rotation_type ->
-              {adj_start, adj_end} =
-                adjust_highland_dates(rotation_type, start_date, end_date)
-
-              rotation = %{
-                slot_index: slot_index,
-                start_date: adj_start,
-                end_date: adj_end,
-                rotation_type: rotation_type
-              }
-
-              {[rotation | rotations], warnings}
-          end
+          collect_rotation(
+            key,
+            trimmed,
+            position_code,
+            slot_index,
+            start_date,
+            end_date,
+            rotations,
+            warnings
+          )
       end
     end)
     |> then(fn {rotations, warnings} ->
@@ -431,5 +422,35 @@ defmodule ResidencySchedule.Importer.CsvParser do
 
   defp reject_empty_cells(cells) do
     Enum.reject(cells, &(&1 == "" or is_nil(&1)))
+  end
+
+  defp collect_rotation(
+         key,
+         trimmed,
+         position_code,
+         slot_index,
+         start_date,
+         end_date,
+         rotations,
+         warnings
+       ) do
+    case Map.get(@rotation_abbreviations, key) do
+      nil ->
+        warning = {position_code, slot_index, trimmed}
+        {rotations, [warning | warnings]}
+
+      rotation_type ->
+        {adj_start, adj_end} =
+          adjust_highland_dates(rotation_type, start_date, end_date)
+
+        rotation = %{
+          slot_index: slot_index,
+          start_date: adj_start,
+          end_date: adj_end,
+          rotation_type: rotation_type
+        }
+
+        {[rotation | rotations], warnings}
+    end
   end
 end
