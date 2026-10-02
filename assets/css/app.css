@@ -135,6 +135,42 @@
 /* Use the data attribute for dark mode  */
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
+/* Plain controls also appear outside DaisyUI. Utilities retain precedence for
+   their error, disabled and focus states. */
+@layer base {
+  [data-theme="dark"] *,
+  [data-theme="dark"] *::before,
+  [data-theme="dark"] *::after {
+    border-color: var(--color-gray-700);
+  }
+
+  [data-theme="dark"] body {
+    background-color: var(--color-gray-950);
+    color: var(--color-gray-100);
+  }
+
+  [data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]):not([type="submit"]):not([type="button"]),
+  [data-theme="dark"] select,
+  [data-theme="dark"] textarea {
+    color: var(--color-gray-100);
+    background-color: var(--color-gray-900);
+    border-color: var(--color-gray-600);
+    color-scheme: dark;
+  }
+
+  [data-theme="dark"] input::placeholder,
+  [data-theme="dark"] textarea::placeholder {
+    color: var(--color-gray-400);
+  }
+}
+
+@layer components {
+  [data-theme="dark"] .chat-markdown code {
+    background-color: var(--color-gray-700);
+    color: var(--color-gray-100);
+  }
+}
+
 /* Make LiveView wrapper divs transparent for layout */
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
@@ -184,3 +220,41 @@ body.tour-paused .shepherd-element { visibility: hidden !important; opacity: 0 !
 }
 
 /* This file is for your main application CSS */
+
+/* Shepherd renders outside the LiveView; override its bundled white tooltip. */
+.shepherd-tour-hint { font-size: 0.85em; color: #666; }
+[data-theme="dark"] .shepherd-element,
+[data-theme="dark"] .shepherd-arrow:before {
+  background: var(--color-gray-900);
+  color: var(--color-gray-100);
+}
+[data-theme="dark"] .shepherd-header,
+[data-theme="dark"] .shepherd-has-title .shepherd-content .shepherd-header,
+[data-theme="dark"] .shepherd-element.shepherd-has-title[data-popper-placement^=bottom] > .shepherd-arrow:before {
+  background: var(--color-gray-800);
+}
+[data-theme="dark"] .shepherd-title,
+[data-theme="dark"] .shepherd-text,
+[data-theme="dark"] .shepherd-tour-hint,
+[data-theme="dark"] .shepherd-has-title .shepherd-content .shepherd-cancel-icon,
+[data-theme="dark"] .shepherd-cancel-icon {
+  color: var(--color-gray-100);
+}
+[data-theme="dark"] .shepherd-button.shepherd-button-secondary {
+  background: var(--color-gray-700);
+  color: var(--color-gray-100);
+}
+[data-theme="dark"] .shepherd-button.shepherd-button-secondary:not(:disabled):hover {
+  background: var(--color-gray-600);
+  color: var(--color-gray-100);
+}
+[data-theme="dark"] .shepherd-button:not(.shepherd-button-secondary),
+[data-theme="dark"] #tour-continue-btn {
+  background: var(--color-blue-600);
+  color: white;
+}
+[data-theme="dark"] .shepherd-button:not(.shepherd-button-secondary):not(:disabled):hover,
+[data-theme="dark"] #tour-continue-btn:hover {
+  background: var(--color-blue-700);
+  color: white;
+}

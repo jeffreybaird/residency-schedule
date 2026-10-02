@@ -326,21 +326,23 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
   def render(assigns) do
     ~H"""
     <div class="max-w-2xl mx-auto py-10 px-4">
-      <h1 class="text-2xl font-bold text-gray-800 mb-8">Admin</h1>
+      <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-8">Admin</h1>
 
       <div class="space-y-4">
         <%!-- Schedules card --%>
-        <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
-          <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
+        <div class="border-2 border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-700">
+            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-300">
               Schedules
             </span>
           </div>
-          <div class="divide-y divide-gray-100">
+          <div class="divide-y divide-gray-100 dark:divide-gray-700">
             <div class="px-4 py-4 flex items-center justify-between">
               <div>
-                <p class="text-sm font-medium text-gray-800">Upload a New Schedule</p>
-                <p class="text-xs text-gray-500 mt-0.5">
+                <p class="text-sm font-medium text-gray-800 dark:text-gray-100">
+                  Upload a New Schedule
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-300 mt-0.5">
                   Import a CSV to create a new academic year schedule.
                 </p>
               </div>
@@ -356,22 +358,28 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
               <div class="px-4 py-4">
                 <div class="flex items-center justify-between mb-3">
                   <div>
-                    <p class="text-sm font-medium text-gray-800">Delete a Schedule</p>
-                    <p class="text-xs text-gray-500 mt-0.5">
+                    <p class="text-sm font-medium text-gray-800 dark:text-gray-100">
+                      Delete a Schedule
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-300 mt-0.5">
                       Permanently removes the schedule and all associated resident and rotation data.
                     </p>
                   </div>
-                  <span class="text-xs text-gray-400 ml-4 shrink-0">
+                  <span class="text-xs text-gray-400 dark:text-gray-400 ml-4 shrink-0">
                     {length(@schedules)} schedule{if length(@schedules) != 1, do: "s"}
                   </span>
                 </div>
                 <ul class="space-y-2">
                   <%= for s <- @schedules do %>
-                    <li class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 bg-white">
-                      <span class="text-sm font-medium text-gray-700">{s.label}</span>
+                    <li class="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-900">
+                      <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                        {s.label}
+                      </span>
                       <%= if @delete_confirm_id == s.id do %>
                         <div class="flex items-center gap-2">
-                          <span class="text-xs text-red-700 font-medium">Delete {s.label}?</span>
+                          <span class="text-xs text-red-700 dark:text-red-300 font-medium">
+                            Delete {s.label}?
+                          </span>
                           <button
                             phx-click="confirm_delete"
                             phx-value-id={s.id}
@@ -381,7 +389,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                           </button>
                           <button
                             phx-click="cancel_delete"
-                            class="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-md hover:bg-gray-200 transition-colors"
+                            class="px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-medium rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                           >
                             Cancel
                           </button>
@@ -390,7 +398,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                         <button
                           phx-click="request_delete"
                           phx-value-id={s.id}
-                          class="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
+                          class="px-3 py-1 text-xs font-medium text-red-600 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
                         >
                           Delete
                         </button>
@@ -404,24 +412,26 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
         </div>
 
         <%!-- Users card --%>
-        <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
-          <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
+        <div class="border-2 border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-700">
+            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-300">
               Users
             </span>
           </div>
 
           <%= if @pending_users != [] do %>
             <div class="px-4 py-4">
-              <p class="text-sm font-medium text-gray-800 mb-2">
+              <p class="text-sm font-medium text-gray-800 dark:text-gray-100 mb-2">
                 Pending Approval ({length(@pending_users)})
               </p>
               <ul class="space-y-2">
                 <%= for u <- @pending_users do %>
-                  <li class="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                  <li class="flex items-center justify-between rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-3 py-2">
                     <div>
-                      <span class="text-sm font-medium text-gray-700">{u.email}</span>
-                      <span class="text-xs text-gray-400 ml-2">
+                      <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                        {u.email}
+                      </span>
+                      <span class="text-xs text-gray-400 dark:text-gray-400 ml-2">
                         {Calendar.strftime(u.inserted_at, "%b %-d, %Y")}
                       </span>
                     </div>
@@ -436,7 +446,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                       <button
                         phx-click="deny_user"
                         phx-value-id={u.id}
-                        class="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
+                        class="px-3 py-1 text-xs font-medium text-red-600 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
                       >
                         Deny
                       </button>
@@ -447,23 +457,23 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
             </div>
           <% end %>
 
-          <div class="px-4 py-4 border-t border-gray-100">
-            <p class="text-sm font-medium text-gray-800 mb-2">
+          <div class="px-4 py-4 border-t border-gray-100 dark:border-gray-700">
+            <p class="text-sm font-medium text-gray-800 dark:text-gray-100 mb-2">
               Approved Users ({length(@approved_users)})
             </p>
             <%= if @approved_users == [] do %>
-              <p class="text-xs text-gray-400">No approved users yet.</p>
+              <p class="text-xs text-gray-400 dark:text-gray-400">No approved users yet.</p>
             <% else %>
               <ul class="space-y-2">
                 <%= for u <- @approved_users do %>
-                  <li class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 bg-white">
-                    <span class="text-sm text-gray-700 truncate">{u.email}</span>
+                  <li class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-900">
+                    <span class="text-sm text-gray-700 dark:text-gray-200 truncate">{u.email}</span>
                     <div class="flex items-center gap-2 shrink-0">
                       <form phx-change="set_role" id={"role-form-#{u.id}"}>
                         <input type="hidden" name="user_id" value={u.id} />
                         <select
                           name="role"
-                          class="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:border-blue-500 focus:outline-none"
+                          class="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1 text-xs text-gray-700 dark:text-gray-200 focus:border-blue-500 focus:outline-none"
                         >
                           <option value="user" selected={u.role == :user}>User</option>
                           <option value="resident" selected={u.role == :resident}>Resident</option>
@@ -473,7 +483,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                       <button
                         phx-click="revoke_user"
                         phx-value-id={u.id}
-                        class="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
+                        class="px-3 py-1 text-xs font-medium text-red-600 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
                       >
                         Revoke
                       </button>
@@ -483,11 +493,14 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
               </ul>
             <% end %>
             <%= if @role_error do %>
-              <p class="text-sm text-red-600 mt-2">{@role_error}</p>
+              <p class="text-sm text-red-600 dark:text-red-300 mt-2">{@role_error}</p>
             <% end %>
 
-            <div class="mt-3 pt-3 border-t border-gray-100">
-              <.link navigate="/admin/denied" class="text-xs text-gray-400 hover:text-gray-600">
+            <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+              <.link
+                navigate="/admin/denied"
+                class="text-xs text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
                 Manage denied users →
               </.link>
             </div>
@@ -495,23 +508,23 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
         </div>
 
         <%!-- Account password card --%>
-        <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
-          <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
+        <div class="border-2 border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-700">
+            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-300">
               My Account
             </span>
           </div>
 
           <div class="px-4 py-4 space-y-4">
             <div>
-              <p class="text-sm font-medium text-gray-800 mb-0.5">
+              <p class="text-sm font-medium text-gray-800 dark:text-gray-100 mb-0.5">
                 {if @has_password, do: "Change My Password", else: "Set My Password"}
               </p>
-              <p class="text-xs text-gray-500">
+              <p class="text-xs text-gray-500 dark:text-gray-300">
                 Used to log in as {@current_user.email} and to confirm schedule deletion.
               </p>
               <%= unless @has_password do %>
-                <p class="text-xs text-amber-600 mt-1">
+                <p class="text-xs text-amber-600 dark:text-amber-300 mt-1">
                   Your account has no password yet — you can only log in via email link
                   and cannot confirm schedule deletions until you set one.
                 </p>
@@ -525,7 +538,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
             >
               <%= if @has_password do %>
                 <div>
-                  <label class="block text-xs font-medium text-gray-600 mb-1">
+                  <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
                     Current password
                   </label>
                   <input
@@ -533,13 +546,13 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                     name="current_password"
                     autocomplete="current-password"
                     required
-                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                    class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               <% end %>
 
               <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
                   New password
                 </label>
                 <input
@@ -547,13 +560,13 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                   name="new_password"
                   autocomplete="new-password"
                   required
-                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                  class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 focus:border-blue-500 focus:outline-none"
                 />
-                <p class="text-xs text-gray-400 mt-1">At least 8 characters.</p>
+                <p class="text-xs text-gray-400 dark:text-gray-400 mt-1">At least 8 characters.</p>
               </div>
 
               <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
                   Confirm new password
                 </label>
                 <input
@@ -561,15 +574,15 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                   name="confirm_password"
                   autocomplete="new-password"
                   required
-                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                  class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 focus:border-blue-500 focus:outline-none"
                 />
               </div>
 
               <%= if @password_error do %>
-                <p class="text-sm text-red-600">{@password_error}</p>
+                <p class="text-sm text-red-600 dark:text-red-300">{@password_error}</p>
               <% end %>
               <%= if @password_success do %>
-                <p class="text-sm text-green-600">{@password_success}</p>
+                <p class="text-sm text-green-600 dark:text-green-300">{@password_success}</p>
               <% end %>
 
               <button
@@ -583,48 +596,48 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
         </div>
 
         <%!-- Override card --%>
-        <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
-          <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
+        <div class="border-2 border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-700">
+            <span class="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-300">
               Schedule Overrides
             </span>
           </div>
 
           <%!-- Pending change requests (filed via the assistant API) --%>
           <%= if @pending_requests != [] or @request_error do %>
-            <div class="px-4 py-4 border-b border-gray-200">
-              <p class="text-sm font-medium text-gray-800 mb-2">
+            <div class="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+              <p class="text-sm font-medium text-gray-800 dark:text-gray-100 mb-2">
                 Pending Change Requests ({length(@pending_requests)})
               </p>
               <%= if @request_error do %>
-                <p class="text-sm text-red-600 mb-2">{@request_error}</p>
+                <p class="text-sm text-red-600 dark:text-red-300 mb-2">{@request_error}</p>
               <% end %>
               <ul class="space-y-2">
                 <%= for r <- @pending_requests do %>
                   <li
                     id={"change-request-#{r.id}"}
-                    class="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
+                    class="flex items-start justify-between gap-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-3 py-2"
                   >
-                    <div class="text-sm text-gray-700 leading-snug">
+                    <div class="text-sm text-gray-700 dark:text-gray-200 leading-snug">
                       <span class={"inline-block rounded px-1.5 py-0.5 text-xs font-medium mr-1 #{Rotations.rotation_type_color(r.rotation.rotation_type)}"}>
                         {Rotations.rotation_type_label(r.rotation.rotation_type)}
                       </span>
                       <span class="font-medium">{r.rotation.schedule_resident.name}</span>
-                      <span class="text-gray-400 mx-1">covered by</span>
+                      <span class="text-gray-400 dark:text-gray-400 mx-1">covered by</span>
                       <span class="font-medium">{r.covering_schedule_resident.name}</span>
-                      <span class="text-gray-400 text-xs ml-1">
+                      <span class="text-gray-400 dark:text-gray-400 text-xs ml-1">
                         {Calendar.strftime(r.start_date, "%b %-d")}–{Calendar.strftime(
                           r.end_date,
                           "%b %-d, %Y"
                         )}
                       </span>
-                      <div class="text-xs text-gray-500 mt-0.5">
+                      <div class="text-xs text-gray-500 dark:text-gray-300 mt-0.5">
                         Requested by {r.requested_by_user.email} on {Calendar.strftime(
                           r.inserted_at,
                           "%b %-d, %Y"
                         )}
                         <%= if r.note do %>
-                          <span class="text-gray-400">·</span> “{r.note}”
+                          <span class="text-gray-400 dark:text-gray-400">·</span> “{r.note}”
                         <% end %>
                       </div>
                     </div>
@@ -639,7 +652,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                       <button
                         phx-click="deny_request"
                         phx-value-id={r.id}
-                        class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                        class="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-950"
                       >
                         Deny
                       </button>
@@ -652,8 +665,10 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
 
           <div class="px-4 py-4 space-y-4">
             <div>
-              <p class="text-sm font-medium text-gray-800 mb-0.5">Create a Shift Override</p>
-              <p class="text-xs text-gray-500">
+              <p class="text-sm font-medium text-gray-800 dark:text-gray-100 mb-0.5">
+                Create a Shift Override
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-300">
                 Assign a resident to cover another's shift for a specific date range.
               </p>
             </div>
@@ -662,10 +677,12 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
               <%!-- Step 1: shift type + date range --%>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label class="block text-xs font-medium text-gray-600 mb-1">Shift type</label>
+                  <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                    Shift type
+                  </label>
                   <select
                     name="rotation_type"
-                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                    class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 focus:border-blue-500 focus:outline-none"
                   >
                     <option value="">— select —</option>
                     <%= for type <- Rotations.all_rotation_types() |> Enum.sort() do %>
@@ -677,22 +694,26 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                 </div>
 
                 <div>
-                  <label class="block text-xs font-medium text-gray-600 mb-1">From</label>
+                  <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                    From
+                  </label>
                   <input
                     type="date"
                     name="start_date"
                     value={date_value(@override_start_date)}
-                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                    class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label class="block text-xs font-medium text-gray-600 mb-1">To</label>
+                  <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                    To
+                  </label>
                   <input
                     type="date"
                     name="end_date"
                     value={date_value(@override_end_date)}
-                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                    class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -701,15 +722,17 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
               <div class={
                 if @available_rotations == [], do: "opacity-40 pointer-events-none", else: ""
               }>
-                <label class="block text-xs font-medium text-gray-600 mb-1">
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
                   Resident to cover for
                   <%= if @available_rotations == [] do %>
-                    <span class="text-gray-400 font-normal">(select shift type and dates first)</span>
+                    <span class="text-gray-400 dark:text-gray-400 font-normal">
+                      (select shift type and dates first)
+                    </span>
                   <% end %>
                 </label>
                 <select
                   name="rotation_id"
-                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                  class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 focus:border-blue-500 focus:outline-none"
                 >
                   <option value="">— select resident —</option>
                   <%= for rot <- @available_rotations do %>
@@ -730,17 +753,17 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
               <div class={
                 if @override_rotation_id in [nil, ""], do: "opacity-40 pointer-events-none", else: ""
               }>
-                <label class="block text-xs font-medium text-gray-600 mb-1">
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
                   Covering resident
                   <%= if @override_rotation_id in [nil, ""] do %>
-                    <span class="text-gray-400 font-normal">
+                    <span class="text-gray-400 dark:text-gray-400 font-normal">
                       (select resident to cover for first)
                     </span>
                   <% end %>
                 </label>
                 <select
                   name="covering_resident_id"
-                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none"
+                  class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 focus:border-blue-500 focus:outline-none"
                 >
                   <option value="">— select covering resident —</option>
                   <%= for res <- @available_covering_residents do %>
@@ -755,10 +778,10 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
               </div>
 
               <%= if @override_error do %>
-                <p class="text-sm text-red-600">{@override_error}</p>
+                <p class="text-sm text-red-600 dark:text-red-300">{@override_error}</p>
               <% end %>
               <%= if @override_success do %>
-                <p class="text-sm text-green-600">{@override_success}</p>
+                <p class="text-sm text-green-600 dark:text-green-300">{@override_success}</p>
               <% end %>
 
               <button
@@ -772,23 +795,23 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
 
           <%!-- Existing overrides list --%>
           <%= if @existing_overrides != [] do %>
-            <div class="border-t border-gray-200">
-              <div class="px-4 py-3 bg-gray-50 border-b border-gray-100">
-                <span class="text-xs font-semibold uppercase tracking-widest text-gray-500">
+            <div class="border-t border-gray-200 dark:border-gray-700">
+              <div class="px-4 py-3 bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-700">
+                <span class="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-300">
                   Active Overrides ({length(@existing_overrides)})
                 </span>
               </div>
-              <ul class="divide-y divide-gray-100">
+              <ul class="divide-y divide-gray-100 dark:divide-gray-700">
                 <%= for o <- @existing_overrides do %>
                   <li class="px-4 py-3 flex items-start justify-between gap-3">
-                    <div class="text-sm text-gray-700 leading-snug">
+                    <div class="text-sm text-gray-700 dark:text-gray-200 leading-snug">
                       <span class={"inline-block rounded px-1.5 py-0.5 text-xs font-medium mr-1 #{Rotations.rotation_type_color(o.rotation.rotation_type)}"}>
                         {Rotations.rotation_type_label(o.rotation.rotation_type)}
                       </span>
                       <span class="font-medium">{o.rotation.schedule_resident.name}</span>
-                      <span class="text-gray-400 mx-1">covered by</span>
+                      <span class="text-gray-400 dark:text-gray-400 mx-1">covered by</span>
                       <span class="font-medium">{o.covering_schedule_resident.name}</span>
-                      <span class="text-gray-400 text-xs ml-1">
+                      <span class="text-gray-400 dark:text-gray-400 text-xs ml-1">
                         {Calendar.strftime(o.override_start_date, "%b %-d")}–{Calendar.strftime(
                           o.override_end_date,
                           "%b %-d, %Y"
@@ -798,7 +821,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
                     <button
                       phx-click="delete_override"
                       phx-value-id={o.id}
-                      class="text-xs text-red-500 hover:text-red-700 shrink-0 mt-0.5"
+                      class="text-xs text-red-500 dark:text-red-300 hover:text-red-700 dark:hover:text-red-300 shrink-0 mt-0.5"
                     >
                       Remove
                     </button>

@@ -142,8 +142,8 @@ defmodule ResidencyScheduleWeb.EditLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-gray-50">
-      <div class="sticky top-14 z-40 border-b bg-white px-4 py-3 flex flex-wrap items-center gap-3">
+    <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div class="sticky top-14 z-40 border-b bg-white dark:bg-gray-900 px-4 py-3 flex flex-wrap items-center gap-3">
         <.form for={to_form(%{}, as: nil)} id="load-editor-form" phx-submit="load_schedule">
           <div class="flex gap-2 items-center">
             <select name="schedule_id" aria-label="Academic year" class="rounded border px-2 py-1">
@@ -155,7 +155,9 @@ defmodule ResidencyScheduleWeb.EditLive.Index do
           </div>
         </.form>
         <%= if @editor do %>
-          <span class="text-sm text-gray-600">{@editor.label} · {length(@draft)} assignments</span>
+          <span class="text-sm text-gray-600 dark:text-gray-300">
+            {@editor.label} · {length(@draft)} assignments
+          </span>
           <button
             phx-click="undo"
             disabled={@history == []}
@@ -169,20 +171,34 @@ defmodule ResidencyScheduleWeb.EditLive.Index do
           <button phx-click="save" class="rounded bg-blue-600 px-3 py-2 text-white text-sm">
             Save changes
           </button>
-          <span :if={@saved} role="status" class="text-sm text-green-700">Changes saved</span>
+          <span :if={@saved} role="status" class="text-sm text-green-700 dark:text-green-300">
+            Changes saved
+          </span>
         <% end %>
       </div>
-      <p :if={@load_error} id="edit-load-error" role="alert" class="p-4 text-red-700">
+      <p
+        :if={@load_error}
+        id="edit-load-error"
+        role="alert"
+        class="p-4 text-red-700 dark:text-red-300"
+      >
         {@load_error}
       </p>
-      <p :if={@save_error} id="edit-save-error" role="alert" class="p-4 text-red-700">
+      <p
+        :if={@save_error}
+        id="edit-save-error"
+        role="alert"
+        class="p-4 text-red-700 dark:text-red-300"
+      >
         {@save_error}
       </p>
       <%= if @editor do %>
-        <div class="p-4 text-sm text-gray-600">
+        <div class="p-4 text-sm text-gray-600 dark:text-gray-300">
           Each badge is a separate assignment. Selecting a badge edits its complete saved date range.
           Changes stay in this draft until you save. Resident names are read-only.
-          <span :if={@history != []} class="font-semibold text-amber-700">Unsaved changes</span>
+          <span :if={@history != []} class="font-semibold text-amber-700 dark:text-amber-300">
+            Unsaved changes
+          </span>
         </div>
         <div class="px-4 pb-3 flex gap-2 items-center text-sm">
           <span>Residents:</span>
@@ -201,8 +217,8 @@ defmodule ResidencyScheduleWeb.EditLive.Index do
         <div class="overflow-x-auto pb-6">
           <table id="editor-grid" class="border-separate border-spacing-0 text-xs">
             <thead>
-              <tr class="bg-gray-100">
-                <th class="sticky left-0 z-20 bg-gray-100 border-b border-r px-3 py-2 text-left min-w-52">
+              <tr class="bg-gray-100 dark:bg-gray-800">
+                <th class="sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 border-b border-r px-3 py-2 text-left min-w-52">
                   Resident
                 </th>
                 <th
@@ -221,19 +237,19 @@ defmodule ResidencyScheduleWeb.EditLive.Index do
             </thead>
             <tbody>
               <tr :for={resident <- visible_residents(@editor.residents, @filter_year)}>
-                <td class="sticky left-0 z-10 bg-white border-b border-r px-3 py-2">
+                <td class="sticky left-0 z-10 bg-white dark:bg-gray-900 border-b border-r px-3 py-2">
                   <div class="font-semibold">{resident.position_code} · {resident.name}</div>
                   <button
                     phx-click="add_assignment"
                     phx-value-resident-id={resident.id}
-                    class="mt-1 text-blue-700"
+                    class="mt-1 text-blue-700 dark:text-blue-300"
                   >
                     + Add assignment
                   </button>
                 </td>
                 <td
                   :for={{index, start_date, _end_date} <- @slots}
-                  class="border-b border-r bg-white px-1 py-1 align-top"
+                  class="border-b border-r bg-white dark:bg-gray-900 px-1 py-1 align-top"
                 >
                   <div
                     :for={rotation <- Map.get(@grid, {resident.id, index}, [])}
@@ -264,7 +280,7 @@ defmodule ResidencyScheduleWeb.EditLive.Index do
                       phx-value-id={rotation.id}
                       aria-label={"Remove #{abbreviation(rotation.rotation_type)} assignment #{rotation.start_date} – #{rotation.end_date}"}
                       title="Remove entire assignment from draft"
-                      class="px-1 text-red-700"
+                      class="px-1 text-red-700 dark:text-red-300"
                     >
                       ×
                     </button>
@@ -278,7 +294,7 @@ defmodule ResidencyScheduleWeb.EditLive.Index do
       <%= if @selection do %>
         <div class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
           <div
-            class="rounded-lg bg-white p-6 shadow-xl w-full max-w-md"
+            class="rounded-lg bg-white dark:bg-gray-900 p-6 shadow-xl w-full max-w-md"
             role="dialog"
             aria-modal="true"
             aria-labelledby="assignment-title"
@@ -286,10 +302,12 @@ defmodule ResidencyScheduleWeb.EditLive.Index do
             <h2 id="assignment-title" class="text-lg font-semibold">
               {if(@selection.action == :add, do: "Add assignment", else: "Edit assignment")}
             </h2>
-            <p class="mt-2 text-sm text-gray-600">
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
               These dates describe the whole assignment, including every grid column it spans.
             </p>
-            <p :if={@save_error} role="alert" class="mt-2 text-sm text-red-700">{@save_error}</p>
+            <p :if={@save_error} role="alert" class="mt-2 text-sm text-red-700 dark:text-red-300">
+              {@save_error}
+            </p>
             <.form
               for={@assignment_form}
               id="assignment-form"

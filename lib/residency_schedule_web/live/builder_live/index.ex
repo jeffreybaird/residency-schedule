@@ -189,9 +189,9 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
     assigns = assign(assigns, :abbrev_map, @abbrev_map)
 
     ~H"""
-    <div class="min-h-screen bg-gray-50 relative">
+    <div class="min-h-screen bg-gray-50 dark:bg-gray-950 relative">
       <%!-- Toolbar --%>
-      <div class="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3 sticky top-14 z-40">
+      <div class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3 sticky top-14 z-40">
         <%!-- Generate from scratch --%>
         <form phx-submit="generate" class="flex items-center gap-2">
           <input
@@ -201,12 +201,14 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
             phx-change="set_year"
             min="2020"
             max="2040"
-            class="border border-gray-300 rounded px-2 py-1 text-sm w-24 focus:outline-none focus:ring-1 focus:ring-blue-400"
+            class="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm w-24 focus:outline-none focus:ring-1 focus:ring-blue-400"
             placeholder="Start year"
           />
           <%= case Integer.parse(@academic_year_input) do %>
             <% {y, ""} -> %>
-              <span class="text-xs text-gray-500 font-medium tabular-nums">{y}–{y + 1}</span>
+              <span class="text-xs text-gray-500 dark:text-gray-300 font-medium tabular-nums">
+                {y}–{y + 1}
+              </span>
             <% _ -> %>
               <span></span>
           <% end %>
@@ -224,9 +226,9 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
           <% cov_count = length(@builder_state.coverage_warnings) %>
           <% placement_count = length(@builder_state.placement_warnings) %>
           <% warning_count = duty_count + cov_count + placement_count %>
-          <span class="w-px h-4 bg-gray-200"></span>
+          <span class="w-px h-4 bg-gray-200 dark:bg-gray-700"></span>
           <%= if warning_count > 0 do %>
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-300 rounded-full text-xs font-medium">
               <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fill-rule="evenodd"
@@ -245,19 +247,19 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
               </button>
             <% end %>
           <% else %>
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300 rounded-full text-xs font-medium">
               No warnings
             </span>
           <% end %>
-          <span class="w-px h-4 bg-gray-200"></span>
+          <span class="w-px h-4 bg-gray-200 dark:bg-gray-700"></span>
           <button
             phx-click="undo"
             disabled={@history == []}
             class={[
               "inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors",
               if(@history == [],
-                do: "text-gray-300 cursor-not-allowed",
-                else: "text-gray-600 hover:bg-gray-100"
+                do: "text-gray-300 dark:text-gray-500 cursor-not-allowed",
+                else: "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               )
             ]}
             title="Undo (Ctrl+Z)"
@@ -278,46 +280,50 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
       <%= if @builder_state do %>
         <%!-- Warning banner --%>
         <%= if length(@builder_state.duty_warnings) > 0 or length(@builder_state.coverage_warnings) > 0 or length(@builder_state.placement_warnings) > 0 do %>
-          <div class="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-2">
+          <div class="bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800 px-4 sm:px-6 py-2">
             <%= if length(@builder_state.duty_warnings) > 0 do %>
-              <p class="text-xs font-semibold text-amber-800 mb-1">
+              <p class="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-1">
                 Duty Hour Violations (80 hr/wk avg exceeded):
               </p>
               <div class="flex flex-wrap gap-1 mb-1">
                 <%= for v <- Enum.take(@builder_state.duty_warnings, 30) do %>
                   <% resident = Enum.at(@builder_state.residents, v.resident_index) %>
-                  <span class="inline-block px-2 py-0.5 bg-amber-200 text-amber-900 rounded text-xs">
+                  <span class="inline-block px-2 py-0.5 bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-300 rounded text-xs">
                     {resident && resident.position_code}: {Float.round(v.weekly_avg * 1.0, 1)} hr/wk @ slot {v.window_start_slot}
                   </span>
                 <% end %>
                 <%= if length(@builder_state.duty_warnings) > 30 do %>
-                  <span class="text-xs text-amber-700">
+                  <span class="text-xs text-amber-700 dark:text-amber-300">
                     +{length(@builder_state.duty_warnings) - 30} more
                   </span>
                 <% end %>
               </div>
             <% end %>
             <%= if length(@builder_state.coverage_warnings) > 0 do %>
-              <p class="text-xs font-semibold text-red-800 mb-1">Coverage Shortfalls:</p>
+              <p class="text-xs font-semibold text-red-800 dark:text-red-300 mb-1">
+                Coverage Shortfalls:
+              </p>
               <div class="flex flex-wrap gap-1">
                 <%= for w <- Enum.take(@builder_state.coverage_warnings, 20) do %>
-                  <span class="inline-block px-2 py-0.5 bg-red-100 text-red-900 rounded text-xs">
+                  <span class="inline-block px-2 py-0.5 bg-red-100 dark:bg-red-900 text-red-900 dark:text-red-300 rounded text-xs">
                     Slot {w.slot_index}: {abbrev_atom(w.rotation_type, @abbrev_map)} {w.actual}/{w.required}
                   </span>
                 <% end %>
                 <%= if length(@builder_state.coverage_warnings) > 20 do %>
-                  <span class="text-xs text-red-700">
+                  <span class="text-xs text-red-700 dark:text-red-300">
                     +{length(@builder_state.coverage_warnings) - 20} more
                   </span>
                 <% end %>
               </div>
             <% end %>
             <%= if length(@builder_state.placement_warnings) > 0 do %>
-              <p class="text-xs font-semibold text-purple-800 mb-1 mt-1">Wrong Slot Type:</p>
+              <p class="text-xs font-semibold text-purple-800 dark:text-purple-300 mb-1 mt-1">
+                Wrong Slot Type:
+              </p>
               <div class="flex flex-wrap gap-1">
                 <%= for w <- Enum.take(@builder_state.placement_warnings, 20) do %>
                   <% resident = Enum.at(@builder_state.residents, w.resident_index) %>
-                  <span class="inline-block px-2 py-0.5 bg-purple-100 text-purple-900 rounded text-xs">
+                  <span class="inline-block px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-300 rounded text-xs">
                     {resident && resident.position_code} slot {w.slot_index}: {abbrev_atom(
                       w.rotation_type,
                       @abbrev_map
@@ -325,7 +331,7 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
                   </span>
                 <% end %>
                 <%= if length(@builder_state.placement_warnings) > 20 do %>
-                  <span class="text-xs text-purple-700">
+                  <span class="text-xs text-purple-700 dark:text-purple-300">
                     +{length(@builder_state.placement_warnings) - 20} more
                   </span>
                 <% end %>
@@ -335,8 +341,8 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
         <% end %>
 
         <%!-- Year filter tabs --%>
-        <div class="px-4 sm:px-6 py-3 bg-white border-b border-gray-200 flex flex-wrap items-center gap-2">
-          <span class="text-sm text-gray-500 font-medium">Year:</span>
+        <div class="px-4 sm:px-6 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-2">
+          <span class="text-sm text-gray-500 dark:text-gray-300 font-medium">Year:</span>
           <button
             phx-click="filter_year"
             phx-value-year="all"
@@ -355,7 +361,7 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
           <% end %>
           <span
             id="gantt-year-indicator"
-            class="ml-auto text-sm font-semibold text-gray-500 tabular-nums"
+            class="ml-auto text-sm font-semibold text-gray-500 dark:text-gray-300 tabular-nums"
           >
           </span>
         </div>
@@ -367,15 +373,15 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
         <div id="gantt-scroll" phx-hook="YearTracker" class="overflow-x-auto">
           <table class="border-separate border-spacing-0 text-xs">
             <thead>
-              <tr class="bg-gray-100 sticky top-0 z-30">
+              <tr class="bg-gray-100 dark:bg-gray-800 sticky top-0 z-30">
                 <th
-                  class="sticky left-0 z-40 bg-gray-100 px-2 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-300 whitespace-nowrap"
+                  class="sticky left-0 z-40 bg-gray-100 dark:bg-gray-800 px-2 py-2 text-left font-semibold text-gray-600 dark:text-gray-300 border-b border-r border-gray-300 dark:border-gray-600 whitespace-nowrap"
                   style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
                 >
                   ID
                 </th>
                 <th
-                  class="sticky z-40 bg-gray-100 px-2 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-300 whitespace-nowrap"
+                  class="sticky z-40 bg-gray-100 dark:bg-gray-800 px-2 py-2 text-left font-semibold text-gray-600 dark:text-gray-300 border-b border-r border-gray-300 dark:border-gray-600 whitespace-nowrap"
                   style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
                 >
                   Name
@@ -383,10 +389,10 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
                 <%= for slot <- @builder_state.slots do %>
                   <th
                     class={[
-                      "px-1 py-2 text-center font-medium border-b border-gray-200 whitespace-nowrap",
+                      "px-1 py-2 text-center font-medium border-b border-gray-200 dark:border-gray-700 whitespace-nowrap",
                       if(MapSet.member?(coverage_warned_set, slot.slot_index),
-                        do: "text-red-500 bg-red-50",
-                        else: "text-gray-500"
+                        do: "text-red-500 dark:text-red-300 bg-red-50 dark:bg-red-950",
+                        else: "text-gray-500 dark:text-gray-300"
                       )
                     ]}
                     style="min-width: 44px"
@@ -399,24 +405,24 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
             </thead>
             <tbody>
               <%= for {year, residents} <- visible_residents(residents_by_year, @filter_year) do %>
-                <tr class="bg-gray-50">
+                <tr class="bg-gray-50 dark:bg-gray-950">
                   <td
                     colspan={2 + length(@builder_state.slots)}
-                    class="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200"
+                    class="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700"
                   >
                     R{year} Residents
                   </td>
                 </tr>
                 <%= for {resident, res_idx} <- residents do %>
-                  <tr class="hover:bg-gray-50 border-b border-gray-100">
+                  <tr class="hover:bg-gray-50 dark:hover:bg-gray-950 border-b border-gray-100 dark:border-gray-700">
                     <td
-                      class="sticky left-0 z-20 bg-white px-2 py-1 font-mono text-gray-500 border-r border-gray-200"
+                      class="sticky left-0 z-20 bg-white dark:bg-gray-900 px-2 py-1 font-mono text-gray-500 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700"
                       style={"width: #{@id_col_px}px; min-width: #{@id_col_px}px; max-width: #{@id_col_px}px"}
                     >
                       {resident.position_code}
                     </td>
                     <td
-                      class="group sticky z-20 bg-white border-r border-gray-200 cursor-grab select-none"
+                      class="group sticky z-20 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 cursor-grab select-none"
                       style={"left: #{@id_col_px}px; width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
                       draggable="true"
                       data-res-idx={res_idx}
@@ -425,9 +431,9 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
                       id={"name-cell-#{res_idx}"}
                       phx-hook="ResidentDrag"
                     >
-                      <div class="flex items-center gap-0.5 px-1 py-0.5 bg-white name-cell-inner">
+                      <div class="flex items-center gap-0.5 px-1 py-0.5 bg-white dark:bg-gray-900 name-cell-inner">
                         <svg
-                          class="shrink-0 text-gray-300 group-hover:text-gray-400 transition-colors"
+                          class="shrink-0 text-gray-300 dark:text-gray-500 group-hover:text-gray-400 dark:group-hover:text-gray-400 transition-colors"
                           width="8"
                           height="14"
                           viewBox="0 0 8 14"
@@ -451,11 +457,11 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
                           name="name"
                           title={if is_dup, do: "Name must be unique", else: nil}
                           class={[
-                            "w-full text-xs font-medium bg-transparent rounded px-1 py-0.5 focus:outline-none focus:bg-white transition-colors cursor-text select-text",
+                            "w-full text-xs font-medium bg-transparent rounded px-1 py-0.5 focus:outline-none focus:bg-white dark:focus:bg-gray-900 transition-colors cursor-text select-text",
                             if is_dup do
-                              "border border-red-400 text-red-700 hover:border-red-500 focus:border-red-500"
+                              "border border-red-400 text-red-700 dark:text-red-300 hover:border-red-500 focus:border-red-500"
                             else
-                              "border border-transparent text-gray-700 hover:border-gray-300 focus:border-blue-400"
+                              "border border-transparent text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-400"
                             end
                           ]}
                           placeholder="Name"
@@ -470,7 +476,7 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
                           MapSet.member?(coverage_warned_set, slot.slot_index) %>
                       <td
                         class={[
-                          "px-0.5 py-0.5 text-center border-r border-gray-100 cursor-pointer hover:bg-blue-50 transition-colors",
+                          "px-0.5 py-0.5 text-center border-r border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors",
                           if(has_warn, do: "ring-1 ring-inset ring-amber-300")
                         ]}
                         phx-click="open_picker"
@@ -497,7 +503,7 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
         <% end %>
 
         <%!-- Footer save bar --%>
-        <div class="sticky bottom-0 bg-white border-t border-gray-200 px-4 sm:px-6 py-3 flex items-center gap-3 z-30">
+        <div class="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-3 flex items-center gap-3 z-30">
           <button
             phx-click="save"
             disabled={
@@ -506,12 +512,17 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
             class={[
               "px-5 py-2 rounded-md text-sm font-medium transition-colors",
               if not MapSet.equal?(@duplicate_name_indices, MapSet.new()) do
-                "bg-gray-300 text-gray-500 cursor-not-allowed"
+                "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-300 cursor-not-allowed"
               else
                 case @save_state do
-                  :saving -> "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  :saved -> "bg-green-500 text-white"
-                  _ -> "bg-green-600 text-white hover:bg-green-700"
+                  :saving ->
+                    "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-300 cursor-not-allowed"
+
+                  :saved ->
+                    "bg-green-500 text-white"
+
+                  _ ->
+                    "bg-green-600 text-white hover:bg-green-700"
                 end
               end
             ]}
@@ -531,21 +542,23 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
             end}
           </button>
           <%= if not MapSet.equal?(@duplicate_name_indices, MapSet.new()) do %>
-            <span class="text-sm text-red-600">Resolve duplicate names before saving.</span>
+            <span class="text-sm text-red-600 dark:text-red-300">
+              Resolve duplicate names before saving.
+            </span>
           <% end %>
           <%= if match?({:error, _}, @save_state) do %>
             <% {:error, reason} = @save_state %>
-            <span class="text-sm text-red-600">{inspect(reason)}</span>
+            <span class="text-sm text-red-600 dark:text-red-300">{inspect(reason)}</span>
           <% end %>
           <%= if @save_state == :saved do %>
-            <span class="text-sm text-green-700">
+            <span class="text-sm text-green-700 dark:text-green-300">
               Schedule saved — view it in the main schedule view.
             </span>
           <% end %>
         </div>
       <% else %>
         <div class="flex flex-col items-center justify-center py-24 text-center">
-          <p class="text-gray-500 mb-2">
+          <p class="text-gray-500 dark:text-gray-300 mb-2">
             Enter an academic year and click "Generate new schedule" to build a draft.
           </p>
         </div>
@@ -560,21 +573,23 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
         <% slot = Enum.find(@builder_state.slots, &(&1.slot_index == slot_idx)) %>
         <% valid_rotations = ScheduleBuilder.valid_rotations_for_slot(resident.residency_year, slot) %>
         <div class="fixed inset-0 bg-black/20 z-50" phx-click="close_picker"></div>
-        <div class="fixed right-0 top-0 h-full w-72 bg-white shadow-xl z-50 flex flex-col">
-          <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+        <div class="fixed right-0 top-0 h-full w-72 bg-white dark:bg-gray-900 shadow-xl z-50 flex flex-col">
+          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <div>
-              <p class="text-sm font-semibold text-gray-800">{resident.position_code}</p>
-              <p class="text-xs text-gray-500">Slot {slot_idx}</p>
+              <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                {resident.position_code}
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-300">Slot {slot_idx}</p>
             </div>
             <button
               phx-click="close_picker"
-              class="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             >
               &times;
             </button>
           </div>
           <div class="flex-1 overflow-y-auto px-3 py-3">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wide mb-2">
               Select Rotation
             </p>
             <div class="flex flex-col gap-1">
@@ -586,26 +601,29 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
                   phx-value-rotation={rotation_type}
                   class={[
                     "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors text-left w-full",
-                    if(is_current, do: "ring-2 ring-blue-500 bg-blue-50", else: "hover:bg-gray-50")
+                    if(is_current,
+                      do: "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950",
+                      else: "hover:bg-gray-50 dark:hover:bg-gray-950"
+                    )
                   ]}
                 >
                   <span class={"inline-block rounded px-1.5 py-0.5 text-xs font-medium #{color}"}>
                     {abbrev_atom(rotation_type, @abbrev_map)}
                   </span>
-                  <span class="text-gray-700 flex-1">
+                  <span class="text-gray-700 dark:text-gray-200 flex-1">
                     {Rotations.rotation_type_label(Atom.to_string(rotation_type))}
                   </span>
                   <%= if is_current do %>
-                    <span class="text-blue-500 text-xs font-medium">Current</span>
+                    <span class="text-blue-500 dark:text-blue-300 text-xs font-medium">Current</span>
                   <% end %>
                 </button>
               <% end %>
             </div>
             <%= if current_rotation do %>
-              <div class="mt-3 pt-3 border-t border-gray-100">
+              <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                 <button
                   phx-click="clear_rotation"
-                  class="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-red-600 hover:bg-red-50 transition-colors w-full text-left"
+                  class="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950 transition-colors w-full text-left"
                 >
                   <span class="text-red-400">✕</span> Clear assignment
                 </button>
@@ -657,7 +675,7 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
   end
 
   defp render_builder_cell(nil, _abbrev_map) do
-    Phoenix.HTML.raw(~s(<span class="text-gray-200">–</span>))
+    Phoenix.HTML.raw(~s(<span class="text-gray-200 dark:text-gray-600">–</span>))
   end
 
   defp render_builder_cell(rotation_type, abbrev_map) do
@@ -674,7 +692,8 @@ defmodule ResidencyScheduleWeb.BuilderLive.Index do
 
     if current == value,
       do: "#{base} bg-blue-600 text-white",
-      else: "#{base} bg-gray-100 text-gray-700 hover:bg-gray-200"
+      else:
+        "#{base} bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
   end
 
   defp push_history(socket) do

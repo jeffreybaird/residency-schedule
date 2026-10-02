@@ -1,15 +1,17 @@
-<div class="min-h-screen flex items-center justify-center bg-gray-50">
-  <div class="max-w-sm w-full bg-white rounded-xl shadow-md p-8">
-    <h1 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Residency Schedule</h1>
+<div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+  <div class="max-w-sm w-full bg-white dark:bg-gray-900 rounded-xl shadow-md p-8">
+    <h1 class="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-6 text-center">
+      Residency Schedule
+    </h1>
 
     <%= if flash = @flash["error"] do %>
-      <div class="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+      <div class="mb-4 rounded-md bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
         {flash}
       </div>
     <% end %>
 
     <%= if flash = @flash["info"] do %>
-      <div class="mb-4 rounded-md bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
+      <div class="mb-4 rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
         {flash}
       </div>
     <% end %>
@@ -19,7 +21,10 @@
         <form method="post" action="/login/identify" class="space-y-4">
           <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
           <div>
-            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              for="email"
+              class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
+            >
               Email address
             </label>
             <input
@@ -28,7 +33,7 @@
               name="email"
               autofocus
               placeholder="you@example.com"
-              class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <button
@@ -39,8 +44,8 @@
           </button>
         </form>
       <% :choose_method -> %>
-        <p class="text-sm text-gray-500 text-center mb-4">
-          Signing in as <span class="font-medium text-gray-700">{@email}</span>
+        <p class="text-sm text-gray-500 dark:text-gray-300 text-center mb-4">
+          Signing in as <span class="font-medium text-gray-700 dark:text-gray-200">{@email}</span>
         </p>
 
         <div class="space-y-3">
@@ -57,17 +62,22 @@
           <%= if @has_password do %>
             <div class="relative">
               <div class="absolute inset-0 flex items-center">
-                <div class="w-full border-t border-gray-200"></div>
+                <div class="w-full border-t border-gray-200 dark:border-gray-700"></div>
               </div>
               <div class="relative flex justify-center text-xs">
-                <span class="bg-white px-2 text-gray-400">or</span>
+                <span class="bg-white dark:bg-gray-900 px-2 text-gray-400 dark:text-gray-400">
+                  or
+                </span>
               </div>
             </div>
 
             <form method="post" action="/login/password" class="space-y-3">
               <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
               <div>
-                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  for="password"
+                  class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
+                >
                   Password
                 </label>
                 <input
@@ -75,7 +85,7 @@
                   id="password"
                   name="password"
                   autofocus
-                  class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <button
@@ -89,23 +99,26 @@
         </div>
 
         <div class="mt-4 text-center">
-          <a href="/login" class="text-sm text-gray-400 hover:text-gray-600">
+          <a
+            href="/login"
+            class="text-sm text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
             ← Use a different email
           </a>
         </div>
       <% :check_email -> %>
         <div class="text-center space-y-3">
           <div class="text-4xl">✉️</div>
-          <p class="text-sm text-gray-700">
+          <p class="text-sm text-gray-700 dark:text-gray-200">
             We sent a login link to <span class="font-medium">{@email}</span>
           </p>
-          <p class="text-xs text-gray-400">
+          <p class="text-xs text-gray-400 dark:text-gray-400">
             Check your inbox and click the link to sign in. It expires in 15 minutes.
           </p>
         </div>
       <% :confirm_login -> %>
         <div class="text-center space-y-4">
-          <p class="text-sm text-gray-700">
+          <p class="text-sm text-gray-700 dark:text-gray-200">
             Click below to finish signing in as <span class="font-medium">{@email}</span>.
           </p>
           <form method="post" action="/auth/verify">
@@ -120,15 +133,19 @@
           </form>
         </div>
       <% :set_password -> %>
-        <p class="text-sm text-gray-500 text-center mb-4">
+        <p class="text-sm text-gray-500 dark:text-gray-300 text-center mb-4">
           You're in! Optionally set a password for faster logins next time.
         </p>
 
         <form method="post" action="/auth/set-password" class="space-y-4">
           <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
           <div>
-            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
-              Password <span class="text-gray-400 font-normal">(optional)</span>
+            <label
+              for="password"
+              class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
+            >
+              Password
+              <span class="text-gray-400 dark:text-gray-400 font-normal">(optional)</span>
             </label>
             <input
               type="password"
@@ -136,7 +153,7 @@
               name="password"
               autofocus
               placeholder="At least 8 characters"
-              class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <button
@@ -152,7 +169,7 @@
           <input type="hidden" name="password" value="" />
           <button
             type="submit"
-            class="w-full text-sm text-gray-400 hover:text-gray-600 py-2 transition-colors"
+            class="w-full text-sm text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 py-2 transition-colors"
           >
             Skip for now →
           </button>
@@ -160,31 +177,37 @@
       <% :pending_approval -> %>
         <div class="text-center space-y-3">
           <div class="text-4xl">⏳</div>
-          <p class="text-sm text-gray-700">
+          <p class="text-sm text-gray-700 dark:text-gray-200">
             Your account (<span class="font-medium"><%= @email %></span>) is pending approval.
           </p>
-          <p class="text-xs text-gray-400">
+          <p class="text-xs text-gray-400 dark:text-gray-400">
             You'll be able to access the schedule once an administrator approves your account.
           </p>
         </div>
         <div class="mt-4 text-center">
-          <a href="/login" class="text-sm text-gray-400 hover:text-gray-600">
+          <a
+            href="/login"
+            class="text-sm text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
             ← Back to login
           </a>
         </div>
       <% :denied -> %>
         <div class="text-center space-y-3">
           <div class="text-4xl">🚫</div>
-          <p class="text-sm text-gray-700">
+          <p class="text-sm text-gray-700 dark:text-gray-200">
             Your access request for <span class="font-medium">{@email}</span> was not approved.
           </p>
-          <p class="text-xs text-gray-400">
+          <p class="text-xs text-gray-400 dark:text-gray-400">
             If you believe this was a mistake, reply to the email we sent you and an
             administrator can take another look.
           </p>
         </div>
         <div class="mt-4 text-center">
-          <a href="/login" class="text-sm text-gray-400 hover:text-gray-600">
+          <a
+            href="/login"
+            class="text-sm text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
             ← Back to login
           </a>
         </div>

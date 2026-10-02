@@ -118,9 +118,12 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
   def render(%{review: review} = assigns) when not is_nil(review) do
     ~H"""
     <div class="max-w-4xl mx-auto py-12 px-4">
-      <h1 class="text-3xl font-bold text-gray-800 mb-2">Confirm Residents</h1>
+      <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-2">Confirm Residents</h1>
       <%= if @review.mode == :update_dates do %>
-        <div id="date-update-review" class="rounded-md bg-blue-50 px-4 py-3 mb-6 text-blue-900">
+        <div
+          id="date-update-review"
+          class="rounded-md bg-blue-50 dark:bg-blue-950 px-4 py-3 mb-6 text-blue-900 dark:text-blue-300"
+        >
           <p class="font-medium">Update dates in {@review.label}</p>
           <p>
             {elem(@review.date_range, 0)} through {elem(@review.date_range, 1)} · {length(
@@ -134,12 +137,12 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
           </p>
         </div>
       <% else %>
-        <p class="text-gray-600 mb-6">
+        <p class="text-gray-600 dark:text-gray-300 mb-6">
           {@review.label} · {length(@review.proposals)} rows.
           Each row is matched to an existing resident where possible so their record carries
           across academic years. Check every link before importing.
           <%= if @review.replaces_existing? do %>
-            <span class="font-medium text-yellow-800">
+            <span class="font-medium text-yellow-800 dark:text-yellow-300">
               A schedule for {@review.label} already exists and will be replaced.
             </span>
           <% end %>
@@ -147,7 +150,7 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
       <% end %>
 
       <%= if @error do %>
-        <div class="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
+        <div class="rounded-md bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300 mb-4">
           {@error}
         </div>
       <% end %>
@@ -155,7 +158,7 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
       <.form for={%{}} phx-submit="confirm" class="space-y-6">
         <table class="w-full text-sm" id="link-review">
           <thead>
-            <tr class="text-left text-gray-500 border-b">
+            <tr class="text-left text-gray-500 dark:text-gray-300 border-b">
               <th class="py-2 pr-4">Row</th>
               <th class="py-2 pr-4">Name in CSV</th>
               <th class="py-2 pr-4">Match</th>
@@ -165,8 +168,10 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
           <tbody>
             <%= for proposal <- @review.proposals do %>
               <tr class="border-b" data-row={proposal.position_code}>
-                <td class="py-2 pr-4 font-mono text-gray-700">{proposal.position_code}</td>
-                <td class="py-2 pr-4 text-gray-800">{proposal.name}</td>
+                <td class="py-2 pr-4 font-mono text-gray-700 dark:text-gray-200">
+                  {proposal.position_code}
+                </td>
+                <td class="py-2 pr-4 text-gray-800 dark:text-gray-100">{proposal.name}</td>
                 <td class="py-2 pr-4">
                   <span class={"px-2 py-0.5 rounded-full text-xs font-semibold #{confidence_class(proposal.confidence)}"}>
                     {confidence_label(proposal)}
@@ -174,11 +179,13 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
                 </td>
                 <td class="py-2">
                   <%= if @review.mode == :update_dates do %>
-                    <span class="text-gray-700">{proposal.name} (existing resident)</span>
+                    <span class="text-gray-700 dark:text-gray-200">
+                      {proposal.name} (existing resident)
+                    </span>
                   <% else %>
                     <select
                       name={"link[#{proposal.position_code}]"}
-                      class="border border-gray-300 rounded-md text-sm px-2 py-1 w-full max-w-xs"
+                      class="border border-gray-300 dark:border-gray-600 rounded-md text-sm px-2 py-1 w-full max-w-xs"
                     >
                       <option
                         value="new"
@@ -203,13 +210,13 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
         </table>
 
         <%= if length(@warnings) > 0 do %>
-          <div class="rounded-md bg-yellow-50 border border-yellow-200 px-4 py-3">
-            <p class="text-sm font-medium text-yellow-800 mb-2">
+          <div class="rounded-md bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 px-4 py-3">
+            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-2">
               {length(@warnings)} unrecognized abbreviation(s). {if @review.mode == :update_dates,
                 do: "Existing assignments on those dates will be preserved:",
                 else: "These assignments will be skipped:"}
             </p>
-            <ul class="text-sm text-yellow-700 list-disc list-inside space-y-0.5">
+            <ul class="text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-0.5">
               <%= for {code, _idx, val} <- Enum.take(@warnings, 20) do %>
                 <li>{code}: "{val}"</li>
               <% end %>
@@ -227,7 +234,7 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
           <button
             type="button"
             phx-click="cancel-review"
-            class="py-2 px-4 text-sm text-gray-600 hover:text-gray-800"
+            class="py-2 px-4 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
           >
             Cancel
           </button>
@@ -240,7 +247,7 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
   def render(assigns) do
     ~H"""
     <div class="max-w-2xl mx-auto py-12 px-4">
-      <h1 class="text-3xl font-bold text-gray-800 mb-8">Upload Schedule</h1>
+      <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-8">Upload Schedule</h1>
 
       <.form for={%{}} phx-submit="save" phx-change="validate" class="space-y-6">
         <.input
@@ -260,17 +267,19 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
           prompt="Select an existing schedule"
           options={Enum.map(@schedules, &{&1.label, Integer.to_string(&1.academic_year)})}
         />
-        <p class="text-sm text-gray-600">Update dates fills in FLOAT periods using a partial CSV.
+        <p class="text-sm text-gray-600 dark:text-gray-300">
+          Update dates fills in FLOAT periods using a partial CSV.
           Only recognized assignments and explicit OFF cells change existing dates.
-          Replace year replaces the complete schedule.</p>
+          Replace year replaces the complete schedule.
+        </p>
         <div
-          class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors"
+          class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center hover:border-blue-400 transition-colors"
           phx-drop-target={@uploads.schedule_csv.ref}
         >
           <.live_file_input upload={@uploads.schedule_csv} class="sr-only" />
 
           <div class="space-y-2">
-            <p class="text-gray-600">Drag and drop a CSV file here, or</p>
+            <p class="text-gray-600 dark:text-gray-300">Drag and drop a CSV file here, or</p>
             <label
               for={@uploads.schedule_csv.ref}
               class="cursor-pointer inline-block bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
@@ -280,35 +289,35 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
           </div>
 
           <%= for entry <- @uploads.schedule_csv.entries do %>
-            <div class="mt-4 flex items-center justify-between bg-gray-50 rounded-md px-4 py-2">
-              <span class="text-sm text-gray-700">{entry.client_name}</span>
+            <div class="mt-4 flex items-center justify-between bg-gray-50 dark:bg-gray-950 rounded-md px-4 py-2">
+              <span class="text-sm text-gray-700 dark:text-gray-200">{entry.client_name}</span>
               <button
                 type="button"
                 phx-click="cancel-upload"
                 phx-value-ref={entry.ref}
-                class="text-red-500 hover:text-red-700 text-xs"
+                class="text-red-500 dark:text-red-300 hover:text-red-700 dark:hover:text-red-300 text-xs"
               >
                 Remove
               </button>
             </div>
             <%= for err <- upload_errors(@uploads.schedule_csv, entry) do %>
-              <p class="mt-1 text-sm text-red-600">{humanize_error(err)}</p>
+              <p class="mt-1 text-sm text-red-600 dark:text-red-300">{humanize_error(err)}</p>
             <% end %>
           <% end %>
         </div>
 
         <%= if @error do %>
-          <div class="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          <div class="rounded-md bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {@error}
           </div>
         <% end %>
 
         <%= if length(@warnings) > 0 do %>
-          <div class="rounded-md bg-yellow-50 border border-yellow-200 px-4 py-3">
-            <p class="text-sm font-medium text-yellow-800 mb-2">
+          <div class="rounded-md bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 px-4 py-3">
+            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-2">
               {length(@warnings)} unrecognized abbreviation(s) were skipped:
             </p>
-            <ul class="text-sm text-yellow-700 list-disc list-inside space-y-0.5">
+            <ul class="text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-0.5">
               <%= for {code, _idx, val} <- Enum.take(@warnings, 20) do %>
                 <li>{code}: "{val}"</li>
               <% end %>
@@ -323,7 +332,10 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
           >
             Import Schedule
           </button>
-          <.link navigate="/admin" class="py-2 px-4 text-sm text-gray-600 hover:text-gray-800">
+          <.link
+            navigate="/admin"
+            class="py-2 px-4 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
+          >
             Back to Admin
           </.link>
         </div>
@@ -367,10 +379,17 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
   defp confidence_label(%{suggestions: []}), do: "No match"
   defp confidence_label(%{suggestions: many}), do: "#{length(many)} possible matches"
 
-  defp confidence_class(:exact), do: "bg-green-100 text-green-700"
-  defp confidence_class(:alias), do: "bg-green-100 text-green-700"
-  defp confidence_class(:first_name), do: "bg-yellow-100 text-yellow-800"
-  defp confidence_class(:none), do: "bg-gray-100 text-gray-600"
+  defp confidence_class(:exact),
+    do: "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
+
+  defp confidence_class(:alias),
+    do: "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
+
+  defp confidence_class(:first_name),
+    do: "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300"
+
+  defp confidence_class(:none),
+    do: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
 
   defp humanize_error(:too_large), do: "File is too large (max 5 MB)"
   defp humanize_error(:too_many_files), do: "Only one file at a time"

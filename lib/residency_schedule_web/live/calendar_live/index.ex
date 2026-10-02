@@ -198,16 +198,19 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       <div id="calendar-prefs" phx-hook="CalendarPrefs" class="hidden"></div>
       <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div class="flex items-center gap-3">
-          <h1 class="text-2xl font-bold text-gray-800">Calendar</h1>
+          <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Calendar</h1>
           <button
             phx-click="restart_tour"
-            class="text-sm text-blue-500 hover:text-blue-700 transition-colors"
+            class="text-sm text-blue-500 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
             title="Take a guided tour"
           >
             Take a tour
           </button>
         </div>
-        <div id="tour-view-toggle" class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+        <div
+          id="tour-view-toggle"
+          class="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1"
+        >
           <%= for {mode, label} <- [{:month, "Month"}, {:week, "Week"}, {:day, "Day"}] do %>
             <button
               phx-click="set_view"
@@ -232,24 +235,24 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         <div id="tour-month-nav" class="flex items-center justify-between mb-4">
           <button
             phx-click="prev"
-            class="px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 text-sm font-medium transition-colors"
+            class="px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium transition-colors"
           >
             ← Prev
           </button>
           <div class="flex items-center gap-3">
-            <h2 class="text-lg font-semibold text-gray-700">
+            <h2 class="text-lg font-semibold text-gray-700 dark:text-gray-200">
               {period_label(@view_mode, @focus_date)}
             </h2>
             <button
               phx-click="today"
-              class="px-2 py-1 rounded-md text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+              class="px-2 py-1 rounded-md text-xs font-medium text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
             >
               Today
             </button>
           </div>
           <button
             phx-click="next"
-            class="px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 text-sm font-medium transition-colors"
+            class="px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium transition-colors"
           >
             Next →
           </button>
@@ -260,7 +263,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
             <% :month -> %>
               <div
                 id="tour-calendar-grid"
-                class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm"
+                class="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
               >
                 <.weekday_headers />
                 <%= for day <- calendar_days(@focus_date) do %>
@@ -269,15 +272,15 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                     phx-click="select_day"
                     phx-value-date={Date.to_iso8601(day)}
                     class={[
-                      "relative bg-white p-1 sm:p-2 h-14 sm:h-20 cursor-pointer border-0 transition-colors hover:bg-blue-50",
+                      "relative bg-white dark:bg-gray-900 p-1 sm:p-2 h-14 sm:h-20 cursor-pointer border-0 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950",
                       if(day.month == @focus_date.month, do: "", else: "opacity-40")
                     ]}
                   >
                     <span class={[
                       "text-sm font-medium",
                       if(day == Date.utc_today(),
-                        do: "text-blue-600 font-bold",
-                        else: "text-gray-700"
+                        do: "text-blue-600 dark:text-blue-300 font-bold",
+                        else: "text-gray-700 dark:text-gray-200"
                       )
                     ]}>
                       {day.day}
@@ -297,7 +300,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
             <% :week -> %>
               <div
                 id="tour-calendar-grid"
-                class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden shadow-sm"
+                class="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
               >
                 <.weekday_headers />
                 <%= for day <- week_days(@focus_date) do %>
@@ -305,13 +308,13 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                   <div
                     phx-click="select_day"
                     phx-value-date={Date.to_iso8601(day)}
-                    class="bg-white p-2 min-h-[8rem] cursor-pointer transition-colors hover:bg-blue-50"
+                    class="bg-white dark:bg-gray-900 p-2 min-h-[8rem] cursor-pointer transition-colors hover:bg-blue-50 dark:hover:bg-blue-950"
                   >
                     <span class={[
                       "text-sm font-medium",
                       if(day == Date.utc_today(),
-                        do: "text-blue-600 font-bold",
-                        else: "text-gray-700"
+                        do: "text-blue-600 dark:text-blue-300 font-bold",
+                        else: "text-gray-700 dark:text-gray-200"
                       )
                     ]}>
                       {day.day}
@@ -330,9 +333,9 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
             <% :day -> %>
               <div
                 id="tour-calendar-grid"
-                class="bg-white border border-gray-200 rounded-xl shadow-sm p-6"
+                class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6"
               >
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
                   {Calendar.strftime(@focus_date, "%A, %B %-d, %Y")}
                 </h3>
                 <.detail_groups groups={day_detail_for(assigns, @focus_date)} />
@@ -344,22 +347,22 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         <%= if @selected_date && @view_mode in [:month, :week] do %>
           <div class="fixed inset-0 z-50 flex items-center justify-center">
             <div phx-click="close_modal" class="absolute inset-0 bg-black/40"></div>
-            <div class="relative bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 z-10 max-h-[80vh] flex flex-col">
+            <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full mx-4 z-10 max-h-[80vh] flex flex-col">
               <div class="flex items-start justify-between p-6 pb-4 shrink-0">
-                <h3 class="text-lg font-semibold text-gray-800">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
                   {Calendar.strftime(@selected_date, "%A, %B %-d, %Y")}
                 </h3>
                 <div class="flex items-center gap-3 ml-4">
                   <button
                     phx-click="open_day_view"
                     phx-value-date={Date.to_iso8601(@selected_date)}
-                    class="text-xs font-medium text-blue-600 hover:underline whitespace-nowrap"
+                    class="text-xs font-medium text-blue-600 dark:text-blue-300 hover:underline whitespace-nowrap"
                   >
                     Day view
                   </button>
                   <button
                     phx-click="close_modal"
-                    class="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                    class="text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none"
                   >
                     ✕
                   </button>
@@ -374,7 +377,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         <% end %>
       <% else %>
         <div class="text-center py-20">
-          <p class="text-gray-500">No schedule uploaded yet.</p>
+          <p class="text-gray-500 dark:text-gray-300">No schedule uploaded yet.</p>
         </div>
       <% end %>
     </div>
@@ -385,7 +388,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   defp weekday_headers(assigns) do
     ~H"""
     <%= for {short, long} <- [{"Su","Sun"},{"Mo","Mon"},{"Tu","Tue"},{"We","Wed"},{"Th","Thu"},{"Fr","Fri"},{"Sa","Sat"}] do %>
-      <div class="bg-gray-50 px-1 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
+      <div class="bg-gray-50 dark:bg-gray-950 px-1 py-2 text-center text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wide">
         <span class="sm:hidden">{short}</span>
         <span class="hidden sm:inline">{long}</span>
       </div>
@@ -415,15 +418,20 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       </div>
 
       <%= if @filter_panel == :residents do %>
-        <div class="mt-2 rounded-lg border border-gray-200 bg-white shadow-sm p-3">
+        <div class="mt-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm p-3">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Residents</span>
-            <button phx-click="clear_resident_filter" class="text-xs text-blue-600 hover:underline">
+            <span class="text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wide">
+              Residents
+            </span>
+            <button
+              phx-click="clear_resident_filter"
+              class="text-xs text-blue-600 dark:text-blue-300 hover:underline"
+            >
               All
             </button>
           </div>
           <%= if @resident_options == [] do %>
-            <p class="text-sm text-gray-400">No residents yet.</p>
+            <p class="text-sm text-gray-400 dark:text-gray-400">No residents yet.</p>
           <% else %>
             <div class="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
               <%= for resident <- @resident_options do %>
@@ -442,15 +450,20 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       <% end %>
 
       <%= if @filter_panel == :rotations do %>
-        <div class="mt-2 rounded-lg border border-gray-200 bg-white shadow-sm p-3">
+        <div class="mt-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm p-3">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rotations</span>
-            <button phx-click="clear_rotation_filter" class="text-xs text-blue-600 hover:underline">
+            <span class="text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wide">
+              Rotations
+            </span>
+            <button
+              phx-click="clear_rotation_filter"
+              class="text-xs text-blue-600 dark:text-blue-300 hover:underline"
+            >
               All
             </button>
           </div>
           <%= if @type_options == [] do %>
-            <p class="text-sm text-gray-400">No rotations in view.</p>
+            <p class="text-sm text-gray-400 dark:text-gray-400">No rotations in view.</p>
           <% else %>
             <div class="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
               <%= for type <- @type_options do %>
@@ -461,7 +474,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                     "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
                     if(type in @rotation_filter,
                       do: Rotations.rotation_type_color(type),
-                      else: "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      else:
+                        "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
                     )
                   ]}
                 >
@@ -480,7 +494,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   defp detail_groups(assigns) do
     ~H"""
     <%= if @groups == [] do %>
-      <p class="text-sm text-gray-400">No rotations recorded for this day.</p>
+      <p class="text-sm text-gray-400 dark:text-gray-400">No rotations recorded for this day.</p>
     <% else %>
       <div class="space-y-4">
         <%= for {type, entries} <- @groups do %>
@@ -489,35 +503,35 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
               <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{Rotations.rotation_type_color(type)}"}>
                 {Rotations.rotation_type_label(type)}
               </span>
-              <span class="text-xs text-gray-400">
+              <span class="text-xs text-gray-400 dark:text-gray-400">
                 {length(entries)} resident{if length(entries) != 1, do: "s"}
               </span>
             </div>
             <ul class="space-y-1 pl-1">
               <%= for entry <- entries do %>
                 <li class="flex items-center gap-2 text-sm">
-                  <span class="text-xs text-gray-400 font-mono w-10">
+                  <span class="text-xs text-gray-400 dark:text-gray-400 font-mono w-10">
                     {entry.resident.position_code}
                   </span>
                   <.link
                     navigate={"/residents/#{entry.resident.id}"}
                     class={[
-                      "hover:text-blue-600 hover:underline",
+                      "hover:text-blue-600 dark:hover:text-blue-300 hover:underline",
                       if(entry.overridden,
-                        do: "line-through text-gray-400",
-                        else: "text-gray-700"
+                        do: "line-through text-gray-400 dark:text-gray-400",
+                        else: "text-gray-700 dark:text-gray-200"
                       )
                     ]}
                   >
                     {entry.resident.name}
                   </.link>
                   <%= if entry.overridden do %>
-                    <span class="text-xs text-gray-400 italic">
+                    <span class="text-xs text-gray-400 dark:text-gray-400 italic">
                       → {entry.covered_by.name}
                     </span>
                   <% end %>
                   <%= if entry.is_coverage do %>
-                    <span class="text-xs text-blue-500 italic">(covering)</span>
+                    <span class="text-xs text-blue-500 dark:text-blue-300 italic">(covering)</span>
                   <% end %>
                 </li>
               <% end %>
@@ -686,17 +700,23 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     base = "px-3 py-1 rounded-md text-sm font-medium transition-colors"
 
     if current == mode,
-      do: "#{base} bg-white text-blue-600 shadow-sm",
-      else: "#{base} text-gray-600 hover:text-gray-800"
+      do: "#{base} bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-300 shadow-sm",
+      else:
+        "#{base} text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
   end
 
   defp filter_toggle_class(open?, active?) do
     base = "px-3 py-1.5 rounded-md text-sm font-medium transition-colors border"
 
     cond do
-      open? -> "#{base} bg-blue-600 text-white border-blue-600"
-      active? -> "#{base} bg-blue-50 text-blue-700 border-blue-200"
-      true -> "#{base} bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+      open? ->
+        "#{base} bg-blue-600 text-white border-blue-600"
+
+      active? ->
+        "#{base} bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+
+      true ->
+        "#{base} bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-950"
     end
   end
 
@@ -706,7 +726,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
     if selected?,
       do: "#{base} bg-blue-600 text-white",
-      else: "#{base} bg-gray-100 text-gray-700 hover:bg-gray-200"
+      else:
+        "#{base} bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
   end
 
   defp filter_count_suffix([]), do: ""

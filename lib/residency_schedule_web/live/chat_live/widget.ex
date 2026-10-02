@@ -145,18 +145,18 @@ defmodule ResidencyScheduleWeb.ChatLive.Widget do
         id="chat-panel"
         role="dialog"
         aria-label="Assistant"
-        class="fixed inset-x-2 bottom-2 z-40 flex h-[70vh] flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl sm:inset-x-auto sm:bottom-4 sm:right-4 sm:h-[32rem] sm:max-h-[calc(100vh-2rem)] sm:w-96"
+        class="fixed inset-x-2 bottom-2 z-40 flex h-[70vh] flex-col rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl sm:inset-x-auto sm:bottom-4 sm:right-4 sm:h-[32rem] sm:max-h-[calc(100vh-2rem)] sm:w-96"
       >
-        <div class="flex items-center justify-between gap-2 border-b border-gray-200 px-4 py-2">
-          <h2 class="text-sm font-semibold text-gray-800">Assistant</h2>
-          <div class="flex items-center gap-2 text-xs text-gray-500">
+        <div class="flex items-center justify-between gap-2 border-b border-gray-200 dark:border-gray-700 px-4 py-2">
+          <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-100">Assistant</h2>
+          <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-300">
             <span id="chat-remaining">{@remaining} messages left today</span>
             <button
               :if={@entries != []}
               type="button"
               phx-click="reset"
               disabled={@busy}
-              class="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+              class="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50"
             >
               New chat
             </button>
@@ -165,7 +165,7 @@ defmodule ResidencyScheduleWeb.ChatLive.Widget do
               type="button"
               phx-click="close"
               aria-label="Close the assistant"
-              class="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+              class="rounded-md p-1 text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-100"
             >
               <.icon name="hero-x-mark" class="size-4" />
             </button>
@@ -177,24 +177,31 @@ defmodule ResidencyScheduleWeb.ChatLive.Widget do
           phx-hook="ChatScroll"
           class="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3"
         >
-          <p :if={@entries == []} class="text-sm text-gray-500">
+          <p :if={@entries == []} class="text-sm text-gray-500 dark:text-gray-300">
             Ask about who is on a service, a resident's schedule, shared shifts, or coverage.
           </p>
           <.entry :for={entry <- @entries} entry={entry} />
-          <p :if={@busy} id="chat-thinking" class="text-xs text-gray-400">Working…</p>
+          <p :if={@busy} id="chat-thinking" class="text-xs text-gray-400 dark:text-gray-400">
+            Working…
+          </p>
         </div>
 
         <div
           :if={@pending != []}
           id="chat-approval"
-          class="space-y-2 border-t border-amber-200 bg-amber-50 px-4 py-3"
+          class="space-y-2 border-t border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-3"
         >
-          <p class="text-sm font-semibold text-amber-900">
+          <p class="text-sm font-semibold text-amber-900 dark:text-amber-300">
             The assistant wants to make a change. Run it?
           </p>
-          <div :for={call <- @pending} class="rounded-lg border border-amber-200 bg-white p-2">
-            <p class="text-sm font-medium text-gray-800">{tool_label(call.name)}</p>
-            <pre class="mt-1 whitespace-pre-wrap text-xs text-gray-600">{format_args(call.args)}</pre>
+          <div
+            :for={call <- @pending}
+            class="rounded-lg border border-amber-200 dark:border-amber-800 bg-white dark:bg-gray-900 p-2"
+          >
+            <p class="text-sm font-medium text-gray-800 dark:text-gray-100">
+              {tool_label(call.name)}
+            </p>
+            <pre class="mt-1 whitespace-pre-wrap text-xs text-gray-600 dark:text-gray-300">{format_args(call.args)}</pre>
           </div>
           <div class="flex gap-2">
             <button
@@ -209,7 +216,7 @@ defmodule ResidencyScheduleWeb.ChatLive.Widget do
               type="button"
               phx-click="deny"
               disabled={@busy}
-              class="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+              class="rounded-md bg-gray-100 dark:bg-gray-800 px-3 py-1 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50"
             >
               Deny
             </button>
@@ -219,12 +226,16 @@ defmodule ResidencyScheduleWeb.ChatLive.Widget do
         <p
           :if={@error}
           id="chat-error"
-          class="mx-4 mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          class="mx-4 mb-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 px-3 py-2 text-sm text-red-700 dark:text-red-300"
         >
           {@error}
         </p>
 
-        <form id="chat-form" phx-submit="send" class="flex gap-2 border-t border-gray-200 px-3 py-2">
+        <form
+          id="chat-form"
+          phx-submit="send"
+          class="flex gap-2 border-t border-gray-200 dark:border-gray-700 px-3 py-2"
+        >
           <input
             type="text"
             name="message"
@@ -232,7 +243,7 @@ defmodule ResidencyScheduleWeb.ChatLive.Widget do
             placeholder="Who is on onc tomorrow?"
             disabled={@busy or @pending != []}
             phx-mounted={JS.focus()}
-            class="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:bg-gray-50"
+            class="min-w-0 flex-1 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:bg-gray-50 dark:disabled:bg-gray-950"
           />
           <button
             type="submit"
@@ -263,7 +274,7 @@ defmodule ResidencyScheduleWeb.ChatLive.Widget do
   defp entry(%{entry: %{kind: :assistant}} = assigns) do
     ~H"""
     <div id={"entry-#{@entry.id}"} data-kind="assistant" class="flex justify-start">
-      <div class="chat-markdown max-w-[85%] rounded-2xl bg-gray-100 px-3 py-2 text-sm text-gray-800">
+      <div class="chat-markdown max-w-[85%] rounded-2xl bg-gray-100 px-3 py-2 dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100">
         {Markdown.to_html(@entry.text)}
       </div>
     </div>
@@ -278,7 +289,7 @@ defmodule ResidencyScheduleWeb.ChatLive.Widget do
       data-status={tool_status(@entry.result)}
       class="flex justify-start"
     >
-      <p class="text-xs text-gray-500 px-2">
+      <p class="text-xs text-gray-500 dark:text-gray-300 px-2">
         <span :if={is_nil(@entry.result)}>Running {tool_label(@entry.call.name)}…</span>
         <span :if={match?(%ToolResult{error?: false}, @entry.result)}>
           Used {tool_label(@entry.call.name)}

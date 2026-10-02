@@ -465,6 +465,8 @@ Hooks.YearTracker = {
       pill.classList.toggle("text-white", isActive)
       pill.classList.toggle("bg-gray-100", !isActive)
       pill.classList.toggle("text-gray-700", !isActive)
+      pill.classList.toggle("dark:bg-gray-800", !isActive)
+      pill.classList.toggle("dark:text-gray-200", !isActive)
     })
   },
 
@@ -517,12 +519,12 @@ function checkAllDuplicateNames() {
   inputs.forEach(inp => {
     const isDup = counts[inp.value.trim().toLowerCase()] > 1
     if (isDup) {
-      inp.classList.add("border-red-400", "text-red-700")
-      inp.classList.remove("border-transparent", "text-gray-700", "hover:border-gray-300", "focus:border-blue-400")
+      inp.classList.add("border-red-400", "text-red-700", "dark:text-red-300")
+      inp.classList.remove("border-transparent", "text-gray-700", "dark:text-gray-200", "hover:border-gray-300", "dark:hover:border-gray-600", "focus:border-blue-400")
       inp.setAttribute("title", "Name must be unique")
     } else {
-      inp.classList.remove("border-red-400", "text-red-700")
-      inp.classList.add("border-transparent", "text-gray-700", "hover:border-gray-300", "focus:border-blue-400")
+      inp.classList.remove("border-red-400", "text-red-700", "dark:text-red-300")
+      inp.classList.add("border-transparent", "text-gray-700", "dark:text-gray-200", "hover:border-gray-300", "dark:hover:border-gray-600", "focus:border-blue-400")
       inp.removeAttribute("title")
     }
   })
@@ -536,7 +538,7 @@ function residentDragYearCells(year) {
 // Transform the .name-cell-inner div (NOT the <td>) so the <td> keeps its hit-test
 // area fixed — prevents the feedback loop that causes shaking.
 //
-// Each inner div has bg-white so it carries its own background when transformed.
+// Each inner div carries its themed background when transformed.
 // During drag we set td backgrounds transparent so a shifted inner from the cell
 // above can show through without being covered by the td's own white background.
 
@@ -549,6 +551,7 @@ function residentDragApplyPreview(srcEl, targetEl) {
   const hasError = srcEl.dataset.hasError === "true"
   const ringColor = hasError ? "ring-red-400" : "ring-blue-400"
   const bgColor   = hasError ? "bg-red-50"   : "bg-blue-50"
+  const darkBgColor = hasError ? "dark:bg-red-950" : "dark:bg-blue-950"
 
   cells.forEach((cell, i) => {
     const inner = cell.querySelector(".name-cell-inner")
@@ -570,6 +573,7 @@ function residentDragApplyPreview(srcEl, targetEl) {
     cell.classList.toggle("ring-2", isTarget)
     cell.classList.toggle(ringColor, isTarget)
     cell.classList.toggle(bgColor, isTarget)
+    cell.classList.toggle(darkBgColor, isTarget)
   })
 }
 
@@ -581,7 +585,7 @@ function residentDragClearPreview() {
       inner.style.transition = "none"
       inner.style.transform = ""
     }
-    cell.classList.remove("ring-2", "ring-blue-400", "ring-red-400", "bg-blue-50", "bg-red-50")
+    cell.classList.remove("ring-2", "ring-blue-400", "ring-red-400", "bg-blue-50", "bg-red-50", "dark:bg-blue-950", "dark:bg-red-950")
     cell.removeAttribute("data-name-drag-over")
   })
 }
@@ -748,4 +752,3 @@ if (process.env.NODE_ENV === "development") {
     window.liveReloader = reloader
   })
 }
-
