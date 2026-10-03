@@ -2,7 +2,14 @@ defmodule ResidencySchedule.DetailedSchedules do
   @moduledoc "Persists confirmed QGenda detail without replacing rotations or absent assignments."
   import Ecto.Query
   alias ResidencySchedule.Accounts.User
-  alias ResidencySchedule.DetailedSchedules.{Activity, ActivitySource, ImportBatch}
+
+  alias ResidencySchedule.DetailedSchedules.{
+    Activity,
+    ActivitySearch,
+    ActivitySource,
+    ImportBatch
+  }
+
   alias ResidencySchedule.Repo
   alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents.{Resident, ScheduleResident}
@@ -29,6 +36,33 @@ defmodule ResidencySchedule.DetailedSchedules do
   end
 
   def commit(_, _), do: {:error, "An administrator must prepare a valid preview before saving."}
+
+  @doc """
+  Searches dated activities by academic year, literal task, note or resident name text.
+  Optional date and stable person filters narrow results; pages contain at most 100 activities.
+  Returns neutral display fields without import provenance. Exempt from doctest — database query.
+  """
+  def search(params) do
+    with {:ok, result} <- ActivitySearch.prepare(params) do
+      entries = result.query |> load_activities() |> Enum.map(&search_entry/1)
+      {:ok, result |> Map.delete(:query) |> Map.put(:entries, entries)}
+    end
+  end
+
+  defp search_entry(activity) do
+    Map.take(activity, [
+      :id,
+      :schedule_resident_id,
+      :resident_id,
+      :position_code,
+      :date,
+      :raw_task,
+      :period,
+      :site,
+      :display_name,
+      :notes
+    ])
+  end
 
   @doc "Lists detail for one schedule and date. Exempt from doctest — database query."
   def list_for_date(schedule_id, date) do
