@@ -1,8 +1,9 @@
 # QGenda calendar preview
 
-Milestone 1 adds a read-only preview of a QGenda **Calendar By Staff** Excel
-export. It does not save assignments, rename residents, replace rotations, or
-determine surgery availability.
+The QGenda **Calendar By Staff** Excel workflow starts with a read-only preview.
+Administrators can then confirm saving matched daily activities alongside the
+existing rotations. Previewing alone does not write assignments. Neither step
+renames residents, replaces rotations, or determines surgery availability.
 
 ## Using the preview
 
@@ -14,9 +15,12 @@ determine surgery availability.
    date coverage, daily assignments, and linked notes.
 5. Use the preview filter and pagination to inspect assignments. Re-uploading
    replaces the current preview rather than appending another copy.
+6. Confirm saving the matched activities when the preview is correct. See
+   [imported daily activities](qgenda-activities.md) for repeated-import behavior
+   and viewing the saved details.
 
-The existing CSV import workflow remains separate. The QGenda preview has no
-commit action. Saving detailed assignments is a later milestone.
+The existing CSV import workflow remains separate. Saving QGenda activities
+does not apply the CSV rotation replacement or date-update operations.
 
 ## Identity matching
 
@@ -27,8 +31,9 @@ not sufficient to establish identity.
 Reviewed aliases can be uploaded with the workbook for that preview. This is
 useful when the existing schedule uses first names or nicknames and QGenda uses
 full names. The preview indicates where its crosswalk came from. Uploaded
-crosswalks apply only to that preview and are not saved on the server; supply
-the file again when preparing another preview.
+crosswalks apply only to that preview and are not saved as reusable mappings on
+the server; supply the file again when preparing another preview. Saving the
+resulting activities preserves their matched resident and source information.
 
 Alternatively, aliases can be supplied through a local server CSV whose default path is
 `data/qgenda-resident-crosswalk.csv`. Configure another location using the

@@ -1,6 +1,7 @@
 defmodule ResidencyScheduleWeb.CalendarLive.Index do
   use ResidencyScheduleWeb, :live_view
 
+  alias ResidencySchedule.DetailedSchedules
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
   alias ResidencySchedule.Schedules
@@ -339,6 +340,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                   {Calendar.strftime(@focus_date, "%A, %B %-d, %Y")}
                 </h3>
                 <.detail_groups groups={day_detail_for(assigns, @focus_date)} />
+                <.day_activity_detail activities={visible_activities(assigns, @focus_date)} />
               </div>
           <% end %>
         </div>
@@ -371,6 +373,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
               <div class="overflow-y-auto px-6 pb-6">
                 <.detail_groups groups={day_detail_for(assigns, @selected_date)} />
+                <.day_activity_detail activities={visible_activities(assigns, @selected_date)} />
               </div>
             </div>
           </div>
@@ -551,13 +554,65 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     rotations = Rotations.list_rotations_in_range_all_schedules(range_start, range_end)
     overrides = ShiftOverrides.list_overrides_in_range(range_start, range_end)
     academic_year = ScheduleIndex.current_academic_year(focus_date)
+    activities = DetailedSchedules.list_in_range(range_start, range_end)
+    options = Residents.list_resident_filter_options_for_year(academic_year)
+
+    activity_options =
+      Enum.map(
+        activities,
+        &%{id: &1.resident_id, name: &1.display_name, position_code: &1.position_code}
+      )
 
     assign(socket,
       rotation_index: index_by_date(rotations, & &1.start_date, & &1.end_date),
       override_index: index_by_date(overrides, & &1.override_start_date, & &1.override_end_date),
-      resident_options: Residents.list_resident_filter_options_for_year(academic_year),
+      resident_options: Enum.uniq_by(options ++ activity_options, & &1.id),
+      activity_index: Enum.group_by(activities, & &1.date),
       type_options: type_options(rotations)
     )
+  end
+
+  defp visible_activities(assigns, date) do
+    assigns.activity_index
+    |> Map.get(date, [])
+    |> Enum.filter(&(assigns.resident_filter == [] or &1.resident_id in assigns.resident_filter))
+  end
+
+  defp day_activity_detail(assigns) do
+    ~H"""
+    <section
+      id="day-activities"
+      class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3"
+    >
+      <h3 class="font-semibold">QGenda daily detail</h3>
+      <p class="text-xs text-gray-500 dark:text-gray-300">
+        Detailed commitments accompany the base rotations above. Resident filters apply; rotation filters do not classify these tasks.
+      </p>
+      <p :if={@activities == []} class="text-sm">
+        No QGenda detail for this date and resident selection. Missing detail does not establish availability.
+      </p>
+      <article
+        :for={activity <- @activities}
+        data-resident-id={activity.resident_id}
+        class="rounded-md bg-gray-50 dark:bg-gray-900 p-3 text-sm"
+      >
+        <.link navigate={"/residents/#{activity.schedule_resident_id}"} class="font-medium underline">
+          {activity.display_name}
+        </.link>
+        <p>{activity.raw_task}</p>
+        <p :if={activity.period || activity.site} class="text-xs">
+          {activity.period || "Period unspecified"} · {activity.site || "Location unspecified"}
+        </p>
+        <p :for={note <- activity.notes} class="mt-1">{note}</p>
+        <details class="mt-1 text-xs text-gray-500 dark:text-gray-300">
+          <summary class="cursor-pointer">Source details</summary>
+          <p :for={source <- activity.sources}>
+            {source.source_sheet}!{source.source_cell} · import {source.batch_id} · {source.raw_staff}
+          </p>
+        </details>
+      </article>
+    </section>
+    """
   end
 
   # Expands each item across its inclusive date range, grouping items by date.

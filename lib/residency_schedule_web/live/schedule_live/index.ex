@@ -93,24 +93,17 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   @impl true
   def handle_event("delete_schedule", %{"schedule_id" => id, "password" => password}, socket) do
     if authorized_to_delete?(socket.assigns.current_user, password) do
-      Schedules.delete_schedule(String.to_integer(id))
-      remaining = Schedules.list_schedules()
+      case Schedules.delete_schedule(String.to_integer(id)) do
+        {:ok, _} ->
+          {:noreply, refresh_after_delete(socket)}
 
-      socket =
-        case remaining do
-          [] ->
-            assign(socket,
-              schedules: [],
-              all_slots: [],
-              unified_residents: [],
-              filter_year: nil
-            )
-
-          _ ->
-            load_all_schedules(socket, remaining, current_date())
-        end
-
-      {:noreply, assign(socket, delete_confirm_id: nil, delete_error: nil)}
+        {:error, reason} ->
+          {:noreply,
+           assign(socket,
+             delete_error:
+               if(is_binary(reason), do: reason, else: "This schedule could not be deleted.")
+           )}
+      end
     else
       {:noreply, assign(socket, delete_error: delete_error_message(socket.assigns.current_user))}
     end
@@ -179,7 +172,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 class="border border-gray-300 dark:border-gray-600 rounded px-2 py-0.5 text-sm w-32 focus:outline-none focus:ring-1 focus:ring-red-400"
               />
               <%= if @delete_error do %>
-                <span class="text-xs text-red-600 dark:text-red-300">{@delete_error}</span>
+                <span id="schedule-delete-error" class="text-xs text-red-600 dark:text-red-300">
+                  {@delete_error}
+                </span>
               <% end %>
               <button
                 type="submit"
@@ -697,5 +692,18 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     else
       "Set a password for your account on the Admin page first."
     end
+  end
+
+  defp refresh_after_delete(socket) do
+    socket =
+      case Schedules.list_schedules() do
+        [] ->
+          assign(socket, schedules: [], all_slots: [], unified_residents: [], filter_year: nil)
+
+        remaining ->
+          load_all_schedules(socket, remaining, current_date())
+      end
+
+    assign(socket, delete_confirm_id: nil, delete_error: nil)
   end
 end

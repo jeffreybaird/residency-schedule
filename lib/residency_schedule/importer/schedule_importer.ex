@@ -8,6 +8,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   find_or_create semantics ensure each physical person has exactly one row.
   """
 
+  alias ResidencySchedule.DetailedSchedules
   alias ResidencySchedule.Importer.CsvParser
   alias ResidencySchedule.Importer.DateUpdater
   alias ResidencySchedule.Importer.ResidentLinker
@@ -48,7 +49,8 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   """
   def prepare(csv_binary) do
     with {:ok, parsed_residents, warnings} <- CsvParser.parse(csv_binary),
-         {:ok, academic_year} <- academic_year_of(parsed_residents) do
+         {:ok, academic_year} <- academic_year_of(parsed_residents),
+         :ok <- ensure_replaceable(academic_year) do
       {:ok,
        %{
          parsed: parsed_residents,
@@ -184,6 +186,12 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
     Repo.transaction(fn ->
       {:ok, schedule} = Schedules.upsert_schedule(academic_year, label)
 
+      if DetailedSchedules.has_detail?(schedule.id),
+        do:
+          Repo.rollback(
+            "This schedule has saved QGenda detail. Use date updates; whole-year replacement would erase resident links."
+          )
+
       Repo.delete_all(from(sr in ScheduleResident, where: sr.schedule_id == ^schedule.id))
 
       {resident_count, rotation_count} =
@@ -197,6 +205,20 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
 
       %{schedule_id: schedule.id, residents: resident_count, rotations: rotation_count}
     end)
+  end
+
+  defp ensure_replaceable(year) do
+    case Schedules.get_by_year(year) do
+      nil ->
+        :ok
+
+      schedule ->
+        if DetailedSchedules.has_detail?(schedule.id),
+          do:
+            {:error,
+             "This schedule has saved QGenda detail. Use date updates instead of replacing the year."},
+          else: :ok
+    end
   end
 
   defp resident_attrs(parsed, links) do

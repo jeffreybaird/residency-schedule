@@ -116,6 +116,12 @@ defmodule ResidencySchedule.Importer.QgendaPreview do
         |> build(roster, aliases: aliases)
         |> Map.put(:warnings, crosswalk.warnings)
         |> Map.put(:crosswalk_source, crosswalk.source)
+        |> Map.put(:schedule_id, schedule.id)
+        |> Map.put(:academic_year, year)
+        |> Map.put(
+          :roster_snapshot,
+          Enum.map(roster, &Map.take(&1, [:id, :resident_id, :position_code, :name]))
+        )
 
       {:ok, preview}
     else

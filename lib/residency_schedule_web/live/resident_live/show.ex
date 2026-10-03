@@ -1,6 +1,7 @@
 defmodule ResidencyScheduleWeb.ResidentLive.Show do
   use ResidencyScheduleWeb, :live_view
 
+  alias ResidencySchedule.DetailedSchedules
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
   alias ResidencyScheduleWeb.ScheduleLive.Index, as: ScheduleIndex
@@ -49,6 +50,13 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     {:ok,
      assign(socket,
        resident: resident,
+       activity_date: today,
+       day_activities: DetailedSchedules.list_for_resident(resident.id, today),
+       day_base_rotations:
+         Enum.filter(
+           resident.rotations,
+           &(Date.compare(&1.start_date, today) != :gt and Date.compare(&1.end_date, today) != :lt)
+         ),
        year_history: year_history,
        multi_year?: length(year_history) > 1,
        is_home_resident: home_resident_id == resident.resident_id,
@@ -73,6 +81,31 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
        coworkers: Rotations.list_coworker_shared_shift_counts(resident.id),
        current_user: current_user
      )}
+  end
+
+  @impl true
+  def handle_event("resident-activity-date", %{"date" => date}, socket) do
+    case Date.from_iso8601(date) do
+      {:ok, selected} ->
+        resident = socket.assigns.resident
+
+        rotations =
+          Enum.filter(
+            resident.rotations,
+            &(Date.compare(&1.start_date, selected) != :gt and
+                Date.compare(&1.end_date, selected) != :lt)
+          )
+
+        {:noreply,
+         assign(socket,
+           activity_date: selected,
+           day_activities: DetailedSchedules.list_for_resident(resident.id, selected),
+           day_base_rotations: rotations
+         )}
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -263,6 +296,47 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       </div>
 
       <%= if @active_tab == :schedule do %>
+        <section class="mb-6 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+          <h2 class="font-semibold">Daily commitments</h2>
+          <.form for={%{}} id="resident-activity-date-form" phx-change="resident-activity-date">
+            <.input
+              type="date"
+              name="date"
+              id="resident-activity-date"
+              label="Show a date"
+              value={Date.to_iso8601(@activity_date)}
+            />
+          </.form>
+          <div id="resident-day-activities" class="space-y-3 text-sm">
+            <p :for={rotation <- @day_base_rotations}>
+              Base rotation: {Rotations.rotation_type_label(rotation.rotation_type)}
+            </p>
+            <p :if={@day_activities == []}>
+              No QGenda detail for this date. Missing detail does not establish availability.
+            </p>
+            <article
+              :for={activity <- @day_activities}
+              class="rounded-md bg-gray-50 dark:bg-gray-900 p-3"
+            >
+              <p class="font-medium">{activity.display_name} — {activity.raw_task}</p>
+              <p :if={activity.period || activity.site}>
+                {activity.period || "Period unspecified"} · {activity.site || "Location unspecified"}
+              </p>
+              <p :for={note <- activity.notes}>{note}</p>
+              <details class="mt-1 text-xs">
+                <summary class="cursor-pointer">Source details</summary>
+                <div :for={source <- activity.sources}>
+                  <p>
+                    {source.source_sheet}!{source.source_cell} · import {source.batch_id} · {source.raw_staff}
+                  </p>
+                  <p :for={note <- source.notes}>
+                    {note.source_sheet}!{note.source_cell}: {note.text}
+                  </p>
+                </div>
+              </details>
+            </article>
+          </div>
+        </section>
         <%= if @schedule_start && @schedule_end do %>
           <div class="mb-4 text-sm text-gray-500 dark:text-gray-300">
             {Calendar.strftime(@schedule_start, "%B %-d, %Y")} – {Calendar.strftime(

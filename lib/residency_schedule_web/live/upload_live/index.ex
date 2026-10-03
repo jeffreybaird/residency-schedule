@@ -3,6 +3,7 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
 
   on_mount {ResidencyScheduleWeb.UserAuth, :ensure_admin}
 
+  alias ResidencySchedule.DetailedSchedules
   alias ResidencySchedule.Importer.QgendaPreview
   alias ResidencySchedule.Importer.ResidentLinker
   alias ResidencySchedule.Importer.ScheduleImporter
@@ -24,6 +25,7 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
       )
       |> assign(
         qgenda_preview: nil,
+        qgenda_saved: nil,
         qgenda_error: nil,
         qgenda_year: "",
         qgenda_query: "",
@@ -48,11 +50,32 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
 
   @impl true
   def handle_event("qgenda-validate", params, socket) do
-    {:noreply,
-     assign(socket, qgenda_year: Map.get(params, "academic_year", socket.assigns.qgenda_year))}
+    year = Map.get(params, "academic_year", socket.assigns.qgenda_year)
+
+    socket =
+      if year != socket.assigns.qgenda_year,
+        do: assign(socket, qgenda_preview: nil, qgenda_saved: nil),
+        else: socket
+
+    {:noreply, assign(socket, qgenda_year: year)}
+  end
+
+  def handle_event("qgenda-cancel-preview", _, socket) do
+    {:noreply, assign(socket, qgenda_preview: nil, qgenda_saved: nil, qgenda_error: nil)}
+  end
+
+  def handle_event("qgenda-save", _, %{assigns: %{qgenda_saved: saved}} = socket)
+      when not is_nil(saved), do: {:noreply, socket}
+
+  def handle_event("qgenda-save", _, socket) do
+    case DetailedSchedules.commit(socket.assigns.qgenda_preview, socket.assigns.current_user) do
+      {:ok, result} -> {:noreply, assign(socket, qgenda_saved: result, qgenda_error: nil)}
+      {:error, reason} -> {:noreply, assign(socket, qgenda_error: reason)}
+    end
   end
 
   def handle_event("qgenda-preview", params, socket) do
+    socket = assign(socket, qgenda_saved: nil)
     year = parse_year(Map.get(params, "academic_year", socket.assigns.qgenda_year))
 
     result =
@@ -425,6 +448,7 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
         qgenda_year={@qgenda_year}
         qgenda_error={@qgenda_error}
         qgenda_preview={@qgenda_preview}
+        qgenda_saved={@qgenda_saved}
         qgenda_query={@qgenda_query}
         qgenda_rows={@qgenda_rows}
         qgenda_count={@qgenda_count}
@@ -439,7 +463,7 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
     <section class="mt-12 border-t border-gray-200 dark:border-gray-700 pt-8">
       <h2 class="text-2xl font-bold mb-2">QGenda detail preview</h2>
       <p class="text-sm text-gray-600 dark:text-gray-300 mb-6">
-        Review a Calendar By Staff XLSX export against an existing schedule. This preview does not save assignments or rename residents.
+        Review a Calendar By Staff XLSX export against an existing schedule. Detailed assignments are saved only after you confirm below; resident names and base rotations remain unchanged.
       </p>
       <.form
         for={%{}}
@@ -518,7 +542,11 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
       </p>
       <div :if={@qgenda_preview} id="qgenda-preview" class="mt-8 space-y-6">
         <div id="qgenda-summary" class="rounded-lg bg-blue-50 dark:bg-blue-950 p-4">
-          <h3 class="font-semibold">Preview only — nothing saved</h3>
+          <h3 class="font-semibold">
+            {if @qgenda_saved,
+              do: "Detailed assignments saved",
+              else: "Preview — review before saving"}
+          </h3>
           <p id="qgenda-crosswalk-source">
             Name crosswalk: {qgenda_crosswalk_source(@qgenda_preview.crosswalk_source)}
           </p>
@@ -662,6 +690,31 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
           >
             Next
           </button>
+        </div>
+        <div class="rounded-lg border border-blue-200 dark:border-blue-800 p-4 space-y-3">
+          <p>
+            Save matched assignments alongside existing rotations. Unmatched staff are skipped. Repeated tasks are deduplicated; missing dates and older details are preserved. Corrections and removals require separate review.
+          </p>
+          <button
+            id="qgenda-save-preview"
+            type="button"
+            phx-click="qgenda-save"
+            disabled={not is_nil(@qgenda_saved)}
+            class="btn btn-primary"
+          >
+            Save detailed assignments
+          </button>
+          <button
+            id="qgenda-cancel-preview"
+            type="button"
+            phx-click="qgenda-cancel-preview"
+            class="btn"
+          >
+            Close preview
+          </button>
+          <p :if={@qgenda_saved} id="qgenda-save-result" role="status">
+            {@qgenda_saved.inserted} new assignments saved; {@qgenda_saved.existing} already present; {@qgenda_saved.skipped} unmatched assignments skipped.
+          </p>
         </div>
       </div>
     </section>
