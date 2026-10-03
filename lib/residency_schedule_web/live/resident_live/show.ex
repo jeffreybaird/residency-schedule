@@ -5,6 +5,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
+  alias ResidencyScheduleWeb.DailyAssignments
   alias ResidencyScheduleWeb.ScheduleLive.Index, as: ScheduleIndex
 
   @strong_night_types ~w[night_float strong_weekend_nights]
@@ -63,6 +64,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
            &(Date.compare(&1.start_date, today) != :gt and Date.compare(&1.end_date, today) != :lt)
          ),
        year_history: year_history,
+       appearance_ids: Map.new(appearances, &{&1.schedule_id, &1.id}),
        multi_year?: length(year_history) > 1,
        is_home_resident: home_resident_id == resident.resident_id,
        schedule_start: schedule_start,
@@ -186,7 +188,15 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     # so coworkers are looked up in that entry's schedule, not the page's.
     schedule_id = coworker_schedule_id(params, socket.assigns.resident.schedule_id)
 
-    open_coworker_modal(type, sd, ed, schedule_id, socket)
+    valid? =
+      Enum.any?(socket.assigns.all_entries, fn entry ->
+        entry.schedule_id == schedule_id and entry.rotation_type == type and
+          Date.to_iso8601(entry.start_date) == sd and Date.to_iso8601(entry.end_date) == ed
+      end)
+
+    if valid?,
+      do: open_coworker_modal(type, sd, ed, schedule_id, socket),
+      else: {:noreply, socket}
   end
 
   @impl true
@@ -316,33 +326,15 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             />
           </.form>
           <div id="resident-day-activities" class="space-y-3 text-sm">
+            <h3 class="font-medium">{@resident.name}</h3>
             <p :for={rotation <- @day_base_rotations}>
               Base rotation: {Rotations.rotation_type_label(rotation.rotation_type)}
             </p>
-            <p :if={@day_activities == []}>
-              No QGenda detail for this date. Missing detail does not establish availability.
-            </p>
-            <article
-              :for={activity <- @day_activities}
-              class="rounded-md bg-gray-50 dark:bg-gray-900 p-3"
-            >
-              <p class="font-medium">{activity.display_name} — {activity.raw_task}</p>
-              <p :if={activity.period || activity.site}>
-                {activity.period || "Period unspecified"} · {activity.site || "Location unspecified"}
-              </p>
-              <p :for={note <- activity.notes}>{note}</p>
-              <details class="mt-1 text-xs">
-                <summary class="cursor-pointer">Source details</summary>
-                <div :for={source <- activity.sources}>
-                  <p>
-                    {source.source_sheet}!{source.source_cell} · import {source.batch_id} · {source.raw_staff}
-                  </p>
-                  <p :for={note <- source.notes}>
-                    {note.source_sheet}!{note.source_cell}: {note.text}
-                  </p>
-                </div>
-              </details>
-            </article>
+            <DailyAssignments.activities
+              id="resident-day-tasks"
+              activities={@day_activities}
+              show_dates={false}
+            />
           </div>
         </section>
         <%= if @schedule_start && @schedule_end do %>
@@ -746,6 +738,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
               role="dialog"
               aria-modal="true"
               aria-labelledby="shift-coworkers-modal-title"
+              phx-window-keydown="close_shift_coworkers"
+              phx-key="Escape"
             >
               <div phx-click="close_shift_coworkers" class="absolute inset-0 bg-black/40"></div>
               <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 z-10 max-h-[80vh] overflow-y-auto">
@@ -755,7 +749,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                       id="shift-coworkers-modal-title"
                       class="text-lg font-semibold text-gray-800 dark:text-gray-100"
                     >
-                      {type_label}
+                      {@resident.name} — {type_label}
                     </h3>
                     <p class="text-sm text-gray-500 dark:text-gray-300 mt-1">
                       {Calendar.strftime(modal.start_date, "%b %-d, %Y")} – {Calendar.strftime(
@@ -774,6 +768,11 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                   </button>
                 </div>
 
+                <DailyAssignments.activities
+                  id="rotation-daily-assignments"
+                  activities={modal.activities}
+                />
+                <h4 class="font-semibold mt-6 mb-2">Residents on this rotation</h4>
                 <div class="mb-3">
                   <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{color}"}>
                     {type_label}
@@ -1008,7 +1007,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   end
 
   defp coworker_schedule_id(params, fallback) do
-    case Integer.parse(params["schedule-id"] || params["schedule_id"] || "") do
+    value = params["schedule-id"] || params["schedule_id"] || ""
+
+    case if(is_binary(value), do: Integer.parse(value), else: :error) do
       {schedule_id, ""} -> schedule_id
       _ -> fallback
     end
@@ -1235,6 +1236,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
            assign(socket,
              shift_coworkers_modal: %{
                rotation_type: "off",
+               activities: modal_activities(socket, schedule_id, start_d, end_d),
                start_date: start_d,
                end_date: end_d,
                coworker_rows: coworker_rows
@@ -1260,6 +1262,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
            assign(socket,
              shift_coworkers_modal: %{
                rotation_type: type,
+               activities: modal_activities(socket, schedule_id, start_d, end_d),
                start_date: start_d,
                end_date: end_d,
                coworker_rows: coworker_rows
@@ -1272,5 +1275,11 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       true ->
         {:noreply, socket}
     end
+  end
+
+  defp modal_activities(socket, schedule_id, first, last) do
+    socket.assigns.appearance_ids
+    |> Map.get(schedule_id)
+    |> DetailedSchedules.list_for_resident_range(first, last)
   end
 end

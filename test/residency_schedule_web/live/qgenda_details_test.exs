@@ -94,9 +94,9 @@ defmodule ResidencyScheduleWeb.QgendaDetailsTest do
       view |> form("#resident-activity-date-form", %{"date" => "2026-12-29"}) |> render_change()
       assert has_element?(view, "#resident-day-activities", "GOG Continuity Clinic PM")
       assert has_element?(view, "#resident-day-activities", "Bring simulation kit")
-      assert has_element?(view, "#resident-day-activities", "Page 1")
+      refute has_element?(view, "#resident-day-activities", "Source details")
       view |> form("#resident-activity-date-form", %{"date" => "2027-01-04"}) |> render_change()
-      assert has_element?(view, "#resident-day-activities", "No QGenda detail")
+      assert has_element?(view, "#resident-day-activities", "No daily assignments recorded")
       refute has_element?(view, "#resident-day-activities", "Off")
       refute has_element?(view, "#resident-day-activities", "Available")
     end

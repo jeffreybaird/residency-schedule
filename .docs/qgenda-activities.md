@@ -1,6 +1,6 @@
-# Imported daily activities
+# Daily assignments
 
-QGenda activities describe what a resident is doing on a particular date or
+Daily assignments describe what a resident is doing on a particular date or
 period. They are stored separately from the existing rotation schedule. A
 resident can therefore remain on gynecology while an afternoon clinic is shown
 on the same day.
@@ -40,19 +40,28 @@ the check prevents saving an obviously different year's export into this roster.
 
 ## Viewing a day
 
-The calendar's day details and the resident's daily activity view show imported
-tasks and linked notes alongside rotations. Source labels preserve clinic names,
-AM/PM, and call responsibilities. A task remains visible when the resident has
+The calendar's day view and day-detail dialog group each resident's rotations,
+daily assignments, and notes together. Clinic names, AM/PM, and call
+responsibilities remain visible. A task remains visible when the resident has
 no base rotation recorded for that date.
+
+On a resident page, open a rotation to see that resident's assignments and notes
+for the rotation's date range, alongside the existing coworker information. The
+dialog identifies the resident and rotation dates and closes with Escape. The
+resident's date selector also provides access to assignments on days without a
+rotation.
+
+These schedule views use ordinary scheduling language. They do not show the
+import provider, workbook coordinates, or batch metadata. Administrators can
+still review source information during import.
 
 For example, a resident may have both `SMH GYN R3 Day` and
 `GOG Continuity Clinic PM`. Both belong in the day's details. The clinic must not
 be collapsed into a generic GYN label.
 
-No imported activities means that the app has no imported detail for that day.
-It does not mean the resident is free, off duty, or available for surgery. This
-milestone displays the source information; activity search and availability
-rules are later milestones.
+An empty day says "No daily assignments recorded." It does not establish that
+the resident is free, off duty, or available for surgery. Activity search and
+availability rules are separate capabilities.
 
 ## Repeated and partial imports
 

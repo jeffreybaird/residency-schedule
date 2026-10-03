@@ -44,6 +44,26 @@ defmodule ResidencySchedule.DetailedSchedules do
     |> load_activities()
   end
 
+  @doc """
+  Lists a resident's assignments within an inclusive range of at most 370 days.
+  Invalid or reversed ranges return no rows. Exempt from doctest — database query.
+  """
+  def list_for_resident_range(resident_id, %Date{} = first, %Date{} = last)
+      when is_integer(resident_id) do
+    if Date.diff(last, first) in 0..369 do
+      activity_query()
+      |> where(
+        [a],
+        a.schedule_resident_id == ^resident_id and a.date >= ^first and a.date <= ^last
+      )
+      |> load_activities()
+    else
+      []
+    end
+  end
+
+  def list_for_resident_range(_, _, _), do: []
+
   @doc "Lists detail across schedules for a visible date range. Exempt from doctest — database query."
   def list_in_range(first, last) do
     activity_query() |> where([a], a.date >= ^first and a.date <= ^last) |> load_activities()
