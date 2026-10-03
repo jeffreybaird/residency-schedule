@@ -16,7 +16,7 @@
       {
         "hooks": [
           {
-            "command": "python3 -B /Users/jeffreybaird/src/residency-schedule/.codex/hooks/workflow_guard.py --platform codex --root /Users/jeffreybaird/src/residency-schedule --policy /Users/jeffreybaird/src/residency-schedule/.codex/hooks/policy.json",
+            "command": "python3 -B \"$(git rev-parse --show-toplevel)/.codex/hooks/workflow_guard.py\" --platform codex --root \"$(git rev-parse --show-toplevel)\" --policy \"$(git rev-parse --show-toplevel)/.codex/hooks/policy.json\"",
             "timeout": 5,
             "type": "command"
           }
