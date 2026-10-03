@@ -19,7 +19,8 @@ implementation.
 - Final source: `MIX_ENV=test mix test --max-cases 1` exited 0:
   **175 doctests, 1,369 tests, 0 failures**, seed 827244, 31.4 seconds.
   Serial execution avoids the previously documented concurrent test-database
-  deadlock; no tests were excluded.
+  deadlock; no tests were excluded. This was a workaround, not verification of
+  the normal parallel suite. See [the later isolation repair](parallel-test-isolation-verification.md).
 - `MIX_ENV=test mix format --check-formatted`: exit 0.
 - `MIX_ENV=test mix compile --warnings-as-errors`: exit 0.
 - `MIX_ENV=test mix deps.unlock --check-unused`: exit 0, without lockfile edits.

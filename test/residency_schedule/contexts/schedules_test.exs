@@ -19,10 +19,11 @@ defmodule ResidencySchedule.SchedulesTest do
     end
 
     test "returns schedules ordered oldest first" do
-      {:ok, _} = Schedules.upsert_schedule(2026, "2026–2027")
-      {:ok, _} = Schedules.upsert_schedule(2023, "2023–2024")
+      {older, newer} = ResidencySchedule.ScheduleOrderingFixture.years()
+      {:ok, _} = Schedules.upsert_schedule(newer, Schedules.academic_year_label(newer))
+      {:ok, _} = Schedules.upsert_schedule(older, Schedules.academic_year_label(older))
       [first | _] = Schedules.list_schedules()
-      assert first.academic_year == 2023
+      assert first.academic_year == older
     end
   end
 

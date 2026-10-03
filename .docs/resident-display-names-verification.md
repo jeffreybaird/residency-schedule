@@ -38,7 +38,12 @@ one PostgreSQL `40P01 deadlock_detected` in the existing
 `SchedulesTest` test “list_schedules/0 returns schedules ordered oldest first.”
 It occurred during `Schedules.upsert_schedule(2023, ...)`. Rerunning the same
 seed serially produced the final green above. This records the observed
-concurrency flake; no test was weakened or skipped to obtain green.
+concurrency failure; no test was weakened or skipped. The serial run did not
+establish that normal parallel execution was healthy, and a baseline
+reproduction had not yet established the failure's origin at that point.
+See [the subsequent investigation and repair](parallel-test-isolation-verification.md)
+for independent-connection reproduction on both the PR base and current code,
+and normal parallel verification after correcting fixture isolation.
 
 ## Accepted final SHA-256 hashes
 
