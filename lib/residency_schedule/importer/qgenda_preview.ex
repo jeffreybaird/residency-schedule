@@ -96,6 +96,9 @@ defmodule ResidencySchedule.Importer.QgendaPreview do
 
   @doc """
   Prepares a preview using an existing academic year. Never writes records.
+  An optional `:crosswalk_csv` binary replaces the configured name crosswalk for
+  this call only. Uploaded mappings must match the selected year and current
+  roster identity; invalid mappings return an error instead of falling back.
   Database function; covered by integration tests instead of doctests.
   """
   def prepare(binary, options) do
@@ -103,11 +106,18 @@ defmodule ResidencySchedule.Importer.QgendaPreview do
 
     with true <- is_integer(year),
          schedule when not is_nil(schedule) <- Schedules.get_by_year(year),
-         {:ok, parsed} <- QgendaParser.parse(binary) do
-      {configured_aliases, warnings} = load_crosswalk(year)
-      aliases = Map.merge(configured_aliases, Keyword.get(options, :aliases, %{}))
-      roster = Residents.list_residents_for_schedule(schedule.id)
-      {:ok, build(parsed, roster, aliases: aliases) |> Map.put(:warnings, warnings)}
+         {:ok, parsed} <- QgendaParser.parse(binary),
+         roster = Residents.list_residents_for_schedule(schedule.id),
+         {:ok, crosswalk} <- resolve_crosswalk(options, year, roster) do
+      aliases = Map.merge(crosswalk.aliases, Keyword.get(options, :aliases, %{}))
+
+      preview =
+        parsed
+        |> build(roster, aliases: aliases)
+        |> Map.put(:warnings, crosswalk.warnings)
+        |> Map.put(:crosswalk_source, crosswalk.source)
+
+      {:ok, preview}
     else
       {:error, reason} -> {:error, reason}
       _ -> {:error, "Select an existing academic-year schedule for the preview."}
@@ -233,6 +243,122 @@ defmodule ResidencySchedule.Importer.QgendaPreview do
 
   defp date_range([]), do: nil
   defp date_range(dates), do: {Enum.min(dates, Date), Enum.max(dates, Date)}
+
+  defp resolve_crosswalk(options, year, roster) do
+    case Keyword.fetch(options, :crosswalk_csv) do
+      {:ok, csv} ->
+        resolve_uploaded_crosswalk(csv, year, roster)
+
+      :error ->
+        {aliases, warnings} = load_crosswalk(year)
+        source = if warnings == [], do: :configured, else: :unavailable
+        {:ok, %{aliases: aliases, warnings: warnings, source: source}}
+    end
+  end
+
+  defp resolve_uploaded_crosswalk(csv, year, roster)
+       when is_binary(csv) and byte_size(csv) <= 1_000_000 do
+    rows = csv |> decode_uploaded_crosswalk() |> validate_uploaded_rows(year)
+
+    aliases =
+      Map.new(
+        rows,
+        &{&1["qgenda_staff"],
+         %{position_code: &1["position_code"], expected_name: &1["existing_name"]}}
+      )
+
+    validate_exact_matches(aliases, roster)
+    warnings = uploaded_identity_warnings(aliases, roster)
+    {:ok, %{aliases: aliases, warnings: warnings, source: :uploaded}}
+  rescue
+    _ ->
+      {:error,
+       "The uploaded crosswalk is invalid or conflicts with the roster. Use the four documented columns, the selected academic year, and one unique staff identity per position."}
+  end
+
+  defp resolve_uploaded_crosswalk(_, _, _),
+    do: {:error, "The crosswalk CSV must be no larger than 1 MB."}
+
+  defp decode_uploaded_crosswalk(csv) do
+    if not String.valid?(csv) or String.contains?(csv, <<0>>), do: raise(ArgumentError)
+
+    [header | rows] =
+      csv
+      |> String.trim_leading("\uFEFF")
+      |> String.split("\n", trim: true)
+      |> Enum.map(&String.trim_trailing(&1, "\r"))
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.map(&decode_crosswalk_line/1)
+
+    if Enum.sort(header) != Enum.sort(~w(academic_year position_code qgenda_staff existing_name)),
+      do: raise(ArgumentError)
+
+    Enum.map(rows, &Map.new(Enum.zip(header, &1)))
+  end
+
+  defp decode_crosswalk_line(line) do
+    if not Regex.match?(
+         ~r/^(?:[^",\r\n]*|"(?:[^"]|"")*")(?:,(?:[^",\r\n]*|"(?:[^"]|"")*")){3}$/u,
+         line
+       ),
+       do: raise(ArgumentError)
+
+    ~r/(?:^|,)("(?:[^"]|"")*"|[^",]*)/u
+    |> Regex.scan(line, capture: :all_but_first)
+    |> Enum.map(fn [value] ->
+      if String.starts_with?(value, "\"") do
+        value |> String.slice(1, String.length(value) - 2) |> String.replace("\"\"", "\"")
+      else
+        value
+      end
+    end)
+  end
+
+  defp validate_uploaded_rows(rows, year) do
+    if rows == [] or Enum.any?(rows, &(not valid_uploaded_row?(&1, year))),
+      do: raise(ArgumentError)
+
+    names = Enum.map(rows, &(&1["qgenda_staff"] |> display_name() |> normalize()))
+    positions = Enum.map(rows, & &1["position_code"])
+
+    if length(Enum.uniq(names)) != length(names) or
+         length(Enum.uniq(positions)) != length(positions),
+       do: raise(ArgumentError)
+
+    rows
+  end
+
+  defp valid_uploaded_row?(row, year) do
+    row["academic_year"] == Integer.to_string(year) and
+      Regex.match?(~r/^R[1-4]-[1-9][0-9]*$/, row["position_code"]) and
+      String.trim(row["qgenda_staff"]) != "" and String.trim(row["existing_name"]) != ""
+  end
+
+  defp validate_exact_matches(aliases, roster) do
+    Enum.each(aliases, fn {raw, mapping} ->
+      exact = Enum.filter(roster, &(normalize(&1.name) == normalize(display_name(raw))))
+
+      if Enum.any?(
+           exact,
+           &(&1.position_code != mapping.position_code or &1.name != mapping.expected_name)
+         ),
+         do: raise(ArgumentError)
+    end)
+  end
+
+  defp uploaded_identity_warnings(aliases, roster) do
+    aliases
+    |> Enum.sort()
+    |> Enum.flat_map(fn {raw, mapping} ->
+      if alias_candidates(raw, roster, aliases) == [] do
+        [
+          "#{raw}: #{mapping.position_code} does not match the current roster name #{mapping.expected_name}. This mapping is held; review the position and existing name."
+        ]
+      else
+        []
+      end
+    end)
+  end
 
   defp load_crosswalk(year) do
     path =

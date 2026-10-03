@@ -8,7 +8,8 @@ determine surgery availability.
 
 1. Sign in as an administrator and open **Upload Schedule** (`/admin/upload`).
 2. Use the separate QGenda workbook form and select an existing academic year.
-3. Upload the `.xlsx` export and preview it.
+3. Upload the `.xlsx` export. If the server does not have the reviewed name
+   crosswalk, also select its `.csv` file in the QGenda form, then preview.
 4. Review matched and unmatched staff, missing roster members, unknown tasks,
    date coverage, daily assignments, and linked notes.
 5. Use the preview filter and pagination to inspect assignments. Re-uploading
@@ -23,7 +24,13 @@ QGenda supplies the preferred displayed name. Existing names remain useful for
 matching; the preview does not change stored names. First-name similarity is
 not sufficient to establish identity.
 
-Reviewed aliases can be supplied through a local CSV whose default path is
+Reviewed aliases can be uploaded with the workbook for that preview. This is
+useful when the existing schedule uses first names or nicknames and QGenda uses
+full names. The preview indicates where its crosswalk came from. Uploaded
+crosswalks apply only to that preview and are not saved on the server; supply
+the file again when preparing another preview.
+
+Alternatively, aliases can be supplied through a local server CSV whose default path is
 `data/qgenda-resident-crosswalk.csv`. Configure another location using the
 `:residency_schedule` application setting `:qgenda_crosswalk_path`.
 
@@ -39,6 +46,15 @@ agree with the current resident name. Keep real crosswalks in ignored `data/`
 or another private deployment location. A local ignored file is not delivered
 by Git; configure it separately wherever the application runs. Missing mapping
 data leaves unresolved names visible for review rather than guessing a match.
+An uploaded crosswalk must pass validation for the selected year and current
+roster. Malformed or inconsistent mappings must be corrected rather than used
+to weaken identity matching.
+
+If none of the residents match after deployment, first check the crosswalk
+source shown in the preview. The ignored file on a developer's computer is not
+automatically present in a production release. Compare its `existing_name` and
+`position_code` against the selected production roster; uploading the reviewed
+file solves missing-file configuration without changing resident records.
 
 ## Interpreting the result
 

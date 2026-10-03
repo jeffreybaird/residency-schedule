@@ -32,6 +32,11 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
         qgenda_count: 0
       )
       |> allow_upload(:qgenda_xlsx, accept: ~w(.xlsx), max_entries: 1, max_file_size: 5_000_000)
+      |> allow_upload(:qgenda_crosswalk_csv,
+        accept: ~w(.csv),
+        max_entries: 1,
+        max_file_size: 1_000_000
+      )
       |> allow_upload(:schedule_csv,
         accept: :any,
         max_entries: 1,
@@ -51,9 +56,18 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
     year = parse_year(Map.get(params, "academic_year", socket.assigns.qgenda_year))
 
     result =
-      consume_uploaded_entries(socket, :qgenda_xlsx, fn %{path: path}, _ ->
-        {:ok, path |> File.read!() |> QgendaPreview.prepare(academic_year: year)}
-      end)
+      if qgenda_uploads_ready?(socket) do
+        options = qgenda_preview_options(socket, year)
+
+        consume_uploaded_entries(socket, :qgenda_xlsx, fn %{path: path}, _ ->
+          {:ok, path |> File.read!() |> QgendaPreview.prepare(options)}
+        end)
+      else
+        [
+          {:error,
+           "Complete or remove rejected QGenda uploads before previewing. XLSX files must be at most 5 MB; crosswalk CSV files must be at most 1 MB."}
+        ]
+      end
 
     case result do
       [{:ok, preview}] ->
@@ -87,6 +101,10 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
 
   def handle_event("qgenda-cancel-upload", %{"ref" => ref}, socket) do
     {:noreply, cancel_upload(socket, :qgenda_xlsx, ref)}
+  end
+
+  def handle_event("qgenda-cancel-crosswalk", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :qgenda_crosswalk_csv, ref)}
   end
 
   def handle_event("validate", params, socket) do
@@ -454,6 +472,38 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
             {humanize_error(error)}
           </p>
         </div>
+        <div
+          id="qgenda-crosswalk-help"
+          class="rounded-md bg-gray-50 dark:bg-gray-900 p-4 text-sm space-y-2"
+        >
+          <p class="font-semibold">Optional reviewed name crosswalk (CSV, up to 1 MB)</p>
+          <p>
+            If existing resident names differ from QGenda, upload the reviewed mapping alongside this workbook. It applies only to this preview. Without it, the configured crosswalk is used when available; otherwise only unambiguous full names match.
+          </p>
+          <p>
+            Required columns: <code>academic_year,position_code,qgenda_staff,existing_name</code>. Use the selected academic year, the current roster position and exact existing name. Quote QGenda names containing commas. Each staff identity and position must occur once.
+          </p>
+          <.live_file_input upload={@uploads.qgenda_crosswalk_csv} />
+          <div :for={entry <- @uploads.qgenda_crosswalk_csv.entries}>
+            {entry.client_name}
+            <button
+              type="button"
+              phx-click="qgenda-cancel-crosswalk"
+              phx-value-ref={entry.ref}
+              class="ml-2 underline"
+            >
+              Remove
+            </button>
+            <p
+              :for={error <- upload_errors(@uploads.qgenda_crosswalk_csv, entry)}
+              class="text-red-600"
+            >
+              {if error == :too_large,
+                do: "Crosswalk is too large (max 1 MB)",
+                else: humanize_error(error)}
+            </p>
+          </div>
+        </div>
         <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-md px-4 py-2">
           Preview QGenda detail
         </button>
@@ -469,6 +519,9 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
       <div :if={@qgenda_preview} id="qgenda-preview" class="mt-8 space-y-6">
         <div id="qgenda-summary" class="rounded-lg bg-blue-50 dark:bg-blue-950 p-4">
           <h3 class="font-semibold">Preview only — nothing saved</h3>
+          <p id="qgenda-crosswalk-source">
+            Name crosswalk: {qgenda_crosswalk_source(@qgenda_preview.crosswalk_source)}
+          </p>
           <p>
             {length(@qgenda_preview.assignments)} assignments · {Enum.count(
               @qgenda_preview.assignments,
@@ -619,6 +672,28 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
     key = {assignment.date, assignment.raw_staff, assignment.raw_task}
     Enum.filter(notes, &(&1.assignment_key == key))
   end
+
+  defp qgenda_preview_options(socket, year) do
+    case consume_uploaded_entries(socket, :qgenda_crosswalk_csv, fn %{path: path}, _ ->
+           {:ok, File.read!(path)}
+         end) do
+      [csv] -> [academic_year: year, crosswalk_csv: csv]
+      [] -> [academic_year: year]
+    end
+  end
+
+  defp qgenda_uploads_ready?(socket) do
+    Enum.all?([:qgenda_xlsx, :qgenda_crosswalk_csv], fn key ->
+      upload = socket.assigns.uploads[key]
+
+      upload_errors(upload) == [] and
+        Enum.all?(upload.entries, &(&1.done? and upload_errors(upload, &1) == []))
+    end)
+  end
+
+  defp qgenda_crosswalk_source(:uploaded), do: "Uploaded for this preview"
+  defp qgenda_crosswalk_source(:configured), do: "Configured"
+  defp qgenda_crosswalk_source(:unavailable), do: "Unavailable — full-name matches only"
 
   defp format_qgenda_range(nil), do: "No matched assignments"
   defp format_qgenda_range({first, last}), do: "#{first} through #{last}"
