@@ -51,6 +51,12 @@ dialog identifies the resident and rotation dates and closes with Escape. The
 resident's date selector also provides access to assignments on days without a
 rotation.
 
+Rotation pills in the schedule grid open the same daily assignment details.
+The dialog follows the dates shown by that pill, including adjacent blocks
+combined into one span. Different services and academic years remain separate.
+Pills are keyboard-accessible buttons; Escape, the close button, or the backdrop
+closes the dialog. Changing the displayed cohort or year closes stale details.
+
 These schedule views use ordinary scheduling language. They do not show the
 import provider, workbook coordinates, or batch metadata. Administrators can
 still review source information during import.
