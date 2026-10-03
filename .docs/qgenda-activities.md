@@ -17,6 +17,18 @@ information. Unmatched or ambiguous staff are not attached to residents by guess
 Unknown task labels belonging to matched residents remain intact for inspection.
 The import does not rename people or change the underlying rotation schedule.
 
+## Resident display names
+
+Resident pages, comparison selectors, calendar details, rotation coworker lists,
+and schedule labels use the recorded full name when available. The same person
+keeps that display name across academic years. When sources differ, the newest
+academic year's name takes precedence, followed by the newest source record.
+Directory-style `Last, First` names display as `First Last`.
+
+People without a recorded full name keep their existing name; the app does not
+guess a surname. These display choices do not modify roster names or identity
+matching used by imports.
+
 Matching is revalidated when saving. If the roster changed after previewing,
 prepare a new preview rather than saving stale identity links. Only administrators
 can confirm imports, and their access is rechecked on save. A preview with no

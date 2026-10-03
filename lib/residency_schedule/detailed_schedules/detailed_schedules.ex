@@ -4,6 +4,7 @@ defmodule ResidencySchedule.DetailedSchedules do
   alias ResidencySchedule.Accounts.User
   alias ResidencySchedule.DetailedSchedules.{Activity, ActivitySource, ImportBatch}
   alias ResidencySchedule.Repo
+  alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents.{Resident, ScheduleResident}
   alias ResidencySchedule.Schedules.Schedule
 
@@ -266,7 +267,15 @@ defmodule ResidencySchedule.DetailedSchedules do
       preload: [:sources, :schedule_resident]
   end
 
-  defp load_activities(query), do: query |> Repo.all() |> Enum.map(&present_activity/1)
+  defp load_activities(query) do
+    rows = query |> Repo.all() |> Enum.map(&present_activity/1)
+    names = rows |> Enum.map(& &1.resident_id) |> ResidentDisplayNames.names_for_people()
+
+    Enum.map(
+      rows,
+      &%{&1 | display_name: Map.get(names, &1.resident_id, &1.display_name)}
+    )
+  end
 
   defp present_activity(activity) do
     sources = activity.sources |> Enum.sort_by(& &1.id) |> Enum.map(&present_source/1)

@@ -2,6 +2,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   use ResidencyScheduleWeb, :live_view
 
   alias ResidencySchedule.DetailedSchedules
+  alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
   alias ResidencyScheduleWeb.ScheduleLive.Index, as: ScheduleIndex
@@ -15,7 +16,11 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   def mount(%{"id" => id}, _session, socket) do
     current_user = socket.assigns.current_user
     home_resident_id = current_user && current_user.home_resident_id
-    resident = Residents.get_resident!(String.to_integer(id))
+
+    [resident] =
+      [Residents.get_resident!(String.to_integer(id))]
+      |> ResidentDisplayNames.apply_to_schedule_residents()
+
     today = ScheduleIndex.current_date()
 
     appearances = Residents.list_appearances_for_person(resident.resident_id)
@@ -78,7 +83,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
        night_shifts_expanded: false,
        shift_coworkers_modal: nil,
        active_tab: :schedule,
-       coworkers: Rotations.list_coworker_shared_shift_counts(resident.id),
+       coworkers:
+         resident.id
+         |> Rotations.list_coworker_shared_shift_counts()
+         |> ResidentDisplayNames.apply_to_entries(),
        current_user: current_user
      )}
   end
@@ -958,6 +966,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     all_entries =
       per_year
       |> Enum.flat_map(& &1.entries)
+      |> ResidentDisplayNames.apply_to_entries()
       |> Enum.sort_by(& &1.start_date, Date)
 
     all_rotations = Enum.flat_map(per_year, & &1.rotations)
@@ -1220,6 +1229,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
              {:ok, end_d} <- Date.from_iso8601(ed) do
           coworker_rows =
             Rotations.list_off_coworker_rows_in_range(schedule_id, start_d, end_d)
+            |> ResidentDisplayNames.apply_to_entries()
 
           {:noreply,
            assign(socket,
@@ -1244,6 +1254,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
               start_d,
               end_d
             )
+            |> ResidentDisplayNames.apply_to_entries()
 
           {:noreply,
            assign(socket,

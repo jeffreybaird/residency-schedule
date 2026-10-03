@@ -2,6 +2,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   use ResidencyScheduleWeb, :live_view
 
   alias ResidencySchedule.DetailedSchedules
+  alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
   alias ResidencySchedule.Schedules
@@ -563,10 +564,24 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         &%{id: &1.resident_id, name: &1.display_name, position_code: &1.position_code}
       )
 
+    people =
+      Enum.map(rotations, & &1.schedule_resident.resident_id) ++
+        Enum.map(overrides, & &1.covering_schedule_resident.resident_id) ++
+        Enum.map(options ++ activity_options, & &1.id)
+
+    names = ResidentDisplayNames.names_for_people(people)
+
+    display_options =
+      Enum.map(
+        options ++ activity_options,
+        &%{&1 | name: ResidentDisplayNames.name_for(&1.id, &1.name, names)}
+      )
+
     assign(socket,
       rotation_index: index_by_date(rotations, & &1.start_date, & &1.end_date),
       override_index: index_by_date(overrides, & &1.override_start_date, & &1.override_end_date),
-      resident_options: Enum.uniq_by(options ++ activity_options, & &1.id),
+      resident_options: Enum.uniq_by(display_options, & &1.id),
+      display_names: names,
       activity_index: Enum.group_by(activities, & &1.date),
       type_options: type_options(rotations)
     )
@@ -643,8 +658,24 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   defp day_detail_for(assigns, date) do
     visible_rotations(assigns, date)
     |> Rotations.effective_day_assignments(Map.get(assigns.override_index, date, []))
+    |> Enum.map(&display_day_entry(&1, assigns.display_names))
     |> Enum.group_by(& &1.rotation_type)
     |> Enum.sort_by(&elem(&1, 0))
+  end
+
+  defp display_day_entry(entry, names) do
+    Enum.reduce([:resident, :covered_by], entry, fn field, row ->
+      case Map.get(row, field) do
+        nil ->
+          row
+
+        resident ->
+          Map.put(row, field, %{
+            resident
+            | name: ResidentDisplayNames.name_for(resident.resident_id, resident.name, names)
+          })
+      end
+    end)
   end
 
   defp group_by_type(rotations) do

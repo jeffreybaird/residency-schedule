@@ -2,6 +2,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   use ResidencyScheduleWeb, :live_view
 
   alias ResidencySchedule.Accounts
+  alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
   alias ResidencySchedule.Schedules
@@ -351,7 +352,10 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     schedule_map = Map.new(schedules, &{&1.id, &1})
     schedule_ids = Enum.map(schedules, & &1.id)
 
-    all_schedule_residents = Residents.list_residents_across_schedules(schedule_ids)
+    all_schedule_residents =
+      schedule_ids
+      |> Residents.list_residents_across_schedules()
+      |> ResidentDisplayNames.apply_to_schedule_residents()
 
     residents_by_schedule = Enum.group_by(all_schedule_residents, & &1.schedule_id)
     sections = build_slot_sections(schedules, residents_by_schedule)
