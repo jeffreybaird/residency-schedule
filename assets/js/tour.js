@@ -9,7 +9,7 @@ const CALENDAR_STEPS = [
   {
     id: "welcome",
     title: (_role, brand) => `Welcome to ${brand}!`,
-    text: "Let\u2019s take a quick look around so you know where everything is. This will only take a minute.<br><br><em style='font-size:0.85em;color:#666'>Click anywhere outside the tour to explore \u2014 a button will appear to continue.</em>",
+    text: "Let\u2019s take a quick look around so you know where everything is. This will only take a minute.<br><br><em class='shepherd-tour-hint'>Click anywhere outside the tour to explore \u2014 a button will appear to continue.</em>",
     buttons: ["next"],
   },
   {

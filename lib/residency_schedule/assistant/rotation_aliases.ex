@@ -5,6 +5,20 @@ defmodule ResidencySchedule.Assistant.RotationAliases do
   """
 
   @aliases %{
+    "leave_of_absence" => ["loa", "leave of absence"],
+    "admin" => ["admin", "admin day"],
+    "admin_mfm" => ["admin/mfm", "admin mfm"],
+    "cob" => ["cob", "cob clinic"],
+    "gog_colpo" => ["gog", "gog/colpo", "gog colpo", "gog/colpo clinic"],
+    "mfm" => ["mfm", "mfm clinic"],
+    "mfm_pain" => ["mfm/pain", "mfm pain", "mfm/pain clinic"],
+    "mfm_pm" => ["mfm pm", "mfm perimenopausal", "mfm perimenopausal clinic"],
+    "orientation" => ["orient", "orientation"],
+    "oncology_orientation" => ["onc orient", "oncology orientation"],
+    "highland_obstetrics_orientation" => ["hhob orient", "highland obstetrics orientation"],
+    "strong_gynecology_orientation" => ["gyn orient", "strong gynecology orientation"],
+    "highland_gynecology_orientation" => ["hgyn orient", "highland gynecology orientation"],
+    "strong_obstetrics_orientation" => ["ob orient", "strong obstetrics orientation"],
     "strong_obstetrics" => [
       "ob",
       "obs",

@@ -80,8 +80,8 @@ defmodule ResidencySchedule.ScheduleBuilder do
   Loads an existing schedule from the database into builder state.
 
   Converts the DB residents and their rotations into the in-memory builder
-  format. Legacy schedules use the annual slot calendar; date updates retain
-  their literal date boundaries when loaded and saved.
+  format. Canonical schedules use the annual slot calendar; irregular imports
+  and date updates retain their literal date boundaries when loaded and saved.
   Returns `{:ok, builder_state}`. Date-updated schedules with overlapping shifts
   return `{:error, reason}` because the editor supports one assignment per cell.
 
@@ -95,11 +95,21 @@ defmodule ResidencySchedule.ScheduleBuilder do
     rotations_by_resident =
       Map.new(db_residents, &{&1.id, Rotations.list_rotations_for_resident(&1.id)})
 
+    annual_slots =
+      schedule.academic_year
+      |> SlotCalendar.build_slots()
+      |> Map.new(&{&1.slot_index, &1})
+
     literal_dates? =
       Enum.any?(rotations_by_resident, fn {_, rotations} ->
         indices = Enum.map(rotations, & &1.slot_index)
-        Enum.any?(indices, &(&1 < 0)) or length(indices) != length(Enum.uniq(indices))
+
+        Enum.any?(indices, &(&1 < 0)) or length(indices) != length(Enum.uniq(indices)) or
+          Enum.any?(rotations, &noncanonical_dates?(&1, annual_slots))
       end)
+
+    literal_dates? =
+      literal_dates? and not legacy_weekly_overlap?(rotations_by_resident, annual_slots)
 
     if literal_dates? and
          Enum.any?(rotations_by_resident, fn {_, rotations} ->
@@ -115,6 +125,52 @@ defmodule ResidencySchedule.ScheduleBuilder do
         rotations_by_resident,
         literal_dates?
       )
+    end
+  end
+
+  # Historical annual schedules can have a shifted weekly calendar and Highland
+  # overlaps. Keep their existing annual builder behavior without remapping
+  # ordinary daily imports or explicit date updates.
+  defp legacy_weekly_overlap?(rotations_by_resident, annual_slots) do
+    Enum.any?(rotations_by_resident, fn {_, rotations} ->
+      overlapping_rotations?(rotations)
+    end) and
+      Enum.all?(rotations_by_resident, fn {_, rotations} ->
+        indices = Enum.map(rotations, & &1.slot_index)
+
+        length(indices) == length(Enum.uniq(indices)) and
+          Enum.all?(rotations, fn rotation ->
+            Map.has_key?(annual_slots, rotation.slot_index) and weekly_dates?(rotation)
+          end)
+      end)
+  end
+
+  defp weekly_dates?(rotation) do
+    shape =
+      {Date.day_of_week(rotation.start_date), Date.diff(rotation.end_date, rotation.start_date)}
+
+    case rotation.rotation_type do
+      "highland_night_float" -> shape == {7, 5}
+      "highland_weekend_nights" -> shape == {6, 0}
+      "float" -> shape in [{1, 4}, {1, 6}]
+      _ -> shape in [{1, 4}, {6, 1}]
+    end
+  end
+
+  defp noncanonical_dates?(rotation, annual_slots) do
+    case Map.get(annual_slots, rotation.slot_index) do
+      nil ->
+        true
+
+      slot ->
+        expected =
+          CsvParser.adjust_highland_dates(
+            String.to_existing_atom(rotation.rotation_type),
+            slot.start_date,
+            slot.end_date
+          )
+
+        {rotation.start_date, rotation.end_date} != expected
     end
   end
 
@@ -462,13 +518,21 @@ defmodule ResidencySchedule.ScheduleBuilder do
 
   # --- Private: save helpers ---
 
-  defp build_parsed_residents(%{residents: residents, slots: slots, assignments: assignments}) do
+  defp build_parsed_residents(
+         %{residents: residents, slots: slots, assignments: assignments} = state
+       ) do
     slot_map = Map.new(slots, &{&1.slot_index, &1})
 
     residents
     |> Enum.with_index()
     |> Enum.map(fn {resident, res_idx} ->
-      rotations = build_rotations_for_resident(res_idx, slot_map, assignments)
+      rotations =
+        build_rotations_for_resident(
+          res_idx,
+          slot_map,
+          assignments,
+          Map.get(state, :literal_dates?, false)
+        )
 
       %CsvParser{
         position_code: resident.position_code,
@@ -480,7 +544,7 @@ defmodule ResidencySchedule.ScheduleBuilder do
     end)
   end
 
-  defp build_rotations_for_resident(res_idx, slot_map, assignments) do
+  defp build_rotations_for_resident(res_idx, slot_map, assignments, literal_dates?) do
     assignments
     |> Enum.filter(fn {{ri, _slot_idx}, _type} -> ri == res_idx end)
     |> Enum.flat_map(fn {{_ri, slot_idx}, rotation_type} ->
@@ -489,17 +553,25 @@ defmodule ResidencySchedule.ScheduleBuilder do
           []
 
         slot ->
+          {start_date, end_date} = assignment_dates(rotation_type, slot, literal_dates?)
+
           [
             %{
               slot_index: slot_idx,
-              start_date: slot.start_date,
-              end_date: slot.end_date,
+              start_date: start_date,
+              end_date: end_date,
               rotation_type: rotation_type
             }
           ]
       end
     end)
     |> Enum.sort_by(& &1.slot_index)
+  end
+
+  defp assignment_dates(_rotation_type, slot, true), do: {slot.start_date, slot.end_date}
+
+  defp assignment_dates(rotation_type, slot, false) do
+    CsvParser.adjust_highland_dates(rotation_type, slot.start_date, slot.end_date)
   end
 
   defp template_assignment(resident_index, slot_index, rotation_type, slots, float_slots) do

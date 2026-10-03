@@ -30,6 +30,19 @@ defmodule ResidencySchedule.ScheduleBuilder.Coverage do
     swing
     ultrasound
     vacation
+    admin
+    admin_mfm
+    cob
+    gog_colpo
+    mfm
+    mfm_pain
+    mfm_pm
+    orientation
+    oncology_orientation
+    highland_obstetrics_orientation
+    strong_gynecology_orientation
+    highland_gynecology_orientation
+    strong_obstetrics_orientation
   )a
 
   @weekend_only_rotations ~w(

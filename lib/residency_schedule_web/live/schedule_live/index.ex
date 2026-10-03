@@ -126,14 +126,14 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       phx-hook="GuidedTour"
       data-tour-page="schedule"
       data-tour-role={to_string(@current_user.role)}
-      class="min-h-screen bg-gray-50"
+      class="min-h-screen bg-gray-50 dark:bg-gray-950"
     >
       <%= if @schedules != [] do %>
         <div
           id="tour-schedule-pills"
-          class="bg-white border-b border-gray-200 px-4 sm:px-6 py-2 flex items-center gap-3 flex-wrap"
+          class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-2 flex items-center gap-3 flex-wrap"
         >
-          <span class="text-sm text-gray-500">Schedule:</span>
+          <span class="text-sm text-gray-500 dark:text-gray-300">Schedule:</span>
           <%= for s <- @schedules do %>
             <div class="flex items-center gap-0.5">
               <button
@@ -142,7 +142,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 class={[
                   "px-3 py-1 text-sm font-medium transition-colors",
                   if(@is_admin, do: "rounded-l-full", else: "rounded-full"),
-                  "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
                 ]}
                 data-schedule-pill={s.id}
               >
@@ -152,7 +152,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 <button
                   phx-click="request_delete"
                   phx-value-id={s.id}
-                  class="px-1.5 py-1 rounded-r-full text-sm font-medium transition-colors bg-gray-200 text-gray-500 hover:bg-red-100 hover:text-red-700"
+                  class="px-1.5 py-1 rounded-r-full text-sm font-medium transition-colors bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700 dark:hover:text-red-300"
                   title={"Delete #{s.label}"}
                 >
                   &times;
@@ -165,10 +165,10 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
             <% target = Enum.find(@schedules, &(&1.id == @delete_confirm_id)) %>
             <form
               phx-submit="delete_schedule"
-              class="flex items-center gap-2 ml-2 pl-3 border-l border-gray-200"
+              class="flex items-center gap-2 ml-2 pl-3 border-l border-gray-200 dark:border-gray-700"
             >
               <input type="hidden" name="schedule_id" value={@delete_confirm_id} />
-              <span class="text-sm text-red-700 font-medium">
+              <span class="text-sm text-red-700 dark:text-red-300 font-medium">
                 Delete {target && target.label}?
               </span>
               <input
@@ -176,10 +176,10 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 name="password"
                 placeholder="Password"
                 autofocus
-                class="border border-gray-300 rounded px-2 py-0.5 text-sm w-32 focus:outline-none focus:ring-1 focus:ring-red-400"
+                class="border border-gray-300 dark:border-gray-600 rounded px-2 py-0.5 text-sm w-32 focus:outline-none focus:ring-1 focus:ring-red-400"
               />
               <%= if @delete_error do %>
-                <span class="text-xs text-red-600">{@delete_error}</span>
+                <span class="text-xs text-red-600 dark:text-red-300">{@delete_error}</span>
               <% end %>
               <button
                 type="submit"
@@ -190,7 +190,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
               <button
                 type="button"
                 phx-click="cancel_delete"
-                class="px-3 py-0.5 bg-gray-100 text-gray-700 rounded text-sm font-medium hover:bg-gray-200 transition-colors"
+                class="px-3 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >
                 Cancel
               </button>
@@ -200,9 +200,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       <% end %>
 
       <%= if @all_slots != [] do %>
-        <div class="px-4 sm:px-6 py-4 flex flex-wrap items-center gap-4 border-b border-gray-200 bg-white">
+        <div class="px-4 sm:px-6 py-4 flex flex-wrap items-center gap-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
           <div id="tour-year-filter" class="flex flex-wrap items-center gap-2">
-            <span class="text-sm text-gray-500 font-medium">Year:</span>
+            <span class="text-sm text-gray-500 dark:text-gray-300 font-medium">Year:</span>
             <button
               phx-click="filter_year"
               phx-value-year="all"
@@ -224,14 +224,14 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           <div class="ml-auto flex items-center gap-3">
             <button
               phx-click="restart_tour"
-              class="text-sm text-blue-500 hover:text-blue-700 transition-colors"
+              class="text-sm text-blue-500 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
               title="Take a guided tour"
             >
               Take a tour
             </button>
             <span
               id="gantt-year-indicator"
-              class="text-sm font-semibold text-gray-500 tabular-nums"
+              class="text-sm font-semibold text-gray-500 dark:text-gray-300 tabular-nums"
             >
             </span>
           </div>
@@ -240,9 +240,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
         <div id="gantt-scroll" phx-hook="YearTracker" class="overflow-x-auto">
           <table class="border-separate border-spacing-0 text-xs">
             <thead>
-              <tr class="bg-gray-100 sticky top-0 z-30">
+              <tr class="bg-gray-100 dark:bg-gray-800 sticky top-0 z-30">
                 <th
-                  class="sticky left-0 z-40 bg-gray-100 px-2 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-300 whitespace-nowrap overflow-hidden"
+                  class="sticky left-0 z-40 bg-gray-100 dark:bg-gray-800 px-2 py-2 text-left font-semibold text-gray-600 dark:text-gray-300 border-b border-r border-gray-300 dark:border-gray-600 whitespace-nowrap overflow-hidden"
                   style={"width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
                 >
                   Name
@@ -252,10 +252,13 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                   <% slot_today = not slot_past and Date.compare(start_date, @today) != :gt %>
                   <th
                     class={[
-                      "px-1 py-2 text-center font-medium border-b border-gray-200 whitespace-nowrap",
-                      if(slot_past, do: "text-gray-300", else: "text-gray-500"),
+                      "px-1 py-2 text-center font-medium border-b border-gray-200 dark:border-gray-700 whitespace-nowrap",
+                      if(slot_past,
+                        do: "text-gray-300 dark:text-gray-500",
+                        else: "text-gray-500 dark:text-gray-300"
+                      ),
                       if(first_in_schedule? and schedule_id != elem(hd(@all_slots), 0),
-                        do: "border-l-2 border-l-blue-300",
+                        do: "border-l-2 border-l-blue-300 dark:border-l-blue-800",
                         else: ""
                       )
                     ]}
@@ -281,35 +284,35 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                   data-year-group={graduation_year}
                   data-cohort-graduation-year={graduation_year}
                   class={[
-                    "border-t-2 border-gray-300",
+                    "border-t-2 border-gray-300 dark:border-gray-600",
                     if(initially_hidden, do: "hidden")
                   ]}
                 >
                   <td
-                    class="sticky left-0 z-20 bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500 uppercase tracking-widest border-r border-gray-200"
+                    class="sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-widest border-r border-gray-200 dark:border-gray-700"
                     style={"width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
                   >
                     {cohort_separator_label(cohort_level, graduation_year)}
                   </td>
-                  <td colspan="9999" class="bg-gray-100"></td>
+                  <td colspan="9999" class="bg-gray-100 dark:bg-gray-800"></td>
                 </tr>
                 <%= for resident <- year_residents do %>
                   <tr
                     data-cohort-graduation-year={graduation_year}
                     class={[
-                      "hover:bg-gray-50 transition-colors border-b border-gray-100",
+                      "hover:bg-gray-50 dark:hover:bg-gray-950 transition-colors border-b border-gray-100 dark:border-gray-700",
                       if(initially_hidden, do: "hidden")
                     ]}
                   >
                     <td
-                      class="sticky left-0 z-20 bg-white px-2 py-1 text-gray-700 font-medium border-r border-gray-200 overflow-hidden"
+                      class="sticky left-0 z-20 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 font-medium border-r border-gray-200 dark:border-gray-700 overflow-hidden"
                       style={"width: #{@name_col_px}px; min-width: #{@name_col_px}px; max-width: #{@name_col_px}px"}
                       data-tour-resident-name="true"
                       data-cohort-graduation-year={graduation_year}
                     >
                       <.link
                         navigate={"/residents/#{resident.id}"}
-                        class="hover:text-blue-600 truncate block"
+                        class="hover:text-blue-600 dark:hover:text-blue-300 truncate block"
                       >
                         {resident.name}
                       </.link>
@@ -318,7 +321,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                       <% past = rotation != nil && Date.compare(rotation.end_date, @today) == :lt %>
                       <td
                         colspan={colspan}
-                        class="px-0.5 py-0.5 text-center border-r border-gray-100"
+                        class="px-0.5 py-0.5 text-center border-r border-gray-100 dark:border-gray-700"
                       >
                         {render_rotation_cell(rotation, past)}
                       </td>
@@ -331,7 +334,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
         </div>
       <% else %>
         <div class="flex flex-col items-center justify-center py-24 text-center">
-          <p class="text-gray-500 mb-4">No schedule uploaded yet.</p>
+          <p class="text-gray-500 dark:text-gray-300 mb-4">No schedule uploaded yet.</p>
           <%= if @is_admin do %>
             <.link
               navigate="/admin/upload"
@@ -574,7 +577,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   defp render_rotation_cell(nil, _past) do
-    Phoenix.HTML.raw(~s(<span class="text-gray-200">–</span>))
+    Phoenix.HTML.raw(~s(<span class="text-gray-200 dark:text-gray-600">–</span>))
   end
 
   defp render_rotation_cell(%{rotations: rotations}, past) do
@@ -594,6 +597,20 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   @abbrev_map %{
+    "leave_of_absence" => "LOA",
+    "admin" => "ADMIN",
+    "admin_mfm" => "ADMIN/MFM",
+    "cob" => "COB",
+    "gog_colpo" => "GOG/Colpo",
+    "mfm" => "MFM",
+    "mfm_pain" => "MFM/pain",
+    "mfm_pm" => "MFM PM",
+    "orientation" => "Orient",
+    "oncology_orientation" => "ONC (orient)",
+    "highland_obstetrics_orientation" => "HHOB (orient)",
+    "strong_gynecology_orientation" => "GYN (orient)",
+    "highland_gynecology_orientation" => "HGYN (orient)",
+    "strong_obstetrics_orientation" => "OB (orient)",
     "ambulatory" => "AMB",
     "away_rotation" => "AWAY",
     "elective" => "Elec",
@@ -663,7 +680,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
     if current == value,
       do: "#{base} bg-blue-600 text-white",
-      else: "#{base} bg-gray-100 text-gray-700 hover:bg-gray-200"
+      else:
+        "#{base} bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
   end
 
   # Deleting a schedule is destructive, so the admin must confirm with their

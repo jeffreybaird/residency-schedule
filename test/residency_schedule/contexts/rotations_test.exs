@@ -574,7 +574,8 @@ defmodule ResidencySchedule.RotationsTest do
   describe "working_day?/1 and shared_service?/1" do
     test "classifies every known rotation type" do
       for type <- Rotations.all_rotation_types() do
-        assert Rotations.working_day?(type) == type not in ["vacation", "post_call"]
+        assert Rotations.working_day?(type) ==
+                 type not in ["vacation", "post_call", "leave_of_absence"]
       end
 
       for type <-

@@ -297,7 +297,7 @@ defmodule ResidencySchedule.ScheduleEditorTest do
     {:ok, summary, _} = ScheduleImporter.import_csv(csv)
     before = snapshot()
     {:ok, state} = ScheduleEditor.load(summary.schedule_id)
-    assert length(state.rotations) == 3006
+    assert length(state.rotations) == 3042
     assert Enum.any?(state.rotations, &(&1.slot_index >= 100))
     assert {:ok, _} = ScheduleEditor.commit(state, [])
     assert snapshot() == before

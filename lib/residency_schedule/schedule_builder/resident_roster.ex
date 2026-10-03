@@ -12,6 +12,16 @@ defmodule ResidencySchedule.ScheduleBuilder.ResidentRoster do
 
   @years [1, 2, 3, 4]
 
+  # Manual assignments do not add annual generation targets.
+  @manual_rotations ~w(leave_of_absence cob gog_colpo mfm mfm_pain mfm_pm orientation)a
+  @orientation_counterparts [
+    oncology_orientation: :oncology,
+    highland_obstetrics_orientation: :highland_obstetrics,
+    strong_gynecology_orientation: :strong_gynecology,
+    highland_gynecology_orientation: :highland_gynecology,
+    strong_obstetrics_orientation: :strong_obstetrics
+  ]
+
   # Targets are median per-resident per-year slot counts derived from
   # analysis of the 2023-2024, 2024-2025, and 2025-2026 historical schedules.
   # Each year level has its own set of applicable rotations — rotations not listed
@@ -130,6 +140,7 @@ defmodule ResidencySchedule.ScheduleBuilder.ResidentRoster do
   @doc """
   Returns a list of rotation types that are valid for a given residency year.
 
+  Includes manual clinic, admin, absence and orientation assignments.
   Excludes rotations that belong only to other year levels. USN has been
   removed as of the 2025–2026 schedule and is no longer a valid option.
 
@@ -142,6 +153,7 @@ defmodule ResidencySchedule.ScheduleBuilder.ResidentRoster do
   def valid_rotations_for_year(residency_year) do
     rotation_targets_for_year(residency_year)
     |> Map.keys()
+    |> include_manual_rotations(residency_year)
     |> Enum.sort()
   end
 
@@ -149,6 +161,9 @@ defmodule ResidencySchedule.ScheduleBuilder.ResidentRoster do
     strong_obstetrics oncology strong_gynecology ambulatory night_float
     highland_obstetrics highland_gynecology highland_night_float
     rei urogynecology elective swing ultrasound vacation
+    admin admin_mfm cob gog_colpo mfm mfm_pain mfm_pm orientation
+    oncology_orientation highland_obstetrics_orientation strong_gynecology_orientation
+    highland_gynecology_orientation strong_obstetrics_orientation
   )a
 
   @weekend_only_rotations ~w(
@@ -186,6 +201,16 @@ defmodule ResidencySchedule.ScheduleBuilder.ResidentRoster do
   end
 
   # --- Private ---
+
+  defp include_manual_rotations(types, residency_year) do
+    orientations =
+      @orientation_counterparts
+      |> Enum.filter(fn {_orientation, counterpart} -> counterpart in types end)
+      |> Enum.map(fn {orientation, _counterpart} -> orientation end)
+
+    admin = if residency_year == 4, do: [:admin, :admin_mfm], else: []
+    types ++ @manual_rotations ++ orientations ++ admin
+  end
 
   defp float_slot?(slot) do
     not slot.is_weekend and Date.diff(slot.end_date, slot.start_date) == 6
