@@ -2,9 +2,12 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   use ResidencyScheduleWeb, :live_view
 
   alias ResidencySchedule.Accounts
+  alias ResidencySchedule.DetailedSchedules
+  alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
   alias ResidencySchedule.Schedules
+  alias ResidencyScheduleWeb.DailyAssignments
 
   # Fixed pixel width for the sticky name column — must match left-[Xpx] values below.
   @name_col_px 148
@@ -30,6 +33,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
      assign(socket,
        delete_confirm_id: nil,
        delete_error: nil,
+       rotation_modal: nil,
        demo_mode: ResidencySchedule.demo_mode?(),
        is_admin: Accounts.User.admin?(socket.assigns.current_user),
        today: today,
@@ -42,7 +46,19 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   @impl true
   def handle_event("scroll_to_schedule", %{"id" => id}, socket) do
-    {:noreply, push_event(socket, "scroll-to-schedule", %{schedule_id: id})}
+    {:noreply,
+     socket |> assign(rotation_modal: nil) |> push_event("scroll-to-schedule", %{schedule_id: id})}
+  end
+
+  @impl true
+  def handle_event("open_rotation_details", params, socket) do
+    modal = find_rotation_details(socket.assigns, Map.get(params, "cell-id"))
+    {:noreply, assign(socket, rotation_modal: modal)}
+  end
+
+  @impl true
+  def handle_event("close_rotation_details", _params, socket) do
+    {:noreply, assign(socket, rotation_modal: nil)}
   end
 
   @impl true
@@ -62,12 +78,12 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   @impl true
   def handle_event("filter_year", %{"year" => year}, socket) do
     filter_year = if year == "all", do: nil, else: String.to_integer(year)
-    {:noreply, assign(socket, filter_year: filter_year)}
+    {:noreply, assign(socket, filter_year: filter_year, rotation_modal: nil)}
   end
 
   @impl true
   def handle_event("view_academic_year", %{"aca_year" => aca_year}, socket) do
-    {:noreply, assign(socket, viewed_aca_year: to_integer(aca_year))}
+    {:noreply, assign(socket, viewed_aca_year: to_integer(aca_year), rotation_modal: nil)}
   end
 
   @impl true
@@ -93,24 +109,17 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   @impl true
   def handle_event("delete_schedule", %{"schedule_id" => id, "password" => password}, socket) do
     if authorized_to_delete?(socket.assigns.current_user, password) do
-      Schedules.delete_schedule(String.to_integer(id))
-      remaining = Schedules.list_schedules()
+      case Schedules.delete_schedule(String.to_integer(id)) do
+        {:ok, _} ->
+          {:noreply, refresh_after_delete(socket)}
 
-      socket =
-        case remaining do
-          [] ->
-            assign(socket,
-              schedules: [],
-              all_slots: [],
-              unified_residents: [],
-              filter_year: nil
-            )
-
-          _ ->
-            load_all_schedules(socket, remaining, current_date())
-        end
-
-      {:noreply, assign(socket, delete_confirm_id: nil, delete_error: nil)}
+        {:error, reason} ->
+          {:noreply,
+           assign(socket,
+             delete_error:
+               if(is_binary(reason), do: reason, else: "This schedule could not be deleted.")
+           )}
+      end
     else
       {:noreply, assign(socket, delete_error: delete_error_message(socket.assigns.current_user))}
     end
@@ -179,7 +188,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 class="border border-gray-300 dark:border-gray-600 rounded px-2 py-0.5 text-sm w-32 focus:outline-none focus:ring-1 focus:ring-red-400"
               />
               <%= if @delete_error do %>
-                <span class="text-xs text-red-600 dark:text-red-300">{@delete_error}</span>
+                <span id="schedule-delete-error" class="text-xs text-red-600 dark:text-red-300">
+                  {@delete_error}
+                </span>
               <% end %>
               <button
                 type="submit"
@@ -317,13 +328,13 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                         {resident.name}
                       </.link>
                     </td>
-                    <%= for {colspan, rotation} <- cell_groups_unified(@all_slots, resident.rotation_lookup) do %>
+                    <%= for {colspan, rotation} <- resident.cells do %>
                       <% past = rotation != nil && Date.compare(rotation.end_date, @today) == :lt %>
                       <td
                         colspan={colspan}
                         class="px-0.5 py-0.5 text-center border-r border-gray-100 dark:border-gray-700"
                       >
-                        {render_rotation_cell(rotation, past)}
+                        <.rotation_cell rotation={rotation} past={past} />
                       </td>
                     <% end %>
                   </tr>
@@ -345,6 +356,65 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           <% end %>
         </div>
       <% end %>
+      <%= if @rotation_modal do %>
+        <div
+          id="gantt-rotation-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="gantt-rotation-modal-title"
+          phx-window-keydown="close_rotation_details"
+          phx-key="Escape"
+          phx-mounted={JS.focus(to: "#gantt-close-details")}
+          phx-remove={JS.focus(to: "#gantt-pill-#{@rotation_modal.cell_id}")}
+          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        >
+          <div
+            data-role="backdrop"
+            phx-click="close_rotation_details"
+            class="absolute inset-0 bg-black/40"
+            aria-hidden="true"
+          >
+          </div>
+          <.focus_wrap
+            id="gantt-detail-focus"
+            class="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6"
+          >
+            <div class="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <h2 id="gantt-rotation-modal-title" class="text-lg font-semibold">
+                  {@rotation_modal.name} — {Rotations.rotation_type_label(
+                    @rotation_modal.rotation_type
+                  )}
+                </h2>
+                <p
+                  id="gantt-rotation-dates"
+                  data-start-date={@rotation_modal.start_date}
+                  data-end-date={@rotation_modal.end_date}
+                  class="text-sm text-gray-500 dark:text-gray-300"
+                >
+                  {Calendar.strftime(@rotation_modal.start_date, "%b %-d, %Y")}–{Calendar.strftime(
+                    @rotation_modal.end_date,
+                    "%b %-d, %Y"
+                  )}
+                </p>
+              </div>
+              <button
+                id="gantt-close-details"
+                type="button"
+                aria-label="Close"
+                phx-click="close_rotation_details"
+                class="rounded p-2 hover:bg-gray-100 dark:hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                ×
+              </button>
+            </div>
+            <DailyAssignments.activities
+              id="gantt-daily-assignments"
+              activities={@rotation_modal.activities}
+            />
+          </.focus_wrap>
+        </div>
+      <% end %>
     </div>
     """
   end
@@ -356,7 +426,10 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     schedule_map = Map.new(schedules, &{&1.id, &1})
     schedule_ids = Enum.map(schedules, & &1.id)
 
-    all_schedule_residents = Residents.list_residents_across_schedules(schedule_ids)
+    all_schedule_residents =
+      schedule_ids
+      |> Residents.list_residents_across_schedules()
+      |> ResidentDisplayNames.apply_to_schedule_residents()
 
     residents_by_schedule = Enum.group_by(all_schedule_residents, & &1.schedule_id)
     sections = build_slot_sections(schedules, residents_by_schedule)
@@ -364,11 +437,13 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
     unified_residents =
       build_unified_residents(all_schedule_residents, schedule_map, today)
+      |> Enum.map(&Map.put(&1, :cells, cell_groups_unified(all_slots, &1.rotation_lookup)))
 
     assign(socket,
       schedules: schedules,
       all_slots: all_slots,
       unified_residents: unified_residents,
+      rotation_modal: nil,
       filter_year: nil
     )
   end
@@ -514,7 +589,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   @doc """
-  Groups consecutive slots into merged cells based on rotation type. Works with
+  Groups calendar-adjacent slots within one schedule into cells by rotation type. Works with
   the unified all_slots list and rotations grouped by schedule ID. Legacy column-keyed lookups are also accepted.
 
       iex> all_slots = [{1, 0, ~D[2023-07-03], ~D[2023-07-09], true}, {1, 1, ~D[2023-07-10], ~D[2023-07-16], false}]
@@ -525,27 +600,107 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   """
   def cell_groups_unified(all_slots, rotation_lookup) do
     all_slots
-    |> Enum.map(fn {schedule_id, idx, start, _end, _first?} ->
-      case Map.get(rotation_lookup, schedule_id) do
-        nil ->
-          Map.get(rotation_lookup, {schedule_id, idx})
-
-        rotations ->
-          rotations
-          |> Enum.filter(
-            &(Date.compare(&1.start_date, start) != :gt and
-                Date.compare(&1.end_date, start) != :lt)
-          )
-          |> Enum.sort_by(& &1.rotation_type)
-          |> combine_concurrent_rotations()
-      end
+    |> Enum.map(fn {schedule_id, idx, start, last, _first?} ->
+      {schedule_id, start, last, lookup_slot_rotation(rotation_lookup, schedule_id, idx, start)}
     end)
-    |> Enum.chunk_by(&rotation_cell_key/1)
+    |> Enum.chunk_while([], &chunk_adjacent_cells/2, fn
+      [] -> {:cont, []}
+      group -> {:cont, Enum.reverse(group), []}
+    end)
     |> Enum.map(fn group ->
-      colspan = length(group)
-      rotation = Enum.find(group, &(&1 != nil))
-      {colspan, rotation}
+      {schedule_id, first, _, rotation} = hd(group)
+      {_, _, last, _} = List.last(group)
+      {length(group), annotate_cell(rotation, schedule_id, first, last)}
     end)
+  end
+
+  defp chunk_adjacent_cells(cell, []), do: {:cont, [cell]}
+
+  defp chunk_adjacent_cells({schedule_id, first, _, rotation} = cell, [previous | _] = group) do
+    {previous_schedule, _, previous_last, previous_rotation} = previous
+
+    if schedule_id == previous_schedule and first == Date.add(previous_last, 1) and
+         rotation_cell_key(rotation) == rotation_cell_key(previous_rotation) do
+      {:cont, [cell | group]}
+    else
+      {:cont, Enum.reverse(group), [cell]}
+    end
+  end
+
+  defp lookup_slot_rotation(lookup, schedule_id, idx, date) do
+    case Map.get(lookup, schedule_id) do
+      nil ->
+        Map.get(lookup, {schedule_id, idx})
+
+      rotations ->
+        rotations
+        |> Enum.filter(
+          &(Date.compare(&1.start_date, date) != :gt and Date.compare(&1.end_date, date) != :lt)
+        )
+        |> Enum.sort_by(& &1.rotation_type)
+        |> combine_concurrent_rotations()
+    end
+  end
+
+  defp annotate_cell(nil, _, _, _), do: nil
+
+  defp annotate_cell(%{rotations: rotations} = cell, schedule_id, first, last) do
+    %{
+      cell
+      | rotations: Enum.map(rotations, &annotate_cell(&1, schedule_id, first, last)),
+        end_date: last
+    }
+  end
+
+  defp annotate_cell(rotation, schedule_id, first, last) do
+    token =
+      {schedule_id, Map.get(rotation, :id), first, last}
+      |> :erlang.term_to_binary()
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.url_encode64(padding: false)
+
+    Map.merge(rotation, %{
+      schedule_id: schedule_id,
+      start_date: first,
+      end_date: last,
+      cell_id: token
+    })
+  end
+
+  defp find_rotation_details(assigns, token) when is_binary(token) do
+    assigns.unified_residents
+    |> visible_residents(assigns.filter_year, assigns.viewed_aca_year)
+    |> Enum.find_value(&find_resident_cell(&1, token))
+    |> load_rotation_activities()
+  end
+
+  defp find_rotation_details(_, _), do: nil
+
+  defp find_resident_cell(resident, token) do
+    resident.cells
+    |> Enum.flat_map(fn {_, cell} -> cell_rotations(cell) end)
+    |> Enum.find(&(&1.cell_id == token))
+    |> case do
+      nil -> nil
+      rotation -> Map.put(rotation, :name, resident.name)
+    end
+  end
+
+  defp cell_rotations(nil), do: []
+  defp cell_rotations(%{rotations: rotations}), do: rotations
+  defp cell_rotations(rotation), do: [rotation]
+
+  defp load_rotation_activities(nil), do: nil
+
+  defp load_rotation_activities(rotation) do
+    activities =
+      DetailedSchedules.list_for_resident_range(
+        rotation.schedule_resident_id,
+        rotation.start_date,
+        rotation.end_date
+      )
+
+    Map.put(rotation, :activities, activities)
   end
 
   defp combine_concurrent_rotations([]), do: nil
@@ -576,24 +731,31 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     end)
   end
 
-  defp render_rotation_cell(nil, _past) do
-    Phoenix.HTML.raw(~s(<span class="text-gray-200 dark:text-gray-600">–</span>))
-  end
-
-  defp render_rotation_cell(%{rotations: rotations}, past) do
-    rotations
-    |> Enum.map(&render_rotation_cell(&1, past))
-    |> Enum.map(&Phoenix.HTML.safe_to_string/1)
-    |> Phoenix.HTML.raw()
-  end
-
-  defp render_rotation_cell(rotation, past) do
-    color = Rotations.rotation_type_color(rotation.rotation_type)
-    opacity = if past, do: " opacity-40", else: ""
-
-    Phoenix.HTML.raw(
-      ~s(<span class="inline-block rounded px-1 py-0.5 text-xs font-medium whitespace-nowrap#{opacity} #{color}">#{abbrev(rotation.rotation_type)}</span>)
-    )
+  defp rotation_cell(assigns) do
+    ~H"""
+    <%= if @rotation do %>
+      <%= for rotation <- cell_rotations(@rotation) do %>
+        <button
+          id={"gantt-pill-#{rotation.cell_id}"}
+          type="button"
+          data-rotation-id={rotation.id}
+          phx-click="open_rotation_details"
+          phx-value-cell-id={rotation.cell_id}
+          aria-haspopup="dialog"
+          aria-label={"View #{Rotations.rotation_type_label(rotation.rotation_type)} details"}
+          class={[
+            "inline-block rounded px-1 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:ring-1 focus-visible:ring-2 focus-visible:ring-blue-500",
+            @past && "opacity-40",
+            Rotations.rotation_type_color(rotation.rotation_type)
+          ]}
+        >
+          <span>{abbrev(rotation.rotation_type)}</span>
+        </button>
+      <% end %>
+    <% else %>
+      <span class="text-gray-200 dark:text-gray-600">–</span>
+    <% end %>
+    """
   end
 
   @abbrev_map %{
@@ -697,5 +859,18 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     else
       "Set a password for your account on the Admin page first."
     end
+  end
+
+  defp refresh_after_delete(socket) do
+    socket =
+      case Schedules.list_schedules() do
+        [] ->
+          assign(socket, schedules: [], all_slots: [], unified_residents: [], filter_year: nil)
+
+        remaining ->
+          load_all_schedules(socket, remaining, current_date())
+      end
+
+    assign(socket, delete_confirm_id: nil, delete_error: nil)
   end
 end

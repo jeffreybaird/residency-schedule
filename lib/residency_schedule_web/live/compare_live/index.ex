@@ -1,6 +1,7 @@
 defmodule ResidencyScheduleWeb.CompareLive.Index do
   use ResidencyScheduleWeb, :live_view
 
+  alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
   alias ResidencySchedule.Schedules
@@ -12,7 +13,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
 
     socket =
       if schedule do
-        residents = Residents.list_residents_for_schedule(schedule.id)
+        residents = display_residents(schedule.id)
 
         assign(socket,
           schedule: schedule,
@@ -62,7 +63,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
   @impl true
   def handle_event("select_schedule", %{"id" => id}, socket) do
     schedule = Schedules.get_schedule!(String.to_integer(id))
-    residents = Residents.list_residents_for_schedule(schedule.id)
+    residents = display_residents(schedule.id)
 
     {:noreply,
      assign(socket,
@@ -392,7 +393,7 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
       socket
       |> assign(
         schedule: schedule,
-        residents: Residents.list_residents_for_schedule(schedule.id),
+        residents: display_residents(schedule.id),
         resident_a_id: a_id,
         resident_b_id: b_id
       )
@@ -403,6 +404,12 @@ defmodule ResidencyScheduleWeb.CompareLive.Index do
   end
 
   defp apply_pair_params(socket, _params), do: socket
+
+  defp display_residents(schedule_id) do
+    schedule_id
+    |> Residents.list_residents_for_schedule()
+    |> ResidentDisplayNames.apply_to_schedule_residents()
+  end
 
   defp fetch_resident_schedule(schedule_resident_id) do
     {:ok, Residents.get_resident!(schedule_resident_id).schedule}

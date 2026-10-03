@@ -18,6 +18,7 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
      assign(socket,
        schedules: Schedules.list_schedules(),
        delete_confirm_id: nil,
+       schedule_delete_error: nil,
        pending_users: Accounts.list_pending_users(),
        approved_users: Accounts.list_approved_users(),
        role_error: nil,
@@ -52,8 +53,22 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
 
   @impl true
   def handle_event("confirm_delete", %{"id" => id}, socket) do
-    Schedules.delete_schedule(String.to_integer(id))
-    {:noreply, assign(socket, schedules: Schedules.list_schedules(), delete_confirm_id: nil)}
+    case Schedules.delete_schedule(String.to_integer(id)) do
+      {:ok, _} ->
+        {:noreply,
+         assign(socket,
+           schedules: Schedules.list_schedules(),
+           delete_confirm_id: nil,
+           schedule_delete_error: nil
+         )}
+
+      {:error, reason} ->
+        {:noreply,
+         assign(socket,
+           schedule_delete_error:
+             if(is_binary(reason), do: reason, else: "This schedule could not be deleted.")
+         )}
+    end
   end
 
   @impl true
@@ -327,6 +342,14 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
     ~H"""
     <div class="max-w-2xl mx-auto py-10 px-4">
       <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-8">Admin</h1>
+      <p
+        :if={@schedule_delete_error}
+        id="schedule-delete-error"
+        role="alert"
+        class="mb-4 text-red-600 dark:text-red-300"
+      >
+        {@schedule_delete_error}
+      </p>
 
       <div class="space-y-4">
         <%!-- Schedules card --%>

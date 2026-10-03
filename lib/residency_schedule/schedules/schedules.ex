@@ -2,6 +2,7 @@ defmodule ResidencySchedule.Schedules do
   @moduledoc "Manages academic-year schedules."
 
   import Ecto.Query
+  alias ResidencySchedule.DetailedSchedules
   alias ResidencySchedule.Repo
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Schedules.Schedule
@@ -71,15 +72,25 @@ defmodule ResidencySchedule.Schedules do
   Exempt from doctest — hits the database.
   """
   def delete_schedule(id) do
-    case Repo.get(Schedule, id) do
-      nil ->
-        {:error, :not_found}
+    Repo.transaction(fn ->
+      schedule = Repo.one(from s in Schedule, where: s.id == ^id, lock: "FOR UPDATE")
+      if is_nil(schedule), do: Repo.rollback(:not_found)
 
-      schedule ->
-        result = Repo.delete(schedule)
-        Residents.delete_orphaned_residents()
-        result
-    end
+      if DetailedSchedules.has_detail?(id),
+        do:
+          Repo.rollback(
+            "This schedule has saved QGenda detail and cannot be deleted. Preserve it while reviewing detailed assignments."
+          )
+
+      case Repo.delete(schedule) do
+        {:ok, deleted} ->
+          Residents.delete_orphaned_residents()
+          deleted
+
+        {:error, reason} ->
+          Repo.rollback(reason)
+      end
+    end)
   end
 
   @doc """

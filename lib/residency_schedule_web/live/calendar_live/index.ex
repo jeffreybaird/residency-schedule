@@ -1,10 +1,13 @@
 defmodule ResidencyScheduleWeb.CalendarLive.Index do
   use ResidencyScheduleWeb, :live_view
 
+  alias ResidencySchedule.DetailedSchedules
+  alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
   alias ResidencySchedule.Schedules
   alias ResidencySchedule.ShiftOverrides
+  alias ResidencyScheduleWeb.DailyAssignments
   alias ResidencyScheduleWeb.ScheduleLive.Index, as: ScheduleIndex
 
   @impl true
@@ -338,7 +341,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
                   {Calendar.strftime(@focus_date, "%A, %B %-d, %Y")}
                 </h3>
-                <.detail_groups groups={day_detail_for(assigns, @focus_date)} />
+                <.day_activity_detail rows={day_rows_for(assigns, @focus_date)} />
               </div>
           <% end %>
         </div>
@@ -370,7 +373,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
               </div>
 
               <div class="overflow-y-auto px-6 pb-6">
-                <.detail_groups groups={day_detail_for(assigns, @selected_date)} />
+                <.day_activity_detail rows={day_rows_for(assigns, @selected_date)} />
               </div>
             </div>
           </div>
@@ -490,59 +493,6 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     """
   end
 
-  # Renders rotation assignments for a day, grouped by rotation type.
-  defp detail_groups(assigns) do
-    ~H"""
-    <%= if @groups == [] do %>
-      <p class="text-sm text-gray-400 dark:text-gray-400">No rotations recorded for this day.</p>
-    <% else %>
-      <div class="space-y-4">
-        <%= for {type, entries} <- @groups do %>
-          <div>
-            <div class="flex items-center gap-2 mb-2">
-              <span class={"inline-block rounded px-2 py-0.5 text-xs font-medium #{Rotations.rotation_type_color(type)}"}>
-                {Rotations.rotation_type_label(type)}
-              </span>
-              <span class="text-xs text-gray-400 dark:text-gray-400">
-                {length(entries)} resident{if length(entries) != 1, do: "s"}
-              </span>
-            </div>
-            <ul class="space-y-1 pl-1">
-              <%= for entry <- entries do %>
-                <li class="flex items-center gap-2 text-sm">
-                  <span class="text-xs text-gray-400 dark:text-gray-400 font-mono w-10">
-                    {entry.resident.position_code}
-                  </span>
-                  <.link
-                    navigate={"/residents/#{entry.resident.id}"}
-                    class={[
-                      "hover:text-blue-600 dark:hover:text-blue-300 hover:underline",
-                      if(entry.overridden,
-                        do: "line-through text-gray-400 dark:text-gray-400",
-                        else: "text-gray-700 dark:text-gray-200"
-                      )
-                    ]}
-                  >
-                    {entry.resident.name}
-                  </.link>
-                  <%= if entry.overridden do %>
-                    <span class="text-xs text-gray-400 dark:text-gray-400 italic">
-                      → {entry.covered_by.name}
-                    </span>
-                  <% end %>
-                  <%= if entry.is_coverage do %>
-                    <span class="text-xs text-blue-500 dark:text-blue-300 italic">(covering)</span>
-                  <% end %>
-                </li>
-              <% end %>
-            </ul>
-          </div>
-        <% end %>
-      </div>
-    <% end %>
-    """
-  end
-
   # Fetches rotations and overrides for the visible range and indexes them by date,
   # along with the resident and rotation-type options available for filtering.
   defp assign_view_data(socket) do
@@ -551,13 +501,83 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     rotations = Rotations.list_rotations_in_range_all_schedules(range_start, range_end)
     overrides = ShiftOverrides.list_overrides_in_range(range_start, range_end)
     academic_year = ScheduleIndex.current_academic_year(focus_date)
+    activities = DetailedSchedules.list_in_range(range_start, range_end)
+    options = Residents.list_resident_filter_options_for_year(academic_year)
+
+    activity_options =
+      Enum.map(
+        activities,
+        &%{id: &1.resident_id, name: &1.display_name, position_code: &1.position_code}
+      )
+
+    people =
+      Enum.map(rotations, & &1.schedule_resident.resident_id) ++
+        Enum.map(overrides, & &1.covering_schedule_resident.resident_id) ++
+        Enum.map(options ++ activity_options, & &1.id)
+
+    names = ResidentDisplayNames.names_for_people(people)
+
+    display_options =
+      Enum.map(
+        options ++ activity_options,
+        &%{&1 | name: ResidentDisplayNames.name_for(&1.id, &1.name, names)}
+      )
 
     assign(socket,
       rotation_index: index_by_date(rotations, & &1.start_date, & &1.end_date),
       override_index: index_by_date(overrides, & &1.override_start_date, & &1.override_end_date),
-      resident_options: Residents.list_resident_filter_options_for_year(academic_year),
+      resident_options: Enum.uniq_by(display_options, & &1.id),
+      display_names: names,
+      activity_index: Enum.group_by(activities, & &1.date),
       type_options: type_options(rotations)
     )
+  end
+
+  defp visible_activities(assigns, date) do
+    assigns.activity_index
+    |> Map.get(date, [])
+    |> Enum.filter(&(assigns.resident_filter == [] or &1.resident_id in assigns.resident_filter))
+  end
+
+  defp day_activity_detail(assigns) do
+    ~H"""
+    <section id="day-activities" class="space-y-3">
+      <p :if={@rows == []} class="text-sm text-gray-500 dark:text-gray-300">
+        No daily assignments recorded
+      </p>
+      <article
+        :for={row <- @rows}
+        data-resident-id={row.resident_id}
+        class="rounded-lg border border-gray-200 dark:border-gray-700 p-3 text-sm space-y-2"
+      >
+        <header class="flex items-center gap-2">
+          <.link
+            navigate={"/residents/#{row.schedule_resident_id}"}
+            class="font-semibold hover:underline"
+          >
+            {row.name}
+          </.link>
+          <span class="text-xs text-gray-500 dark:text-gray-300">{row.position_code}</span>
+        </header>
+        <div :for={rotation <- row.rotations} class="flex flex-wrap items-center gap-2">
+          <span class={[
+            "rounded px-2 py-0.5 text-xs font-medium",
+            Rotations.rotation_type_color(rotation.rotation_type),
+            rotation.overridden && "line-through"
+          ]}>
+            {Rotations.rotation_type_label(rotation.rotation_type)}
+          </span>
+          <span :if={rotation.overridden} class="text-xs">Covered by {rotation.covered_by.name}</span>
+          <span :if={rotation.is_coverage} class="text-xs">(covering)</span>
+        </div>
+        <DailyAssignments.activities
+          id={"day-tasks-#{row.resident_id}"}
+          activities={row.activities}
+          show_dates={false}
+        />
+      </article>
+    </section>
+    """
   end
 
   # Expands each item across its inclusive date range, grouping items by date.
@@ -584,12 +604,56 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     |> Rotations.filter_rotations_by_types(assigns.rotation_filter)
   end
 
-  # Effective assignments for a day, filtered and grouped by rotation type for display.
-  defp day_detail_for(assigns, date) do
-    visible_rotations(assigns, date)
-    |> Rotations.effective_day_assignments(Map.get(assigns.override_index, date, []))
-    |> Enum.group_by(& &1.rotation_type)
-    |> Enum.sort_by(&elem(&1, 0))
+  defp day_rows_for(assigns, date) do
+    rotations =
+      visible_rotations(assigns, date)
+      |> Rotations.effective_day_assignments(Map.get(assigns.override_index, date, []))
+      |> Enum.map(&display_day_entry(&1, assigns.display_names))
+      |> Enum.group_by(& &1.resident.resident_id)
+
+    activities = visible_activities(assigns, date) |> Enum.group_by(& &1.resident_id)
+
+    (Map.keys(rotations) ++ Map.keys(activities))
+    |> Enum.uniq()
+    |> Enum.map(&resident_day_row(&1, Map.get(rotations, &1, []), Map.get(activities, &1, [])))
+    |> Enum.sort_by(&{&1.name, &1.resident_id})
+  end
+
+  defp resident_day_row(person_id, [entry | _] = rotations, activities) do
+    %{
+      resident_id: person_id,
+      schedule_resident_id: entry.resident.id,
+      name: entry.resident.name,
+      position_code: entry.resident.position_code,
+      rotations: rotations,
+      activities: activities
+    }
+  end
+
+  defp resident_day_row(person_id, [], [activity | _] = activities) do
+    %{
+      resident_id: person_id,
+      schedule_resident_id: activity.schedule_resident_id,
+      name: activity.display_name,
+      position_code: activity.position_code,
+      rotations: [],
+      activities: activities
+    }
+  end
+
+  defp display_day_entry(entry, names) do
+    Enum.reduce([:resident, :covered_by], entry, fn field, row ->
+      case Map.get(row, field) do
+        nil ->
+          row
+
+        resident ->
+          Map.put(row, field, %{
+            resident
+            | name: ResidentDisplayNames.name_for(resident.resident_id, resident.name, names)
+          })
+      end
+    end)
   end
 
   defp group_by_type(rotations) do
