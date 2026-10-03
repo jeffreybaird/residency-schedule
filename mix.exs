@@ -21,7 +21,7 @@ defmodule ResidencySchedule.MixProject do
   def application do
     [
       mod: {ResidencySchedule.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools, :xmerl]
     ]
   end
 

@@ -3,6 +3,7 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
 
   on_mount {ResidencyScheduleWeb.UserAuth, :ensure_admin}
 
+  alias ResidencySchedule.Importer.QgendaPreview
   alias ResidencySchedule.Importer.ResidentLinker
   alias ResidencySchedule.Importer.ScheduleImporter
   alias ResidencySchedule.Residents
@@ -21,6 +22,16 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
         target_academic_year: "",
         schedules: Schedules.list_schedules()
       )
+      |> assign(
+        qgenda_preview: nil,
+        qgenda_error: nil,
+        qgenda_year: "",
+        qgenda_query: "",
+        qgenda_page: 1,
+        qgenda_rows: [],
+        qgenda_count: 0
+      )
+      |> allow_upload(:qgenda_xlsx, accept: ~w(.xlsx), max_entries: 1, max_file_size: 5_000_000)
       |> allow_upload(:schedule_csv,
         accept: :any,
         max_entries: 1,
@@ -31,6 +42,53 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
   end
 
   @impl true
+  def handle_event("qgenda-validate", params, socket) do
+    {:noreply,
+     assign(socket, qgenda_year: Map.get(params, "academic_year", socket.assigns.qgenda_year))}
+  end
+
+  def handle_event("qgenda-preview", params, socket) do
+    year = parse_year(Map.get(params, "academic_year", socket.assigns.qgenda_year))
+
+    result =
+      consume_uploaded_entries(socket, :qgenda_xlsx, fn %{path: path}, _ ->
+        {:ok, path |> File.read!() |> QgendaPreview.prepare(academic_year: year)}
+      end)
+
+    case result do
+      [{:ok, preview}] ->
+        {:noreply,
+         socket
+         |> assign(qgenda_preview: preview, qgenda_error: nil, qgenda_query: "", qgenda_page: 1)
+         |> assign_qgenda_rows()}
+
+      [{:error, reason}] ->
+        {:noreply, assign(socket, qgenda_preview: nil, qgenda_error: reason)}
+
+      _ ->
+        {:noreply,
+         assign(socket, qgenda_preview: nil, qgenda_error: "Select a QGenda XLSX workbook.")}
+    end
+  end
+
+  def handle_event("qgenda-filter", %{"query" => query}, socket) do
+    {:noreply,
+     socket
+     |> assign(qgenda_query: String.slice(query, 0, 200), qgenda_page: 1)
+     |> assign_qgenda_rows()}
+  end
+
+  def handle_event("qgenda-page", %{"direction" => direction}, socket) do
+    delta = if direction == "next", do: 1, else: -1
+    last = max(1, ceil(socket.assigns.qgenda_count / 100))
+    page = socket.assigns.qgenda_page |> Kernel.+(delta) |> max(1) |> min(last)
+    {:noreply, socket |> assign(qgenda_page: page) |> assign_qgenda_rows()}
+  end
+
+  def handle_event("qgenda-cancel-upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :qgenda_xlsx, ref)}
+  end
+
   def handle_event("validate", params, socket) do
     {:noreply, assign_import_options(socket, params)}
   end
@@ -71,6 +129,9 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
 
   # Step 2: persist with the confirmed links.
   @impl true
+  def handle_event("confirm", _params, %{assigns: %{review: nil}} = socket),
+    do: {:noreply, socket}
+
   def handle_event("confirm", params, socket) do
     review = socket.assigns.review
 
@@ -340,8 +401,251 @@ defmodule ResidencyScheduleWeb.UploadLive.Index do
           </.link>
         </div>
       </.form>
+      <.qgenda_panel
+        uploads={@uploads}
+        schedules={@schedules}
+        qgenda_year={@qgenda_year}
+        qgenda_error={@qgenda_error}
+        qgenda_preview={@qgenda_preview}
+        qgenda_query={@qgenda_query}
+        qgenda_rows={@qgenda_rows}
+        qgenda_count={@qgenda_count}
+        qgenda_page={@qgenda_page}
+      />
     </div>
     """
+  end
+
+  defp qgenda_panel(assigns) do
+    ~H"""
+    <section class="mt-12 border-t border-gray-200 dark:border-gray-700 pt-8">
+      <h2 class="text-2xl font-bold mb-2">QGenda detail preview</h2>
+      <p class="text-sm text-gray-600 dark:text-gray-300 mb-6">
+        Review a Calendar By Staff XLSX export against an existing schedule. This preview does not save assignments or rename residents.
+      </p>
+      <.form
+        for={%{}}
+        id="qgenda-upload-form"
+        phx-change="qgenda-validate"
+        phx-submit="qgenda-preview"
+        class="space-y-4"
+      >
+        <.input
+          type="select"
+          name="academic_year"
+          id="qgenda-academic-year"
+          label="Academic year"
+          value={@qgenda_year}
+          prompt="Select an existing schedule"
+          options={Enum.map(@schedules, &{&1.label, Integer.to_string(&1.academic_year)})}
+        />
+        <.live_file_input upload={@uploads.qgenda_xlsx} />
+        <div :for={entry <- @uploads.qgenda_xlsx.entries} class="text-sm">
+          {entry.client_name}
+          <button
+            type="button"
+            phx-click="qgenda-cancel-upload"
+            phx-value-ref={entry.ref}
+            class="ml-2 underline"
+          >
+            Remove
+          </button>
+          <p :for={error <- upload_errors(@uploads.qgenda_xlsx, entry)} class="text-red-600">
+            {humanize_error(error)}
+          </p>
+        </div>
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-md px-4 py-2">
+          Preview QGenda detail
+        </button>
+      </.form>
+      <p
+        :if={@qgenda_error}
+        id="qgenda-error"
+        role="alert"
+        class="mt-4 text-red-700 dark:text-red-300"
+      >
+        {@qgenda_error}
+      </p>
+      <div :if={@qgenda_preview} id="qgenda-preview" class="mt-8 space-y-6">
+        <div id="qgenda-summary" class="rounded-lg bg-blue-50 dark:bg-blue-950 p-4">
+          <h3 class="font-semibold">Preview only — nothing saved</h3>
+          <p>
+            {length(@qgenda_preview.assignments)} assignments · {Enum.count(
+              @qgenda_preview.assignments,
+              & &1.resident_id
+            )} matched · {Enum.count(@qgenda_preview.assignments, &is_nil(&1.resident_id))} held without a resident match
+          </p>
+          <p>
+            {@qgenda_preview.matches
+            |> Enum.reject(&is_nil(&1.resident_id))
+            |> Enum.uniq_by(& &1.resident_id)
+            |> length()} residents matched · {length(@qgenda_preview.missing_residents)} missing
+          </p>
+          <p :for={warning <- @qgenda_preview.warnings}>{warning}</p>
+        </div>
+        <div id="qgenda-coverage">
+          <h3 class="font-semibold">Date coverage</h3>
+          <p>Workbook headers: {format_qgenda_range(@qgenda_preview.header_range)}</p>
+          <p>Matched resident assignments: {format_qgenda_range(@qgenda_preview.resident_range)}</p>
+          <p>
+            {length(@qgenda_preview.uncovered_dates)} header dates have no matched resident detail. Missing detail does not mean availability; existing schedules remain untouched.
+          </p>
+          <details :if={@qgenda_preview.uncovered_dates != []}>
+            <summary class="cursor-pointer underline">Show dates without resident detail</summary>
+            <p>{Enum.map_join(@qgenda_preview.uncovered_dates, ", ", &Date.to_iso8601/1)}</p>
+          </details>
+        </div>
+        <div id="qgenda-missing-residents">
+          <h3 class="font-semibold">Residents missing from this export</h3>
+          <p :if={@qgenda_preview.missing_residents == []}>None</p>
+          <p :for={resident <- @qgenda_preview.missing_residents}>
+            {resident.name} ({resident.position_code}) — preserve existing schedule
+          </p>
+        </div>
+        <details id="qgenda-matches">
+          <summary class="font-semibold cursor-pointer">Resident matching and naming</summary>
+          <p :for={match <- @qgenda_preview.matches} class="text-sm py-1">
+            {if match.display_name == "", do: "Blank staff", else: match.display_name} — {match.status}
+            <span :if={match.previous_name}>
+              · Existing name / retained alias: {match.previous_name}
+            </span>
+          </p>
+        </details>
+        <div id="qgenda-unknown-tasks">
+          <h3 class="font-semibold">Unrecognized task labels</h3>
+          <p :if={@qgenda_preview.unknown_tasks == []}>None</p>
+          <p :for={task <- @qgenda_preview.unknown_tasks}>{task}</p>
+          <p class="text-sm">
+            All labels are preserved verbatim. No rotation or availability rules are applied.
+          </p>
+        </div>
+        <details :if={@qgenda_preview.unlinked_notes != []} id="qgenda-unlinked-notes">
+          <summary class="font-semibold cursor-pointer">
+            {length(@qgenda_preview.unlinked_notes)} notes could not be linked
+          </summary>
+          <p :for={note <- @qgenda_preview.unlinked_notes}>
+            {note.text} — {note.source_sheet}!{note.source_cell}
+          </p>
+        </details>
+        <.form for={%{}} id="qgenda-filter-form" phx-change="qgenda-filter">
+          <.input
+            name="query"
+            id="qgenda-query"
+            value={@qgenda_query}
+            label="Filter preview by person, task, date, or note"
+            phx-debounce="200"
+          />
+        </.form>
+        <p class="text-sm">
+          {@qgenda_count} matching assignments · Page {@qgenda_page} of {max(
+            1,
+            ceil(@qgenda_count / 100)
+          )}
+        </p>
+        <div class="overflow-x-auto">
+          <table id="qgenda-assignments" class="w-full text-sm text-left">
+            <thead>
+              <tr>
+                <th class="p-2">Date / resident</th>
+                <th class="p-2">Task and notes</th>
+                <th class="p-2">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                :for={assignment <- @qgenda_rows}
+                data-qgenda-assignment="true"
+                data-source-cell={assignment.source_cell}
+                class="border-t align-top"
+              >
+                <td class="p-2">
+                  {assignment.date}<br />{if assignment.display_name == "",
+                    do: "Blank staff",
+                    else: assignment.display_name}<br />
+                  <span class="text-xs">
+                    {assignment.status}
+                  </span>
+                  <span :if={assignment.previous_name} class="block text-xs">
+                    Existing name / alias: {assignment.previous_name}
+                  </span>
+                </td>
+                <td class="p-2">
+                  {assignment.raw_task}<p
+                    :for={note <- assignment.notes}
+                    class="mt-1 text-gray-600 dark:text-gray-300"
+                  >{note}</p>
+                </td>
+                <td class="p-2">
+                  {assignment.source_sheet}!{assignment.source_cell}<br />{assignment.raw_staff}
+                  <span
+                    :for={note <- qgenda_assignment_notes(@qgenda_preview.notes, assignment)}
+                    class="block text-xs"
+                  >
+                    Note: {note.source_sheet}!{note.source_cell}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="flex gap-4">
+          <button
+            id="qgenda-previous-page"
+            type="button"
+            phx-click="qgenda-page"
+            phx-value-direction="previous"
+            disabled={@qgenda_page == 1}
+            class="btn btn-sm"
+          >
+            Previous
+          </button>
+          <button
+            id="qgenda-next-page"
+            type="button"
+            phx-click="qgenda-page"
+            phx-value-direction="next"
+            disabled={@qgenda_page * 100 >= @qgenda_count}
+            class="btn btn-sm"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </section>
+    """
+  end
+
+  defp qgenda_assignment_notes(notes, assignment) do
+    key = {assignment.date, assignment.raw_staff, assignment.raw_task}
+    Enum.filter(notes, &(&1.assignment_key == key))
+  end
+
+  defp format_qgenda_range(nil), do: "No matched assignments"
+  defp format_qgenda_range({first, last}), do: "#{first} through #{last}"
+
+  defp assign_qgenda_rows(%{assigns: %{qgenda_preview: nil}} = socket), do: socket
+
+  defp assign_qgenda_rows(socket) do
+    query = String.downcase(socket.assigns.qgenda_query)
+
+    rows =
+      Enum.filter(socket.assigns.qgenda_preview.assignments, fn row ->
+        [
+          row.display_name,
+          row.previous_name || "",
+          row.raw_staff,
+          row.raw_task,
+          Date.to_iso8601(row.date) | row.notes
+        ]
+        |> Enum.join(" ")
+        |> String.downcase()
+        |> String.contains?(query)
+      end)
+
+    assign(socket,
+      qgenda_count: length(rows),
+      qgenda_rows: Enum.slice(rows, (socket.assigns.qgenda_page - 1) * 100, 100)
+    )
   end
 
   defp assign_import_options(socket, params) do
