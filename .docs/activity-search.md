@@ -6,6 +6,16 @@ Choose a resident or inclusive start and end dates to narrow the results.
 Filters remain in the URL so the view can be bookmarked or shared with another
 signed-in user.
 
+The search box suggests recorded activity labels as you type. Choose a
+suggestion to apply it, or keep typing a resident name, note, or other free-text
+query. Suggestions respect the selected academic year, resident, and date
+filters. Up to 20 distinct matching labels are offered; choosing one returns
+to the first results page.
+
+Suggestions appear in a dropdown below the search box. Click a label to select
+it, or use the arrow keys and Enter. Escape closes the dropdown while preserving
+the typed search. Free text remains supported; choosing a suggestion is optional.
+
 Search text matches task labels, note text, and recorded resident names or
 aliases, ignoring capitalization. Percent signs, underscores, and backslashes
 are literal characters. A person's recorded names can find their assignments

@@ -6,7 +6,12 @@ defmodule ResidencyScheduleWeb.ActivitiesLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, schedules: Schedules.list_schedules())}
+    {:ok,
+     assign(socket,
+       schedules: Schedules.list_schedules(),
+       suggestions_open: false,
+       active_suggestion: nil
+     )}
   end
 
   @impl true
@@ -24,8 +29,26 @@ defmodule ResidencyScheduleWeb.ActivitiesLive.Index do
     filters =
       Map.merge(socket.assigns.filters, Map.take(params, @filters)) |> Map.put("page", "1")
 
-    {:noreply, patch_search(socket, filters)}
+    {:noreply,
+     socket |> assign(suggestions_open: true, active_suggestion: nil) |> patch_search(filters)}
   end
+
+  @impl true
+  def handle_event("focus-suggestions", _params, socket) do
+    {:noreply, assign(socket, suggestions_open: socket.assigns.suggestions != [])}
+  end
+
+  @impl true
+  def handle_event("close-suggestions", _params, socket),
+    do: {:noreply, close_suggestions(socket)}
+
+  @impl true
+  def handle_event("select-suggestion", params, socket),
+    do: {:noreply, select_suggestion(socket, Map.get(params, "label"))}
+
+  @impl true
+  def handle_event("suggestion-key", %{"key" => key}, socket),
+    do: {:noreply, apply_suggestion_key(socket, key)}
 
   @impl true
   def handle_event("paginate", %{"page" => page}, socket) do
@@ -47,14 +70,52 @@ defmodule ResidencyScheduleWeb.ActivitiesLive.Index do
         phx-submit="search"
         class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6"
       >
-        <.input
-          field={@form[:query]}
-          type="search"
-          label="Search"
-          placeholder="Name, clinic, task or note"
-          maxlength="200"
-          phx-debounce="300"
-        />
+        <div class="relative" data-activity-typeahead phx-click-away="close-suggestions">
+          <.input
+            id="activities-query"
+            field={@form[:query]}
+            type="search"
+            label="Search"
+            placeholder="Name, clinic, task or note"
+            maxlength="200"
+            autocomplete="off"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-controls="activity-suggestions"
+            aria-expanded={to_string(@suggestions_open)}
+            aria-activedescendant={
+              if @active_suggestion, do: "activity-suggestion-#{@active_suggestion}"
+            }
+            phx-hook="ActivityTypeahead"
+            phx-focus="focus-suggestions"
+            phx-debounce="300"
+          />
+          <div
+            :if={@suggestions_open}
+            id="activity-suggestions"
+            role="listbox"
+            aria-label="Activity suggestions"
+            class="absolute top-full left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 shadow-lg"
+          >
+            <button
+              :for={{label, index} <- Enum.with_index(@suggestions)}
+              id={"activity-suggestion-#{index}"}
+              type="button"
+              role="option"
+              data-value={label}
+              aria-selected={to_string(@active_suggestion == index)}
+              tabindex="-1"
+              phx-click="select-suggestion"
+              phx-value-label={label}
+              class={[
+                "block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 dark:hover:bg-blue-950",
+                @active_suggestion == index && "bg-blue-100 dark:bg-blue-950"
+              ]}
+            >
+              {label}
+            </button>
+          </div>
+        </div>
         <.input
           field={@form[:academic_year]}
           type="select"
@@ -160,14 +221,68 @@ defmodule ResidencyScheduleWeb.ActivitiesLive.Index do
 
     display_filters = Map.new(filters, fn {key, value} -> {key, display_value(value)} end)
 
+    suggestions = load_suggestions(filters, error)
+
     assign(socket,
       filters: display_filters,
       form: to_form(display_filters),
       result: result,
+      suggestions: suggestions,
+      suggestions_open: socket.assigns.suggestions_open and suggestions != [],
+      active_suggestion: nil,
       error: error,
       residents: search_residents(socket.assigns.schedules, display_filters["academic_year"])
     )
   end
+
+  defp load_suggestions(filters, nil) do
+    case DetailedSchedules.activity_suggestions(filters) do
+      {:ok, labels} -> labels
+      {:error, _} -> []
+    end
+  end
+
+  defp load_suggestions(_, _), do: []
+
+  defp close_suggestions(socket),
+    do: assign(socket, suggestions_open: false, active_suggestion: nil)
+
+  defp select_suggestion(socket, value) do
+    if value in socket.assigns.suggestions do
+      filters = socket.assigns.filters |> Map.put("query", value) |> Map.put("page", "1")
+
+      socket
+      |> close_suggestions()
+      |> push_event("activity-query-selected", %{query: value})
+      |> patch_search(filters)
+    else
+      socket
+    end
+  end
+
+  defp apply_suggestion_key(socket, "Escape"), do: close_suggestions(socket)
+
+  defp apply_suggestion_key(
+         %{assigns: %{active_suggestion: index, suggestions_open: true}} = socket,
+         "Enter"
+       )
+       when is_integer(index),
+       do: select_suggestion(socket, Enum.at(socket.assigns.suggestions, index))
+
+  defp apply_suggestion_key(socket, key) when key in ["ArrowDown", "ArrowUp"] do
+    count = length(socket.assigns.suggestions)
+
+    if count > 0 do
+      step = if key == "ArrowDown", do: 1, else: -1
+      initial = if step == 1, do: -1, else: 0
+      index = Integer.mod((socket.assigns.active_suggestion || initial) + step, count)
+      assign(socket, suggestions_open: true, active_suggestion: index)
+    else
+      close_suggestions(socket)
+    end
+  end
+
+  defp apply_suggestion_key(socket, _), do: socket
 
   defp search_residents(schedules, year) do
     case Enum.find(schedules, &(to_string(&1.academic_year) == year)) do

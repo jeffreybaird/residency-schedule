@@ -49,6 +49,12 @@ defmodule ResidencySchedule.DetailedSchedules do
     end
   end
 
+  @doc """
+  Lists up to 20 distinct stored task labels matching the current year, date,
+  resident and literal query filters. Exempt from doctest — database query.
+  """
+  def activity_suggestions(params), do: ActivitySearch.suggestions(params)
+
   defp search_entry(activity) do
     Map.take(activity, [
       :id,
