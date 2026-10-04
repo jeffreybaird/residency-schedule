@@ -117,3 +117,25 @@ Production source registration, credentials, and delivery verification remain
 separate operational steps; local test delivery does not establish production
 collector delivery. No production activation or deployment is part of this
 repository verification.
+
+## Follow-up: pull-request CI toolchain
+
+The parent review found that the separate `.github/workflows/ci.yml` still pinned
+Elixir 1.18 / OTP 27 after the deploy workflow had been updated. The initial review
+missed this file; those versions cannot build the new Elixir 1.19 dependencies.
+
+The spec writer added `ci_runtime_compatibility_test.exs` to compare both workflow
+pins with `.tool-versions` and the project's Elixir requirement. Independent review
+accepted SHA-256 `203953c45ad40692198ee920a1cd764b6e908b4c93314148be3b6102052f21a7`.
+The runner demonstrated red with
+`MIX_ENV=test mix test test/residency_schedule/ci_runtime_compatibility_test.exs`:
+1 test, 1 failure, exit status 2 (`/private/tmp/residency-otel-ci-red.log`). The
+implementer was then authorized to align the two CI pins with Elixir 1.19.5 / OTP
+28.5.0.7. Dependency locks and advisory results are unchanged.
+
+After the correction, the runner recorded green: 1 test, zero failures; read-only
+format check passed; strict Credo checked 268 files and 2,181 modules/functions
+with no issues. The accepted test hash was unchanged. Evidence:
+`/private/tmp/residency-otel-ci-green.log`. The earlier full suite and release
+smoke remain applicable; this follow-up changes only CI version pins and adds the
+compatibility regression.
