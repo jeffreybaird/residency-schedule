@@ -63,10 +63,11 @@ comparison; no claim of a complete vulnerability scan is made for those assets.
 
 After dependency resolution, review repeated the comparison against all 51 locked
 Hex packages with no matching affected ranges and reran `mix hex.audit` cleanly.
-The published shipper version available at integration time is 0.2.1; local sibling
-documentation describes an unpublished 0.2.2. This application uses published
-`otlp_shipper ~> 0.2.1` with an explicit Mint minimum of 1.10.2 (resolved 1.11.0),
-plus the shipper-verified SDK 1.7.0 / API 1.5.0 pair.
+The first integration used published shipper 0.2.1 because 0.2.2 was not yet
+available. Following publication and the user's requested upgrade, this application
+uses `otlp_shipper ~> 0.2.2`. Its published package enforces the Mint minimum of
+1.10.2, so the redundant direct application dependency was removed. Mint remains
+locked at 1.11.0, alongside the shipper-verified SDK 1.7.0 / API 1.5.0 pair.
 
 The application owns a named SDK provider, initializes the SDK's process-global
 span limits explicitly, and supervises the SDK's shared span storage before its
@@ -139,3 +140,28 @@ with no issues. The accepted test hash was unchanged. Evidence:
 `/private/tmp/residency-otel-ci-green.log`. The earlier full suite and release
 smoke remain applicable; this follow-up changes only CI version pins and adds the
 compatibility regression.
+
+## Follow-up: published shipper 0.2.2
+
+The user requested the now-published 0.2.2 package. Before the dependency-only
+upgrade, the runner verified the 0.2.1 baseline: 6 doctests and 13 focused tests
+passed. Existing accepted behavior contracts remained unchanged; no artificial
+failing test was introduced for a compatible version update.
+
+The implementer changed the shipper requirement to `~> 0.2.2` and updated only
+that lock entry. The downloaded Hex package and metadata both enforce Mint
+`~> 1.10 and >= 1.10.2`, allowing removal of the redundant direct Mint requirement.
+All other resolved versions remained unchanged.
+
+Final runner checks passed: read-only format, warnings-as-errors compilation,
+6 focused doctests and 13 tests (including actual three-signal transport), the
+full suite of 193 doctests and 1,430 tests, and strict Credo across 268 files and
+2,181 modules/functions. All five accepted test hashes remained unchanged. Logs:
+`/private/tmp/residency-otel-shipper022-{compile,focused,full,credo}.log`.
+
+Independent review refreshed the 121 reviewed advisory catalog entries and
+compared all 51 locked Hex packages: no affected installed ranges were found.
+`mix hex.audit` again reported no retired packages. The documented local OTP
+advisories remain applicable. The production release smoke and JS checks above
+were performed with shipper 0.2.1 and were not repeated for this dependency-only
+upgrade; the actual OTLP transport tests passed with 0.2.2.
