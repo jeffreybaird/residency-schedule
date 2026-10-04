@@ -1,5 +1,7 @@
 import Config
 
+config :residency_schedule, :observability, enabled: false
+
 if System.get_env("PHX_SERVER") do
   config :residency_schedule, ResidencyScheduleWeb.Endpoint, server: true
 end
@@ -29,6 +31,29 @@ if config_env() == :dev do
 end
 
 if config_env() == :prod do
+  if System.get_env("OTEL_ENABLED", "false") == "true" do
+    endpoint = System.fetch_env!("OTEL_EXPORTER_OTLP_ENDPOINT")
+    token = System.fetch_env!("OTEL_HUB_TOKEN")
+    uri = URI.parse(endpoint)
+
+    unless uri.scheme == "https" and is_binary(uri.host) and uri.host != "" and
+             is_nil(uri.userinfo) and is_nil(uri.query) and is_nil(uri.fragment) and
+             String.trim(endpoint) == endpoint do
+      raise ArgumentError,
+            "OTEL_EXPORTER_OTLP_ENDPOINT must be an HTTPS URL without credentials, query or fragment"
+    end
+
+    if String.trim(token) == "" or String.contains?(token, ["\r", "\n"]) do
+      raise ArgumentError, "OTEL_HUB_TOKEN must be a nonempty single-line token"
+    end
+
+    config :residency_schedule, :observability,
+      enabled: true,
+      endpoint: endpoint,
+      token: token,
+      environment: "production"
+  end
+
   database_url = System.fetch_env!("DATABASE_URL")
 
   config :residency_schedule, ResidencySchedule.Repo,

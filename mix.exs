@@ -5,7 +5,7 @@ defmodule ResidencySchedule.MixProject do
     [
       app: :residency_schedule,
       version: "0.1.0",
-      elixir: "~> 1.15",
+      elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -21,7 +21,8 @@ defmodule ResidencySchedule.MixProject do
   def application do
     [
       mod: {ResidencySchedule.Application, []},
-      extra_applications: [:logger, :runtime_tools, :xmerl]
+      extra_applications: [:logger, :runtime_tools, :xmerl],
+      included_applications: [:opentelemetry]
     ]
   end
 
@@ -62,6 +63,10 @@ defmodule ResidencySchedule.MixProject do
       {:req, "~> 0.5"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
+      {:otlp_shipper, "~> 0.2.1"},
+      {:mint, "~> 1.10 and >= 1.10.2"},
+      {:opentelemetry, "== 1.7.0", runtime: false},
+      {:opentelemetry_api, "== 1.5.0"},
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},

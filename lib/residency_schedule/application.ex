@@ -10,13 +10,14 @@ defmodule ResidencySchedule.Application do
   @impl true
   def start(_type, _args) do
     children =
-      [
-        ResidencyScheduleWeb.Telemetry,
-        ResidencySchedule.Repo,
-        {DNSCluster,
-         query: Application.get_env(:residency_schedule, :dns_cluster_query) || :ignore},
-        {Phoenix.PubSub, name: ResidencySchedule.PubSub}
-      ] ++
+      ResidencySchedule.Observability.children() ++
+        [
+          ResidencyScheduleWeb.Telemetry,
+          ResidencySchedule.Repo,
+          {DNSCluster,
+           query: Application.get_env(:residency_schedule, :dns_cluster_query) || :ignore},
+          {Phoenix.PubSub, name: ResidencySchedule.PubSub}
+        ] ++
         Session.children() ++
         [
           # Start to serve requests, typically the last entry

@@ -14,7 +14,7 @@ The full architectural spec lives in [`residency_schedule_plan_v2.md`](residency
 
 | Concern | Choice |
 |---|---|
-| Language / runtime | Elixir `~> 1.15` on Erlang/OTP 26–27 (CI runs 1.18 / OTP 27) |
+| Language / runtime | Elixir `~> 1.19` on patched Erlang/OTP (minimum 28.5.0.7 for OTP 28, or 29.1.1 for OTP 29; CI runs 1.19.5 / OTP 28.5.0.7) |
 | Web framework | Phoenix 1.8 + Phoenix LiveView 1.1 |
 | Database | PostgreSQL 14+ via Ecto 3.13 |
 | HTTP server | Bandit |
