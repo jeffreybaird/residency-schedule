@@ -24,10 +24,12 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import {buildTour, consumeTourState} from "./tour.js"
+import ActivityTypeahead from "./activity_typeahead.mjs"
 
 // YearTracker: updates a DOM element with the calendar year of the leftmost
 // visible data column in the Gantt scroll container as the user scrolls.
 const Hooks = {}
+Hooks.ActivityTypeahead = ActivityTypeahead
 
 // ChatScroll: keeps the assistant log pinned to its newest line as text
 // streams in, unless the user has scrolled up to read something earlier.

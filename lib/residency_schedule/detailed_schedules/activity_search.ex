@@ -8,6 +8,43 @@ defmodule ResidencySchedule.DetailedSchedules.ActivitySearch do
 
   @doc "Validates activity filters and prepares a paginated query. Exempt from doctest — database query."
   def prepare(params) when is_map(params) do
+    with {:ok, filters} <- validate_filters(params) do
+      filtered = filters |> scoped_query() |> filter_text(filters.query)
+      total = Repo.aggregate(filtered, :count, :id)
+
+      paginated =
+        from [a, sr] in filtered,
+          order_by: [asc: a.date, asc: sr.position_code, asc: a.id],
+          limit: ^filters.page_size,
+          offset: ^((filters.page - 1) * filters.page_size),
+          preload: [:sources, :schedule_resident]
+
+      {:ok, %{query: paginated, total: total, page: filters.page, page_size: filters.page_size}}
+    end
+  end
+
+  def prepare(_), do: {:error, "Search filters must be an object."}
+
+  @doc "Lists up to 20 distinct task labels in the validated search scope. Exempt from doctest — database query."
+  def suggestions(params) when is_map(params) do
+    with {:ok, filters} <- validate_filters(params) do
+      labels =
+        filters
+        |> scoped_query()
+        |> where([a], fragment("strpos(lower(?), lower(?)) > 0", a.raw_task, ^filters.query))
+        |> select([a], a.raw_task)
+        |> distinct(true)
+        |> order_by([a], asc: a.raw_task)
+        |> limit(20)
+        |> Repo.all()
+
+      {:ok, labels}
+    end
+  end
+
+  def suggestions(_), do: {:error, "Search filters must be an object."}
+
+  defp validate_filters(params) do
     with {:ok, year} <- integer(value(params, :academic_year), nil, 1, 9998),
          {:ok, schedule} <- find_schedule(year),
          {:ok, query} <- search_text(value(params, :query)),
@@ -17,30 +54,30 @@ defmodule ResidencySchedule.DetailedSchedules.ActivitySearch do
          {:ok, person} <- integer(value(params, :resident_id), nil, 1, 2_147_483_647),
          {:ok, page} <- integer(value(params, :page), 1, 1, 10_000),
          {:ok, size} <- integer(value(params, :page_size), 50, 1, 100) do
-      filtered =
-        from(a in Activity,
-          as: :activity,
-          join: sr in assoc(a, :schedule_resident),
-          as: :schedule_resident,
-          where: sr.schedule_id == ^schedule.id and a.date >= ^first and a.date <= ^last
-        )
-        |> filter_person(person)
-        |> filter_text(query)
-
-      total = Repo.aggregate(filtered, :count, :id)
-
-      paginated =
-        from [a, sr] in filtered,
-          order_by: [asc: a.date, asc: sr.position_code, asc: a.id],
-          limit: ^size,
-          offset: ^((page - 1) * size),
-          preload: [:sources, :schedule_resident]
-
-      {:ok, %{query: paginated, total: total, page: page, page_size: size}}
+      {:ok,
+       %{
+         schedule_id: schedule.id,
+         query: query,
+         first: first,
+         last: last,
+         person: person,
+         page: page,
+         page_size: size
+       }}
     end
   end
 
-  def prepare(_), do: {:error, "Search filters must be an object."}
+  defp scoped_query(filters) do
+    from(a in Activity,
+      as: :activity,
+      join: sr in assoc(a, :schedule_resident),
+      as: :schedule_resident,
+      where:
+        sr.schedule_id == ^filters.schedule_id and a.date >= ^filters.first and
+          a.date <= ^filters.last
+    )
+    |> filter_person(filters.person)
+  end
 
   defp value(params, key), do: Map.get(params, key, Map.get(params, Atom.to_string(key)))
 
