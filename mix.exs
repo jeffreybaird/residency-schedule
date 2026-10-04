@@ -64,6 +64,7 @@ defmodule ResidencySchedule.MixProject do
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:otlp_shipper, "~> 0.2.2"},
+      {:mint, "~> 1.10 and >= 1.10.2"},
       {:opentelemetry, "== 1.7.0", runtime: false},
       {:opentelemetry_api, "== 1.5.0"},
       {:gettext, "~> 1.0"},

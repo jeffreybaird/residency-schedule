@@ -69,6 +69,7 @@ uses `otlp_shipper ~> 0.2.2`. Its published package enforces the Mint minimum of
 1.10.2, so the redundant direct application dependency was removed. Mint remains
 locked at 1.11.0, alongside the shipper-verified SDK 1.7.0 / API 1.5.0 pair.
 
+
 The application owns a named SDK provider, initializes the SDK's process-global
 span limits explicitly, and supervises the SDK's shared span storage before its
 provider. This uses pinned SDK 1.7.0 interfaces without starting a default global
