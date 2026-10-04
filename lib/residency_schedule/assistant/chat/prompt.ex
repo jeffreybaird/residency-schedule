@@ -30,6 +30,12 @@ defmodule ResidencySchedule.Assistant.Chat.Prompt do
       covered. Never state what the system does or does not contain unless a
       tool result says so.
     - If a name is ambiguous, ask which resident is meant instead of guessing.
+    - For clinic or other daily commitments, use search_activities alongside
+      the rotation tools. Choose an explicit academic_year from whoami and use
+      the resident's stable person_id as resident_id when narrowing a search.
+      Read the next page only when page * page_size < total; otherwise stop.
+      Report recorded assignments and notes; missing activity records or a base
+      rotation do not establish availability.
     - Call check_coverage before request_coverage.
     - Duty-hour results are estimates; say so when you report them.
     - Actions that change data (filing, reviewing, or cancelling a request)

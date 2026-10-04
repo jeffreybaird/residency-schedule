@@ -8,7 +8,7 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
   """
 
   alias ResidencySchedule.Accounts.User
-  alias ResidencySchedule.{Assistant, ChangeRequests}
+  alias ResidencySchedule.{Assistant, ChangeRequests, DetailedSchedules}
   alias ResidencyScheduleWeb.MCP.Build
 
   @date_desc "ISO 8601 date (YYYY-MM-DD). Defaults to today in America/New_York."
@@ -61,7 +61,7 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
       tool(
         "who_is_on",
         "Who is on a service",
-        "Lists residents effectively working a rotation on a date, with approved coverage applied. Accepts shorthand like 'strong ob', 'onc', 'NF', 'highland gyn'. On weekends the weekend day/night counterparts are included.",
+        "Lists residents effectively working a rotation on a date, with approved coverage applied. Accepts shorthand like 'strong ob', 'onc', 'NF', 'highland gyn'. On weekends the weekend day/night counterparts are included. For clinic or other daily commitments, also consult search_activities; a rotation alone does not establish availability.",
         %{rotation: string("Rotation name or shorthand."), date: string(@date_desc)},
         ["rotation"],
         read_only: true
@@ -69,13 +69,64 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
       tool(
         "resident_schedule",
         "A resident's schedule",
-        "A resident's effective rotation blocks (approved coverage applied) between two dates, across every academic year they appear in. Each block names its schedule.",
+        "A resident's effective rotation blocks (approved coverage applied) between two dates, across every academic year they appear in. Each block names its schedule. Also consult search_activities for clinic and other daily commitments within those blocks.",
         %{
           name: string("Resident's name."),
           from: string("Start of range. " <> @date_desc),
           to: string("End of range (inclusive). Defaults to no end.")
         },
         ["name"],
+        read_only: true
+      ),
+      tool(
+        "search_activities",
+        "Search daily activities",
+        "Searches recorded daily tasks and note text, including clinic commitments, for one academic year. Matches resident full names and earlier name aliases; resident_id is the stable person identity returned as person_id by resident tools. Returns entries, total, page and page_size. Read the next page only when page * page_size < total; otherwise stop. Combine these daily assignments with rotation tools when answering schedule questions. Missing records do not establish availability, and this tool makes no availability determination.",
+        %{
+          academic_year: %{
+            type: "integer",
+            minimum: 1,
+            maximum: 9998,
+            description: "Required existing schedule start year, e.g. 2026 for 2026–2027."
+          },
+          query: %{
+            type: "string",
+            maxLength: 200,
+            description:
+              "Case-insensitive literal substring of a task, note or resident name. Omit to list all matching activities."
+          },
+          start_date: %{
+            type: "string",
+            format: "date",
+            description:
+              "Inclusive YYYY-MM-DD lower bound; defaults to June 1 of academic_year to include orientation."
+          },
+          end_date: %{
+            type: "string",
+            format: "date",
+            description:
+              "Inclusive YYYY-MM-DD upper bound; defaults to June 30 of the following year. Dates must stay within this academic-year window."
+          },
+          resident_id: %{
+            type: "integer",
+            minimum: 1,
+            maximum: 2_147_483_647,
+            description: "Stable person ID, not a schedule-resident ID. Omit for all residents."
+          },
+          page: %{
+            type: "integer",
+            minimum: 1,
+            maximum: 10_000,
+            description: "Result page, starting at 1. Defaults to 1."
+          },
+          page_size: %{
+            type: "integer",
+            minimum: 1,
+            maximum: 100,
+            description: "Activities per page. Defaults to 50."
+          }
+        },
+        ["academic_year"],
         read_only: true
       ),
       tool(
@@ -296,6 +347,8 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
 
   def describe_error(:invalid_request_id), do: "request_id must be an integer."
 
+  def describe_error({:activity_search, reason}) when is_binary(reason), do: reason
+
   def describe_error(%Ecto.Changeset{} = changeset),
     do: "Invalid request: " <> inspect(changeset.errors)
 
@@ -342,6 +395,13 @@ defmodule ResidencyScheduleWeb.MCP.Tools do
 
   defp dispatch("resident_schedule", args, _user),
     do: Assistant.resident_schedule(args["name"], args["from"], args["to"])
+
+  defp dispatch("search_activities", args, _user) do
+    case DetailedSchedules.search(args) do
+      {:ok, result} -> {:ok, result}
+      {:error, reason} -> {:error, {:activity_search, reason}}
+    end
+  end
 
   defp dispatch("shifts_remaining", args, _user),
     do: Assistant.shifts_remaining(args["name"], args["from"], args["to"])
