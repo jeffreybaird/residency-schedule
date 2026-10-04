@@ -8,6 +8,17 @@ draft rotation assignments under coverage and duty-hour constraints.
 
 The full architectural spec lives in [`residency_schedule_plan_v2.md`](residency_schedule_plan_v2.md).
 
+## License
+
+This project is source-available under the custom
+[Residency Schedule Noncommercial License 1.0](LICENSE). Commercial use is
+prohibited, including sales, paid hosting, internal use by for-profit businesses,
+and use in commercial products or services. These restrictions also apply to
+modified versions and derivative works; nonprofit or educational status does
+not create an exemption. Noncommercial use, modification, and redistribution
+are permitted subject to the full license terms. This is not an open-source
+license. Separately licensed third-party materials retain their own licenses.
+
 ---
 
 ## Tech stack

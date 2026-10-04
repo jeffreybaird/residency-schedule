@@ -1,0 +1,86 @@
+Residency Schedule Noncommercial License 1.0
+
+Copyright (c) 2026 the Residency Schedule copyright holders.
+All rights reserved except as expressly granted below.
+
+1. Scope
+
+This license applies to the original code, documentation, and other materials
+in this repository made available under this license (the "Software"), including
+copies, modifications, and derivative works of those materials. "Licensors"
+means the copyright holders offering their respective contributions under this
+license. "You" means any individual or entity exercising rights under it.
+
+2. Limited permission
+
+Subject to compliance with every condition of this license, the Licensors grant
+You a nonexclusive, worldwide, royalty-free license to use, run, reproduce,
+study, modify, and distribute the Software solely for noncommercial purposes.
+Personal learning, experimentation, and noncommercial research are permitted
+only when they do not constitute Commercial Use as defined below.
+
+3. Commercial use prohibited
+
+No permission is granted to use, run, reproduce, modify, distribute, license,
+or otherwise exploit the Software or any part of it for any commercial purpose.
+"Commercial Use" means any use intended for, directed toward, or in support of
+commercial advantage, business operations, monetary compensation, or financial
+gain, whether direct or indirect. Prohibited uses include, without limitation:
+
+  a. Selling, renting, licensing for a fee, or otherwise monetizing the Software
+     or a product or service that incorporates or depends on it.
+  b. Offering the Software as a paid hosted service, subscription, software as
+     a service, or advertising-supported service.
+  c. Using the Software internally for the operations of a for-profit business,
+     or on behalf of such a business, even if no copy is sold or distributed.
+  d. Using the Software to provide paid consulting, support, scheduling,
+     healthcare, or other services, or to support revenue-generating activities.
+  e. Incorporating the Software into a commercial product or using it to
+     develop, test, or operate a product or service intended for commercial use.
+
+These restrictions apply equally to original and modified versions, portions
+of the Software, and derivative works. Providing access without charge does
+not make an otherwise commercial use noncommercial. Nonprofit, charitable,
+educational, research, governmental, or healthcare status does not exempt an
+individual or organization from these restrictions.
+
+4. Copies and distribution
+
+All permitted copies and distributions of the Software, including modified
+versions and derivative works, must retain this license and all applicable
+copyright, attribution, and third-party notices. You must clearly identify
+material modifications. You may distribute the Software only under these same
+terms and may not grant recipients commercial rights to any part of it.
+Recipients receive rights to the Licensors' contributions directly under this
+license, subject to its conditions.
+
+5. Reserved rights and third-party materials
+
+All rights not expressly granted are reserved. No trademark rights are granted.
+Third-party dependencies and materials identified as separately licensed remain
+subject to their own licenses; this license does not replace or restrict rights
+granted by those licenses. Nothing here limits rights that applicable law
+provides independently of this license, including fair use or fair dealing.
+
+6. Termination
+
+Your permissions under this license terminate automatically if You violate any
+of its conditions. Upon termination, You must cease exercising the rights
+granted by this license, including use and distribution of the Software.
+Termination does not eliminate liability for earlier violations. The commercial
+restrictions, reserved rights, warranty disclaimer, and liability limitation
+survive termination.
+
+7. No warranty
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SOFTWARE IS PROVIDED
+"AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, TITLE, AND NONINFRINGEMENT.
+
+8. Limitation of liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSORS SHALL NOT BE
+LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE
+SOFTWARE OR ITS USE OR OTHER DEALINGS IN THE SOFTWARE.
