@@ -89,6 +89,7 @@ defmodule ResidencyScheduleWeb.Router do
         live "/residents/:id", ResidentLive.Show, :show
         live "/calendar", CalendarLive.Index, :index
         live "/compare", CompareLive.Index, :index
+        live "/activities", ActivitiesLive.Index, :index
       end
 
       scope "/admin" do

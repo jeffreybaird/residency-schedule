@@ -108,6 +108,12 @@
           >
             Compare
           </.link>
+          <.link
+            navigate="/activities"
+            class="px-3 py-1.5 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          >
+            Activities
+          </.link>
           <%= if user = @conn.assigns[:current_user] do %>
             <%= if my_page_path = nav_home_path(user) do %>
               <.link
@@ -191,6 +197,12 @@
               class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-950"
             >
               Compare
+            </.link>
+            <.link
+              navigate="/activities"
+              class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-950"
+            >
+              Activities
             </.link>
             <%= if user = @conn.assigns[:current_user] do %>
               <%= if my_page_path = nav_home_path(user) do %>
