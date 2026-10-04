@@ -6,8 +6,8 @@ on:
 
 env:
   MIX_ENV: prod
-  ELIXIR_VERSION: "1.18"
-  OTP_VERSION: "27"
+  ELIXIR_VERSION: "1.19.5"
+  OTP_VERSION: "28.5.0.7"
 
 jobs:
   test:
@@ -130,13 +130,17 @@ jobs:
           # the variable or secret unset leaves the .env line untouched.
           CHAT_ENABLED: ${{ matrix.target == 'prod' && vars.CHAT_ENABLED || '' }}
           ANTHROPIC_API_KEY: ${{ matrix.target == 'prod' && secrets.ANTHROPIC_API_KEY || '' }}
+          OTEL_ENABLED: ${{ matrix.target == 'prod' && vars.OTEL_ENABLED || '' }}
+          OTEL_EXPORTER_OTLP_ENDPOINT: ${{ matrix.target == 'prod' && vars.OTEL_EXPORTER_OTLP_ENDPOINT || '' }}
+          OTEL_HUB_TOKEN: ${{ matrix.target == 'prod' && secrets.OTEL_HUB_TOKEN || '' }}
         with:
           host: ${{ secrets[matrix.host_secret] }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: INSTALL_DIR,SERVICE,SEED_DEMO,APP_PORT,CHAT_ENABLED,ANTHROPIC_API_KEY
+          envs: INSTALL_DIR,SERVICE,SEED_DEMO,APP_PORT,CHAT_ENABLED,ANTHROPIC_API_KEY,OTEL_ENABLED,OTEL_EXPORTER_OTLP_ENDPOINT,OTEL_HUB_TOKEN
           script: |
             set -e
+            umask 077
 
             # Write a KEY=value line into the server .env, replacing any
             # existing line for that key. Skipped when the value is empty so
@@ -150,6 +154,11 @@ jobs:
             }
             upsert_env CHAT_ENABLED "$CHAT_ENABLED"
             upsert_env ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
+            if [ "$SEED_DEMO" != "true" ]; then
+              upsert_env OTEL_ENABLED "$OTEL_ENABLED"
+              upsert_env OTEL_EXPORTER_OTLP_ENDPOINT "$OTEL_EXPORTER_OTLP_ENDPOINT"
+              upsert_env OTEL_HUB_TOKEN "$OTEL_HUB_TOKEN"
+            fi
 
             # Run migrations before swapping (uses server .env for real DB creds)
             # set -a exports all sourced variables to child processes

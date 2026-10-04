@@ -47,7 +47,7 @@ apt-get install -y \
 
 Verify versions:
 ```bash
-elixir --version   # should be 1.15+
+elixir --version   # CI: Elixir 1.19.5 / OTP 28.5.0.7; OTP 29 requires 29.1.1+
 psql --version     # should be 14+
 nginx -v
 ```
@@ -208,12 +208,15 @@ In your GitHub repository go to **Settings → Secrets and variables → Actions
 | `SECRET_KEY_BASE` | Output of `mix phx.gen.secret` | Must match the value in your server `.env` |
 | `PHX_HOST` | Your domain | e.g. `residency-schedule.example.com` |
 | `ANTHROPIC_API_KEY` | Key from console.anthropic.com | Optional. The deploy writes it into the production `.env`; only needed when the chat assistant is on |
+| `OTEL_HUB_TOKEN` | Source-scoped ingest token from OTel Hub | Required when telemetry is enabled; production only |
 
 And under the **Variables** tab (not a secret, it is just a switch):
 
 | Variable | Value | Notes |
 |---|---|---|
 | `CHAT_ENABLED` | `true` or `false` | Optional. The deploy writes it into the production `.env`. Unset leaves the server's current value alone |
+| `OTEL_ENABLED` | `true` or `false` | Optional; defaults off. Set explicitly to `false` to disable an existing integration |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `https://elixir-as-inf.diviningdad.com` | HTTPS base URL; the exporter appends each signal's `/v1/` path |
 
 **`DATABASE_URL` and `ACCESS_PASSWORD` are NOT GitHub Secrets** — they live only in `/home/deploy/residency_schedule/.env` on the server.
 
@@ -482,6 +485,39 @@ If memory is short, lower `POOL_SIZE` in the demo `.env` before adding swap.
 ---
 
 ## Maintenance
+
+### OTel Hub telemetry
+
+Register a source named `residency-schedule` in OTel Hub and store its ingest token
+in the `OTEL_HUB_TOKEN` GitHub Actions secret. Set the endpoint variable above and
+`OTEL_ENABLED=true`, then deploy through the normal `main` workflow. The production
+job writes these settings to the protected server `.env`; the demo target receives
+none of these settings. Missing or invalid required settings fail startup when
+telemetry is enabled. Development and test environments leave export disabled.
+
+The integration reports service identity `residency-schedule`. It exports bounded
+HTTP completion summaries and spans, plus aggregate request, database timing, and
+VM metrics. Request method and response status are the only request attributes.
+Spans summarize completed HTTP requests under the fixed name `HTTP request`;
+they do not provide per-route breakdowns or a distributed call tree of database
+queries and outbound HTTP calls.
+It excludes URLs, query strings, headers, resident names, SQL text and parameters,
+chat content, and arbitrary application log messages. Existing local application
+logging remains available through the journal.
+
+Exporter environment settings are administrator-controlled configuration. Do not
+put credentials or personal data in `OTEL_RESOURCE_ATTRIBUTES`: the metric
+reporter can include these additional resource attributes in exported data.
+
+After deployment, make an ordinary request and verify that the source's logs,
+metrics, and traces arrive in OTel Hub. A successful application health check alone
+does not prove export delivery. Export is asynchronous, bounded, and best effort;
+an unavailable collector must not prevent requests from being served.
+
+To disable export, set `OTEL_ENABLED=false` and deploy again. Removing the GitHub
+variable alone preserves the server's existing value. Rotate the source token by
+updating the secret and deploying; do not paste tokens into command output or
+commit them to the repository.
 
 ### Viewing logs
 

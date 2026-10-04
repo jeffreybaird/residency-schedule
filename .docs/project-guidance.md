@@ -371,6 +371,14 @@ The variables required at runtime are:
 - `PHX_HOST` — GitHub Secret
 - `CHAT_ENABLED` — optional; GitHub Variable, written to the server `.env` by the deploy
 - `ANTHROPIC_API_KEY` — optional; GitHub Secret, written to the server `.env` by the deploy; required at boot when `CHAT_ENABLED=true`
+- `OTEL_ENABLED` — optional; production GitHub Variable; telemetry defaults off
+- `OTEL_EXPORTER_OTLP_ENDPOINT` — production GitHub Variable; HTTPS collector base URL, required when `OTEL_ENABLED=true`
+- `OTEL_HUB_TOKEN` — production GitHub Secret; source-scoped ingest token, required when `OTEL_ENABLED=true`; never log or commit it
+
+OTel Hub receives only fixed HTTP completion summaries, bounded method/status
+attributes, and aggregate metrics. Do not export resident data, chat content,
+request URLs or headers, SQL text or parameters, or arbitrary application logs.
+Keep administrator-supplied `OTEL_RESOURCE_ATTRIBUTES` free of sensitive data.
 
 ### `config/runtime.exs` is the only place for prod config
 
