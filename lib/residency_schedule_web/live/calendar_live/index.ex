@@ -540,44 +540,77 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   end
 
   defp day_activity_detail(assigns) do
+    assigns = assign(assigns, :groups, group_day_rows(assigns.rows))
+
     ~H"""
     <section id="day-activities" class="space-y-3">
       <p :if={@rows == []} class="text-sm text-gray-500 dark:text-gray-300">
         No daily assignments recorded
       </p>
-      <article
-        :for={row <- @rows}
-        data-resident-id={row.resident_id}
-        class="rounded-lg border border-gray-200 dark:border-gray-700 p-3 text-sm space-y-2"
-      >
-        <header class="flex items-center gap-2">
-          <.link
-            navigate={"/residents/#{row.schedule_resident_id}"}
-            class="font-semibold hover:underline"
+      <section :for={{type, rows} <- @groups} data-rotation-type={type} class="space-y-2">
+        <h3 class="flex items-center gap-2">
+          <span
+            :if={type}
+            class={["rounded px-2 py-0.5 text-xs font-medium", Rotations.rotation_type_color(type)]}
           >
-            {row.name}
-          </.link>
-          <span class="text-xs text-gray-500 dark:text-gray-300">{row.position_code}</span>
-        </header>
-        <div :for={rotation <- row.rotations} class="flex flex-wrap items-center gap-2">
-          <span class={[
-            "rounded px-2 py-0.5 text-xs font-medium",
-            Rotations.rotation_type_color(rotation.rotation_type),
-            rotation.overridden && "line-through"
-          ]}>
-            {Rotations.rotation_type_label(rotation.rotation_type)}
+            {Rotations.rotation_type_label(type)}
           </span>
-          <span :if={rotation.overridden} class="text-xs">Covered by {rotation.covered_by.name}</span>
-          <span :if={rotation.is_coverage} class="text-xs">(covering)</span>
-        </div>
-        <DailyAssignments.activities
-          id={"day-tasks-#{row.resident_id}"}
-          activities={row.activities}
-          show_dates={false}
-        />
-      </article>
+          <span :if={is_nil(type)} class="text-sm font-semibold">Daily assignments</span>
+          <span class="text-xs text-gray-500 dark:text-gray-300">
+            {length(rows)} resident{if length(rows) != 1, do: "s"}
+          </span>
+        </h3>
+        <article
+          :for={row <- rows}
+          data-resident-id={row.resident_id}
+          class="rounded-lg border border-gray-200 dark:border-gray-700 p-3 text-sm space-y-2"
+        >
+          <header class="flex items-center gap-2">
+            <.link
+              navigate={"/residents/#{row.schedule_resident_id}"}
+              class="font-semibold hover:underline"
+            >
+              {row.name}
+            </.link>
+            <span class="text-xs text-gray-500 dark:text-gray-300">{row.position_code}</span>
+          </header>
+          <div :for={rotation <- row.rotations} class="flex flex-wrap items-center gap-2">
+            <span class={[
+              "rounded px-2 py-0.5 text-xs font-medium",
+              Rotations.rotation_type_color(rotation.rotation_type),
+              rotation.overridden && "line-through"
+            ]}>
+              {Rotations.rotation_type_label(rotation.rotation_type)}
+            </span>
+            <span :if={rotation.overridden} class="text-xs">
+              Covered by {rotation.covered_by.name}
+            </span>
+            <span :if={rotation.is_coverage} class="text-xs">(covering)</span>
+          </div>
+          <DailyAssignments.activities
+            id={"day-tasks-#{type || "daily"}-#{row.resident_id}"}
+            activities={row.activities}
+            show_dates={false}
+          />
+        </article>
+      </section>
     </section>
     """
+  end
+
+  defp group_day_rows(rows) do
+    rows
+    |> Enum.flat_map(&split_day_row_by_type/1)
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+    |> Enum.sort_by(fn {type, _rows} -> {is_nil(type), type} end)
+  end
+
+  defp split_day_row_by_type(%{rotations: []} = row), do: [{nil, row}]
+
+  defp split_day_row_by_type(row) do
+    row.rotations
+    |> Enum.group_by(& &1.rotation_type)
+    |> Enum.map(fn {type, rotations} -> {type, %{row | rotations: rotations}} end)
   end
 
   # Expands each item across its inclusive date range, grouping items by date.
