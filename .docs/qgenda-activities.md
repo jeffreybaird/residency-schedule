@@ -45,6 +45,11 @@ daily assignments, and notes together. Clinic names, AM/PM, and call
 responsibilities remain visible. A task remains visible when the resident has
 no base rotation recorded for that date.
 
+Each rotation group has one heading and a compact resident list. Daily tasks
+appear in parentheses beside the resident's name; residents without tasks have
+no assignment placeholder. Notes and coverage details remain attached to the
+resident, without duplicate rotation badges or individual bordered cards.
+
 On a resident page, open a rotation to see that resident's assignments and notes
 for the rotation's date range, alongside the existing coworker information. The
 dialog identifies the resident and rotation dates and closes with Escape. The
@@ -73,9 +78,10 @@ For example, a resident may have both `SMH GYN R3 Day` and
 `GOG Continuity Clinic PM`. Both belong in the day's details. The clinic must not
 be collapsed into a generic GYN label.
 
-An empty day says "No daily assignments recorded." It does not establish that
-the resident is free, off duty, or available for surgery. Activity search and
-availability rules are separate capabilities.
+The resident's daily detail panel says "No daily assignments recorded" when
+empty; the calendar's compact list omits that message. Missing assignments do
+not establish that the resident is free, off duty, or available for surgery.
+Activity search and availability rules are separate capabilities.
 
 ## Repeated and partial imports
 
