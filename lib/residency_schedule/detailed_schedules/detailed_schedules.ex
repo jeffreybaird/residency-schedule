@@ -84,6 +84,13 @@ defmodule ResidencySchedule.DetailedSchedules do
     |> load_activities()
   end
 
+  @doc "Lists all detail for one schedule resident. Exempt from doctest — database query."
+  def list_for_resident(schedule_resident_id) do
+    activity_query()
+    |> where([a], a.schedule_resident_id == ^schedule_resident_id)
+    |> load_activities()
+  end
+
   @doc """
   Lists a resident's assignments within an inclusive range of at most 370 days.
   Invalid or reversed ranges return no rows. Exempt from doctest — database query.

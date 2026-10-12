@@ -7,7 +7,6 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   alias ResidencySchedule.Rotations
   alias ResidencySchedule.Schedules
   alias ResidencySchedule.ShiftOverrides
-  alias ResidencyScheduleWeb.DailyAssignments
   alias ResidencyScheduleWeb.ScheduleLive.Index, as: ScheduleIndex
 
   @impl true
@@ -544,9 +543,6 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
     ~H"""
     <section id="day-activities" class="space-y-3">
-      <p :if={@rows == []} class="text-sm text-gray-500 dark:text-gray-300">
-        No daily assignments recorded
-      </p>
       <section :for={{type, rows} <- @groups} data-rotation-type={type} class="space-y-2">
         <h3 class="flex items-center gap-2">
           <span
@@ -563,40 +559,46 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         <article
           :for={row <- rows}
           data-resident-id={row.resident_id}
-          class="rounded-lg border border-gray-200 dark:border-gray-700 p-3 text-sm space-y-2"
+          class="py-1 text-sm space-y-1"
         >
-          <header class="flex items-center gap-2">
+          <header class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <.link
               navigate={"/residents/#{row.schedule_resident_id}"}
-              class="font-semibold hover:underline"
+              class={["font-semibold hover:underline", fully_covered_day_row?(row) && "line-through"]}
             >
               {row.name}
             </.link>
-            <span class="text-xs text-gray-500 dark:text-gray-300">{row.position_code}</span>
-          </header>
-          <div :for={rotation <- row.rotations} class="flex flex-wrap items-center gap-2">
-            <span class={[
-              "rounded px-2 py-0.5 text-xs font-medium",
-              Rotations.rotation_type_color(rotation.rotation_type),
-              rotation.overridden && "line-through"
-            ]}>
-              {Rotations.rotation_type_label(rotation.rotation_type)}
+            <span
+              :if={row.activities != []}
+              id={"day-tasks-#{type || "daily"}-#{row.resident_id}"}
+              data-role="daily-tasks"
+            >
+              ({Enum.map_join(row.activities, "; ", & &1.raw_task)})
             </span>
-            <span :if={rotation.overridden} class="text-xs">
+            <span class="text-xs text-gray-500 dark:text-gray-300">{row.position_code}</span>
+            <span
+              :for={rotation <- row.rotations}
+              :if={rotation.overridden}
+              class="text-xs text-gray-500 dark:text-gray-300"
+            >
               Covered by {rotation.covered_by.name}
             </span>
-            <span :if={rotation.is_coverage} class="text-xs">(covering)</span>
-          </div>
-          <DailyAssignments.activities
-            id={"day-tasks-#{type || "daily"}-#{row.resident_id}"}
-            activities={row.activities}
-            show_dates={false}
-          />
+            <span :if={Enum.any?(row.rotations, & &1.is_coverage)} class="text-xs">(covering)</span>
+          </header>
+          <p :for={note <- day_row_notes(row)} class="text-xs text-gray-500 dark:text-gray-300">
+            {note}
+          </p>
         </article>
       </section>
     </section>
     """
   end
+
+  defp fully_covered_day_row?(row),
+    do: row.rotations != [] and Enum.all?(row.rotations, & &1.overridden)
+
+  defp day_row_notes(row),
+    do: row.activities |> Enum.flat_map(& &1.notes) |> Enum.uniq()
 
   defp group_day_rows(rows) do
     rows

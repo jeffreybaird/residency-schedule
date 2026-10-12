@@ -36,8 +36,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     # spans their whole career and the stats are career-wide.
     {all_entries, all_rotations} = build_career_entries(appearances)
 
-    schedule_start = schedule_start_date(all_rotations)
-    schedule_end = schedule_end_date(all_rotations)
+    scheduled_entries = Enum.reject(all_entries, &(&1.rotation_type == "off"))
+    schedule_start = schedule_start_date(scheduled_entries)
+    schedule_end = schedule_end_date(scheduled_entries)
     night_shift_counts = count_night_shifts(all_rotations)
     available_services = build_service_options(all_entries)
     filtered_entries = filter_entries(all_entries, [])
@@ -190,7 +191,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
     valid? =
       Enum.any?(socket.assigns.all_entries, fn entry ->
-        entry.schedule_id == schedule_id and entry.rotation_type == type and
+        entry.rotation_type != "daily_assignments" and
+          entry.schedule_id == schedule_id and entry.rotation_type == type and
           Date.to_iso8601(entry.start_date) == sd and Date.to_iso8601(entry.end_date) == ed
       end)
 
@@ -411,10 +413,13 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
               </div>
 
               <%= if @stats_expanded do %>
+                <p class="px-4 py-2 text-xs text-gray-500 dark:text-gray-300">
+                  Daily assignments are listed below and excluded from these counts.
+                </p>
                 <%!-- Stats grid: scrollable, capped height --%>
                 <div class="overflow-y-auto max-h-[25vh]">
                   <div class="grid grid-cols-2 divide-x divide-y divide-gray-200 dark:divide-gray-700 bg-gray-50 dark:bg-gray-950">
-                    <div class="px-4 py-3" title="Total scheduled service blocks (excludes vacation)">
+                    <div class="px-4 py-3" title="Total scheduled shift days (excludes vacation)">
                       <p class="text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wide mb-0.5">
                         Total Shifts
                       </p>
@@ -422,7 +427,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                         {@total_shifts}
                       </p>
                     </div>
-                    <div class="px-4 py-3" title="Service blocks with a start date on or after today">
+                    <div class="px-4 py-3" title="Shift days from today onward">
                       <p class="text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wide mb-0.5">
                         Shifts Remaining
                       </p>
@@ -432,7 +437,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                     </div>
                     <div
                       class="px-4 py-3"
-                      title="Night float and weekend night blocks at Strong Memorial remaining"
+                      title="Night float and weekend night shift days at Strong Memorial remaining"
                     >
                       <p class="text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wide mb-0.5">
                         Night Shifts Remaining – Strong
@@ -443,7 +448,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                     </div>
                     <div
                       class="px-4 py-3"
-                      title="Night float and weekend night blocks at Highland remaining"
+                      title="Night float and weekend night shift days at Highland remaining"
                     >
                       <p class="text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wide mb-0.5">
                         Night Shifts Remaining – Highland
@@ -551,7 +556,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                   <tr>
                     <th class="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">
                       <div class="inline-flex items-center justify-center gap-0.5">
-                        <span>Rotation</span>
+                        <span>Rotation / Assignment</span>
                         <button
                           id="service-filter-toggle"
                           type="button"
@@ -622,74 +627,104 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                         <% is_coverage = Map.get(entry, :is_coverage, false) %>
                         <% color = entry_color(entry.rotation_type) %>
                         <% label = entry_label(entry.rotation_type) %>
-                        <tr
-                          id={entry_row_id(entry)}
-                          data-rotation-type={entry.rotation_type}
-                          data-today-anchor={if entry_row_id(entry) == @today_anchor_id, do: "true"}
-                          phx-click="open_shift_coworkers"
-                          phx-value-rotation-type={entry.rotation_type}
-                          phx-value-slot-index={entry.slot_index}
-                          phx-value-schedule-id={entry.schedule_id}
-                          phx-value-start-date={Date.to_iso8601(entry.start_date)}
-                          phx-value-end-date={Date.to_iso8601(entry.end_date)}
-                          class={[
-                            entry_row_class(entry.rotation_type, past),
-                            if(covered, do: "opacity-60", else: ""),
-                            "cursor-pointer"
-                          ]}
-                        >
-                          <td class="px-4 py-2 align-top">
-                            <div class="flex flex-col items-start gap-0.5 text-left">
-                              <span
-                                title={label}
-                                class={[
-                                  "inline-flex h-8 w-full max-w-[11rem] shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
-                                  color,
-                                  if(covered, do: "line-through opacity-70", else: "")
-                                ]}
-                              >
-                                {label}
-                              </span>
-                              <%= if covered do %>
-                                <span class="max-w-full text-xs text-gray-400 dark:text-gray-400 italic break-words">
-                                  covered by {covered.name}
+                        <%= if entry.rotation_type == "daily_assignments" do %>
+                          <tr
+                            id={entry_row_id(entry)}
+                            data-entry-kind="activity"
+                            data-date={Date.to_iso8601(entry.start_date)}
+                            data-today-anchor={if entry_row_id(entry) == @today_anchor_id, do: "true"}
+                            class={if past, do: "opacity-60"}
+                          >
+                            <td class="px-4 py-2 align-top">
+                              <p class="mb-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                                Daily assignments
+                              </p>
+                              <DailyAssignments.activities
+                                id={"#{entry_row_id(entry)}-tasks"}
+                                activities={entry.activities}
+                                show_dates={false}
+                              />
+                            </td>
+                            <td class="px-4 py-2 text-center align-top text-gray-700 dark:text-gray-200">
+                              {Calendar.strftime(entry.start_date, "%b %-d, %Y")}
+                            </td>
+                            <td class="px-4 py-2 text-center align-top text-gray-700 dark:text-gray-200">
+                              {Calendar.strftime(entry.end_date, "%b %-d, %Y")}
+                            </td>
+                            <td class="px-4 py-2 text-right align-top text-gray-500 dark:text-gray-300">
+                              1
+                            </td>
+                          </tr>
+                        <% else %>
+                          <tr
+                            id={entry_row_id(entry)}
+                            data-rotation-type={entry.rotation_type}
+                            data-today-anchor={if entry_row_id(entry) == @today_anchor_id, do: "true"}
+                            phx-click="open_shift_coworkers"
+                            phx-value-rotation-type={entry.rotation_type}
+                            phx-value-slot-index={entry.slot_index}
+                            phx-value-schedule-id={entry.schedule_id}
+                            phx-value-start-date={Date.to_iso8601(entry.start_date)}
+                            phx-value-end-date={Date.to_iso8601(entry.end_date)}
+                            class={[
+                              entry_row_class(entry.rotation_type, past),
+                              if(covered, do: "opacity-60", else: ""),
+                              "cursor-pointer"
+                            ]}
+                          >
+                            <td class="px-4 py-2 align-top">
+                              <div class="flex flex-col items-start gap-0.5 text-left">
+                                <span
+                                  title={label}
+                                  class={[
+                                    "inline-flex h-8 w-full max-w-[11rem] shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
+                                    color,
+                                    if(covered, do: "line-through opacity-70", else: "")
+                                  ]}
+                                >
+                                  {label}
                                 </span>
-                              <% end %>
-                              <%= if is_coverage do %>
-                                <span class="max-w-full text-xs text-blue-500 dark:text-blue-300 italic break-words">
-                                  covering {entry.original_resident.name}
-                                </span>
-                              <% end %>
-                            </div>
-                          </td>
-                          <td class={[
-                            "px-4 py-2 text-center",
-                            if(entry.rotation_type == "off",
-                              do: "text-gray-400 dark:text-gray-400",
-                              else: "text-gray-700 dark:text-gray-200"
-                            )
-                          ]}>
-                            {Calendar.strftime(entry.start_date, "%b %-d, %Y")}
-                          </td>
-                          <td class={[
-                            "px-4 py-2 text-center",
-                            if(entry.rotation_type == "off",
-                              do: "text-gray-400 dark:text-gray-400",
-                              else: "text-gray-700 dark:text-gray-200"
-                            )
-                          ]}>
-                            {Calendar.strftime(entry.end_date, "%b %-d, %Y")}
-                          </td>
-                          <td class={[
-                            "px-4 py-2 text-right tabular-nums",
-                            if(entry.rotation_type == "off",
-                              do: "text-gray-400 dark:text-gray-400",
-                              else: "text-gray-500 dark:text-gray-300"
-                            )
-                          ]}>
-                            {Date.diff(entry.end_date, entry.start_date) + 1}
-                          </td>
-                        </tr>
+                                <%= if covered do %>
+                                  <span class="max-w-full text-xs text-gray-400 dark:text-gray-400 italic break-words">
+                                    covered by {covered.name}
+                                  </span>
+                                <% end %>
+                                <%= if is_coverage do %>
+                                  <span class="max-w-full text-xs text-blue-500 dark:text-blue-300 italic break-words">
+                                    covering {entry.original_resident.name}
+                                  </span>
+                                <% end %>
+                              </div>
+                            </td>
+                            <td class={[
+                              "px-4 py-2 text-center",
+                              if(entry.rotation_type == "off",
+                                do: "text-gray-400 dark:text-gray-400",
+                                else: "text-gray-700 dark:text-gray-200"
+                              )
+                            ]}>
+                              {Calendar.strftime(entry.start_date, "%b %-d, %Y")}
+                            </td>
+                            <td class={[
+                              "px-4 py-2 text-center",
+                              if(entry.rotation_type == "off",
+                                do: "text-gray-400 dark:text-gray-400",
+                                else: "text-gray-700 dark:text-gray-200"
+                              )
+                            ]}>
+                              {Calendar.strftime(entry.end_date, "%b %-d, %Y")}
+                            </td>
+                            <td class={[
+                              "px-4 py-2 text-right tabular-nums",
+                              if(entry.rotation_type == "off",
+                                do: "text-gray-400 dark:text-gray-400",
+                                else: "text-gray-500 dark:text-gray-300"
+                              )
+                            ]}>
+                              {Date.diff(entry.end_date, entry.start_date) + 1}
+                            </td>
+                          </tr>
+                        <% end %>
                       <% end %>
                     <% end %>
                   <% end %>
@@ -834,7 +869,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
             </div>
           <% end %>
         <% else %>
-          <p class="text-gray-500 dark:text-gray-300">No rotations recorded for this resident.</p>
+          <p class="text-gray-500 dark:text-gray-300">
+            No schedule entries recorded for this resident.
+          </p>
         <% end %>
       <% end %>
 
@@ -909,9 +946,11 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   # --- Private helpers ---
 
   defp entry_color("off"), do: "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-400"
+  defp entry_color("daily_assignments"), do: "text-blue-700 dark:text-blue-300"
   defp entry_color(rotation_type), do: Rotations.rotation_type_color(rotation_type)
 
   defp entry_label("off"), do: "OFF"
+  defp entry_label("daily_assignments"), do: "Daily assignments"
   defp entry_label(rotation_type), do: Rotations.rotation_type_label(rotation_type)
 
   defp entry_row_class("off", true), do: ["opacity-40", "bg-gray-50 dark:bg-gray-950"]
@@ -950,12 +989,39 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     end)
   end
 
+  defp exclude_activity_dates(off_slots, activities) do
+    dates = MapSet.new(activities, & &1.date)
+
+    Enum.flat_map(off_slots, fn slot ->
+      slot.start_date
+      |> Date.range(slot.end_date)
+      |> Enum.chunk_by(&MapSet.member?(dates, &1))
+      |> Enum.reject(fn [date | _] -> MapSet.member?(dates, date) end)
+      |> Enum.map(fn days ->
+        %{slot | start_date: hd(days), end_date: List.last(days)}
+      end)
+    end)
+  end
+
+  defp activity_entries(activities) do
+    activities
+    |> Enum.group_by(& &1.date)
+    |> Enum.map(fn {date, daily} ->
+      %{
+        rotation_type: "daily_assignments",
+        start_date: date,
+        end_date: date,
+        activities: daily
+      }
+    end)
+  end
+
   defp merge_effective_entries(effective_segs, off_slots) do
     (effective_segs ++ off_slots)
     |> Enum.sort_by(& &1.start_date, Date)
   end
 
-  # Builds the resident's full multi-year timeline. Returns the rotation/off
+  # Builds the resident's full multi-year timeline. Returns rotation/off/activity
   # entries from every academic year (tagged with the year and schedule for
   # section headers and coworker lookups), sorted chronologically, plus the flat
   # list of all their rotations for career-wide stats.
@@ -975,17 +1041,20 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
   defp year_entries(schedule_resident) do
     rotations = Rotations.list_rotations_for_resident(schedule_resident.id)
+    activities = DetailedSchedules.list_for_resident(schedule_resident.id)
 
     off_slots =
       compute_off_slots(
         rotations,
         Rotations.list_schedule_date_slots(schedule_resident.schedule_id)
       )
+      |> exclude_activity_dates(activities)
 
     entries =
       schedule_resident.id
       |> Rotations.effective_segments_for_resident()
       |> merge_effective_entries(off_slots)
+      |> Kernel.++(activity_entries(activities))
       |> Enum.map(&tag_entry_with_schedule(&1, schedule_resident))
 
     %{entries: entries, rotations: rotations}
@@ -1062,12 +1131,20 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   end
 
   @doc """
-  Builds the stable, timeline-unique DOM id for a rotation/off entry row.
+  Builds the stable, timeline-unique DOM id for a schedule entry row.
 
       iex> entry = %{rotation_type: "oncology", slot_index: 2, start_date: ~D[2024-07-01], end_date: ~D[2024-07-15]}
       iex> ResidencyScheduleWeb.ResidentLive.Show.entry_row_id(entry)
       "rotation-entry-oncology-2-2024-07-01-2024-07-15"
+
+      iex> entry = %{rotation_type: "daily_assignments", schedule_id: 7, start_date: ~D[2026-10-10]}
+      iex> ResidencyScheduleWeb.ResidentLive.Show.entry_row_id(entry)
+      "activity-row-7-2026-10-10"
   """
+  def entry_row_id(%{rotation_type: "daily_assignments"} = entry) do
+    "activity-row-#{entry.schedule_id}-#{Date.to_iso8601(entry.start_date)}"
+  end
+
   def entry_row_id(entry) do
     "rotation-entry-#{entry.rotation_type}-#{entry.slot_index}-#{Date.to_iso8601(entry.start_date)}-#{Date.to_iso8601(entry.end_date)}"
   end

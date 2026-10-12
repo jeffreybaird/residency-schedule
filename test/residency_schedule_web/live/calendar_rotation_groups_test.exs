@@ -72,7 +72,11 @@ defmodule ResidencyScheduleWeb.CalendarRotationGroupsTest do
       assert has_element?(view, group(:oncology) <> " a[href='/residents/#{ctx.clare.id}']")
       assert has_element?(view, group(:oncology), "Covered by Clare")
       assert has_element?(view, group(:oncology), "(covering)")
-      assert has_element?(view, group(:oncology) <> " .line-through")
+
+      assert has_element?(
+               view,
+               group(:oncology) <> " a[href='/residents/#{ctx.tiff.id}'].line-through"
+             )
 
       refute has_element?(
                view,
@@ -117,11 +121,22 @@ defmodule ResidencyScheduleWeb.CalendarRotationGroupsTest do
       assert has_element?(view, group(:strong_gynecology), "Gynecology")
       assert has_element?(view, group(:strong_gynecology), "2 residents")
       assert has_element?(view, iris_row <> " a[href='/residents/#{ctx.iris.id}']", "Iris Reed")
-      assert has_element?(view, iris_row, "GOG Continuity Clinic PM")
+
+      assert has_element?(
+               view,
+               iris_row <> " header a + [data-role='daily-tasks']",
+               ~r/^\(GOG Continuity Clinic PM; SMH GYN R2 Day\)$/
+             )
+
       assert has_element?(view, iris_row, "Bring simulation kit")
       assert has_element?(view, stone_row <> " a[href='/residents/#{ctx.stone.id}']")
       refute has_element?(view, stone_row, "GOG Continuity Clinic PM")
       refute has_element?(view, stone_row, "Bring simulation kit")
+      refute has_element?(view, stone_row <> " [data-role='daily-tasks']")
+      refute has_element?(view, "#day-activities", "No daily assignments recorded")
+      refute has_element?(view, iris_row, "Gynecology")
+      refute has_element?(view, stone_row, "Gynecology")
+      assert_borderless_residents(view)
     end
 
     test "concurrent rotations have one resident row per type and distinct task containers",
@@ -157,7 +172,8 @@ defmodule ResidencyScheduleWeb.CalendarRotationGroupsTest do
         assert document |> LazyHTML.query(resident_row) |> Enum.count() == 1
         assert has_element?(view, group(type) <> " > h3", "1 resident")
         assert has_element?(view, resident_row <> " a[href='/residents/#{ctx.iris.id}']")
-        assert has_element?(view, resident_row, label)
+        assert has_element?(view, group(type) <> " > h3", label)
+        refute has_element?(view, resident_row, label)
         refute has_element?(view, resident_row, other_label)
         assert has_element?(view, resident_row, "GOG Continuity Clinic PM")
         assert has_element?(view, resident_row, "Bring simulation kit")
@@ -180,7 +196,13 @@ defmodule ResidencyScheduleWeb.CalendarRotationGroupsTest do
       juniper_row = "#day-activities [data-resident-id='#{ctx.juniper.resident_id}']"
 
       assert has_element?(view, group(:strong_gynecology))
-      assert has_element?(view, juniper_row, "Sick Backup")
+
+      assert has_element?(
+               view,
+               juniper_row <> " header a + [data-role='daily-tasks']",
+               "(Sick Backup)"
+             )
+
       assert has_element?(view, juniper_row <> " a[href='/residents/#{ctx.juniper.id}']")
 
       refute has_element?(
@@ -229,5 +251,35 @@ defmodule ResidencyScheduleWeb.CalendarRotationGroupsTest do
 
     refute has_element?(view, group(:oncology) <> " a[href='/residents/#{ctx.clare.id}']")
     refute has_element?(view, group(:strong_obstetrics) <> " a[href='/residents/#{ctx.tiff.id}']")
+    refute has_element?(view, "#day-activities", "No daily assignments recorded")
+    refute has_element?(view, "#day-activities [data-resident-id] [data-role='daily-tasks']")
+    refute has_element?(view, "#day-activities [data-resident-id]", "Oncology")
+    refute has_element?(view, "#day-activities [data-resident-id]", "Obstetrics")
+
+    assert has_element?(
+             view,
+             "#day-activities [data-resident-id='#{ctx.tiff.resident_id}'] header",
+             ctx.tiff.position_code
+           )
+
+    assert_borderless_residents(view)
+  end
+
+  defp assert_borderless_residents(view) do
+    classes =
+      view
+      |> render()
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query("#day-activities [data-resident-id]")
+      |> LazyHTML.attribute("class")
+
+    assert classes != []
+
+    for class <- classes do
+      refute Enum.any?(
+               String.split(class),
+               &(&1 == "border" or String.starts_with?(&1, "border-"))
+             )
+    end
   end
 end

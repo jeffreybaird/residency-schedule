@@ -149,12 +149,26 @@ defmodule ResidencyScheduleWeb.DailyAssignmentIntegrationTest do
     refute has_element?(view, "#shift-coworkers-modal")
   end
 
-  test "calendar groups a person's rotation and detailed tasks in the same row", ctx do
+  test "calendar places parenthetical tasks beside the resident name under the rotation heading",
+       ctx do
     {:ok, view, _} = live(ctx.conn, "/calendar?view=day&date=2026-12-29")
     selector = "#day-activities [data-resident-id='#{ctx.iris.resident_id}']"
     assert has_element?(view, selector, "Iris Reed")
-    assert has_element?(view, selector, "Gynecology")
-    assert has_element?(view, selector, "GOG Continuity Clinic PM")
+
+    assert has_element?(
+             view,
+             "#day-activities [data-rotation-type='strong_gynecology'] > h3",
+             "Gynecology"
+           )
+
+    refute has_element?(view, selector, "Gynecology")
+
+    assert has_element?(
+             view,
+             selector <> " header a + [data-role='daily-tasks']",
+             "(GOG Continuity Clinic PM; SMH GYN R2 Day)"
+           )
+
     assert has_element?(view, selector, "Bring simulation kit")
 
     assert view
@@ -189,9 +203,10 @@ defmodule ResidencyScheduleWeb.DailyAssignmentIntegrationTest do
     refute has_element?(view, "#resident-day-activities", "Available")
   end
 
-  test "calendar empty detail is neutral", ctx do
+  test "calendar empty detail omits the assignments placeholder", ctx do
     {:ok, view, _} = live(ctx.conn, "/calendar?view=day&date=2027-01-04")
-    assert has_element?(view, "#day-activities", "No daily assignments recorded")
+    assert has_element?(view, "#day-activities")
+    refute has_element?(view, "#day-activities", "No daily assignments recorded")
     assert_neutral(view, "#day-activities")
   end
 
@@ -236,6 +251,10 @@ defmodule ResidencyScheduleWeb.DailyAssignmentIntegrationTest do
     open_rotation(view)
     assert has_element?(view, "#rotation-daily-assignments", "<script>alert(1)</script>")
     refute has_element?(view, "#rotation-daily-assignments script")
+
+    {:ok, calendar, _} = live(ctx.conn, "/calendar?view=day&date=2026-12-29")
+    assert has_element?(calendar, "#day-activities", "<script>alert(1)</script>")
+    refute has_element?(calendar, "#day-activities script")
   end
 
   defp query_count do

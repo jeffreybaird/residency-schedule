@@ -50,7 +50,7 @@ defmodule ResidencyScheduleWeb.RotationSupportLiveTest do
 
     assert has_element?(
              view,
-             "#sticky-stats div[title^='Total scheduled service blocks'] p.text-xl",
+             "#sticky-stats div[title^='Total scheduled shift days'] p.text-xl",
              "1"
            )
   end
