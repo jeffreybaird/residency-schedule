@@ -531,7 +531,7 @@ defmodule ResidencySchedule.Assistant do
   end
 
   defp effective_assignments_on(date, schedule_id) do
-    rotations = Rotations.list_rotations_for_date(date, schedule_id)
+    rotations = Rotations.projected_rotations_for_date(date, schedule_id)
     overrides = ShiftOverrides.list_overrides_for_schedule_in_range(schedule_id, date, date)
     Rotations.effective_day_assignments(rotations, overrides)
   end

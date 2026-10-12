@@ -498,7 +498,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   defp assign_view_data(socket) do
     focus_date = socket.assigns.focus_date
     {range_start, range_end} = visible_range(socket.assigns.view_mode, focus_date)
-    rotations = Rotations.list_rotations_in_range_all_schedules(range_start, range_end)
+    rotations = Rotations.projected_rotations_in_range_all_schedules(range_start, range_end)
     rotation_index = index_by_date(rotations, & &1.start_date, & &1.end_date)
     overrides = ShiftOverrides.list_overrides_in_range(range_start, range_end)
     academic_year = ScheduleIndex.current_academic_year(focus_date)

@@ -113,6 +113,7 @@ defmodule ResidencySchedule.Ical do
   def trim_last_day?(rotation, next_rotation) do
     !night_shift?(rotation.rotation_type) &&
       night_shift?(next_rotation.rotation_type) &&
+      is_nil(Map.get(next_rotation, :source_assignment_date)) &&
       Date.diff(next_rotation.start_date, rotation.end_date) == 1
   end
 
@@ -145,6 +146,13 @@ defmodule ResidencySchedule.Ical do
   # ── Private ──────────────────────────────────────────────────────────────────
 
   defp build_all_events(sorted_segments, resident) do
+    imported_nights =
+      sorted_segments
+      |> Enum.filter(&(&1.rotation_type == "night_float"))
+      |> Enum.map(&Map.get(&1, :source_assignment_date))
+      |> Enum.reject(&is_nil/1)
+      |> MapSet.new()
+
     sorted_segments
     |> Enum.with_index()
     |> Enum.flat_map(fn {seg, idx} ->
@@ -154,7 +162,7 @@ defmodule ResidencySchedule.Ical do
       if all_day?(seg.rotation_type) do
         [build_all_day_event(resident, seg, trim)]
       else
-        build_timed_events(resident, seg, trim)
+        build_timed_events(resident, seg, trim, imported_nights)
       end
     end)
   end
@@ -177,18 +185,19 @@ defmodule ResidencySchedule.Ical do
     """
   end
 
-  defp build_timed_events(resident, seg, trim_last) do
+  defp build_timed_events(resident, seg, trim_last, imported_nights) do
     seg.start_date
     |> Date.range(seg.end_date)
     |> Enum.to_list()
     |> then(fn dates -> if trim_last, do: Enum.drop(dates, -1), else: dates end)
+    |> Enum.reject(&duplicate_imported_night?(seg, &1, imported_nights))
     |> Enum.map(&build_timed_event(resident, seg, &1))
   end
 
   defp build_timed_event(resident, seg, date) do
     uid = "seg-#{seg.rotation_type}-#{Date.to_iso8601(seg.start_date)}-#{date}@residency-schedule"
     label = Rotations.rotation_type_label(seg.rotation_type)
-    {dtstart, dtend} = event_times(seg.rotation_type, date)
+    {dtstart, dtend} = segment_event_times(seg, date)
 
     """
     BEGIN:VEVENT
@@ -200,6 +209,17 @@ defmodule ResidencySchedule.Ical do
     END:VEVENT
     """
   end
+
+  defp duplicate_imported_night?(segment, date, imported_nights) do
+    segment.rotation_type == "strong_weekend_nights" and
+      is_nil(Map.get(segment, :source_assignment_date)) and
+      MapSet.member?(imported_nights, Date.add(date, -1))
+  end
+
+  defp segment_event_times(%{rotation_type: "night_float", source_assignment_date: date}, date),
+    do: {format_datetime(date, 18), format_datetime(Date.add(date, 1), 6)}
+
+  defp segment_event_times(segment, date), do: event_times(segment.rotation_type, date)
 
   defp format_date(date) do
     "#{pad(date.year, 4)}#{pad(date.month, 2)}#{pad(date.day, 2)}"
