@@ -60,4 +60,29 @@ defmodule ResidencySchedule.DetailedSchedules.TaskEquivalence do
       false
   """
   def matches_rotation?(task, type), do: type in Map.get(@equivalents, task, [])
+
+  @doc """
+  Classifies a task without a base rotation only when its reviewed meaning is unique.
+
+      iex> ResidencySchedule.DetailedSchedules.TaskEquivalence.gap_type("Vacation", ~D[2026-10-10])
+      "vacation"
+
+      iex> ResidencySchedule.DetailedSchedules.TaskEquivalence.gap_type("HH Nights 3rd Call", ~D[2026-10-10])
+      "highland_weekend_nights"
+
+      iex> ResidencySchedule.DetailedSchedules.TaskEquivalence.gap_type("SMH Obstetrics Resident 1st Contact Night", ~D[2026-10-10])
+      "qgenda_assignment"
+  """
+  def gap_type(task, date) do
+    case Map.get(@equivalents, task, []) do
+      [type] ->
+        type
+
+      ["highland_weekend_nights", "highland_night_float"] ->
+        if Date.day_of_week(date) == 6, do: "highland_weekend_nights", else: "qgenda_assignment"
+
+      _ ->
+        "qgenda_assignment"
+    end
+  end
 end

@@ -297,7 +297,13 @@ defmodule ResidencySchedule.AssistantTest do
     test "counts working days including solo rotations and coverage", ctx do
       assert {:ok, result} = Assistant.shifts_remaining("clare", "2026-07-06")
       assert result.count == 21
-      assert result.counting_rule.not_shifts == ["vacation", "post_call", "leave_of_absence"]
+
+      assert result.counting_rule.not_shifts == [
+               "vacation",
+               "post_call",
+               "leave_of_absence",
+               "qgenda_assignment"
+             ]
 
       tiff_ob = rotation_on(ctx.tiff, ~D[2026-07-15])
 

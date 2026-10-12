@@ -108,6 +108,15 @@ queries, shift counts, assistant answers, and calendar exports; it does not chan
 stored rotations or imported activities. See the
 [Friday correction contract and verification](friday-night-float-verification.md).
 
+When the original schedule has no rotation for a resident on a date, imported
+QGenda items fill that gap in read-only schedules. This includes Vacation on
+weekends. Exact tasks with one reviewed rotation equivalent use that category;
+ambiguous or unrecognized tasks retain their literal names as QGenda assignments.
+The established Saturday Highland night classification also applies. Existing
+rotations and coverage take precedence, and no fallback is saved into the original
+schedule. Neutral QGenda assignments do not imply working hours or a coworker
+service. See the [gap fallback contract and verification](qgenda-gap-fallback-verification.md).
+
 On a resident page, open a rotation to see that resident's assignments and notes
 for the rotation's date range, alongside the existing coworker information. The
 dialog identifies the resident and rotation dates and closes with Escape. The
