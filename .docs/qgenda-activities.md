@@ -41,18 +41,42 @@ the check prevents saving an obviously different year's export into this roster.
 ## Viewing a day
 
 The calendar's day view and day-detail dialog group each resident's rotations,
-daily assignments, and notes together. Clinic names, AM/PM, and call
-responsibilities remain visible. A task remains visible when the resident has
-no base rotation recorded for that date.
+daily assignments, and notes together. Additional clinic and duty details remain
+visible except for the reviewed duplicate labels below. A task remains visible
+when the resident has no base rotation recorded for that date.
 
 Each rotation group has one heading and a compact resident list. Daily tasks
 appear in parentheses beside the resident's name; residents without tasks have
 no assignment placeholder. Notes and coverage details remain attached to the
 resident, without duplicate rotation badges or individual bordered cards.
-Within the matching Ambulatory or Elective group, assignments that only repeat
-that rotation (`Ambulatory R1`–`R4`, `Elective R3`–`R4`) are omitted from the
-parentheses. Clinics, call responsibilities, and notes remain visible. The
-original assignments remain stored and appear normally outside that group.
+Assignments that only repeat their matching rotation heading are omitted from
+the parentheses. These exact labels are recognized:
+
+| Assignment | Matching rotation group |
+| --- | --- |
+| `Ambulatory R1`–`R4` | Ambulatory |
+| `Elective R3`–`R4` | Elective |
+| `HH GYN ONC R1`–`R4` | Oncology |
+| `HH GYN R1`–`R4` | Gynecology – Highland |
+| `REI Resident` | Reproductive Endocrinology & Infertility |
+| `Urogyn Resident` | Uro-Gynecology |
+| `Swing Resident` | Swing Shift |
+| `Ultrasound` | Ultrasound |
+| `Vacation` | Vacation |
+| `Post-Call` | Post Call |
+| `SMH GYN R2 Day`, `SMH GYN R3 Day` | Gynecology – Strong Memorial |
+| `SMH Gynecology Chief On Call Day`, `SMH Gynecology Intern On Call Day` | Gynecology – Strong Memorial or Weekend Days – Strong |
+| `SMH Gynecology Chief On Call Night`, `SMH Gynecology Intern On Call Night` | Night Float – Strong or Weekend Nights – Strong |
+| `SMH Obstetrics Resident 1st Contact Day`–`4th Contact Day` | Obstetrics – Strong or Weekend Days – Strong |
+| `SMH Obstetrics Resident 1st Contact Night`–`4th Contact Night` | Night Float – Strong or Weekend Nights – Strong |
+
+These SMH labels were reviewed as restatements of the listed rotation headings.
+Matching uses the existing heading, without inferring a service from the weekday.
+Other clinic, timing, and call labels remain visible. Matching is exact: additional
+suffixes or unlisted tasks are not hidden by a prefix or keyword match. Notes and
+original assignments remain stored; notes remain visible even when their task
+label is omitted. Assignments appear normally outside their matching group. A
+resident with only a redundant assignment has no empty parentheses.
 
 Saturday assignments labeled `HH Nights 2nd Call`, `HH Nights 3rd Call`, or
 `HH Nights Extra` appear in the calendar's **Weekend Nights – Highland** group,

@@ -24,9 +24,12 @@ assignment. Calendar classification is restricted to the exact Saturday labels
 literal dates and responsibilities without creating base rotations.
 
 The user also reported redundant rotation names in the compact assignment list.
-Within the matching rotation group, `Ambulatory R1`–`R4` and `Elective R3`–`R4`
-should be omitted from the displayed parentheses, while specific duties and notes
-remain visible and source records remain unchanged.
+The initial change omitted `Ambulatory R1`–`R4` and `Elective R3`–`R4` within
+their matching rotation groups. The user subsequently reviewed and approved the
+additional exact mappings listed in [the activity guide](qgenda-activities.md),
+including SMH resident gynecology and obstetrics labels. Matching headings now
+omit those reviewed labels from the parentheses. Other duties and all notes
+remain visible; source records remain unchanged.
 
 ## Verification
 

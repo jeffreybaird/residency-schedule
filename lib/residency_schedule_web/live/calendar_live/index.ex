@@ -9,6 +9,44 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   alias ResidencySchedule.ShiftOverrides
   alias ResidencyScheduleWeb.ScheduleLive.Index, as: ScheduleIndex
 
+  # Exact, reviewed display equivalents. Source assignments and notes remain intact.
+  @heading_equivalents %{
+    "Ambulatory R1" => ["ambulatory"],
+    "Ambulatory R2" => ["ambulatory"],
+    "Ambulatory R3" => ["ambulatory"],
+    "Ambulatory R4" => ["ambulatory"],
+    "Elective R3" => ["elective"],
+    "Elective R4" => ["elective"],
+    "HH GYN ONC R1" => ["oncology"],
+    "HH GYN ONC R2" => ["oncology"],
+    "HH GYN ONC R3" => ["oncology"],
+    "HH GYN ONC R4" => ["oncology"],
+    "HH GYN R1" => ["highland_gynecology"],
+    "HH GYN R2" => ["highland_gynecology"],
+    "HH GYN R3" => ["highland_gynecology"],
+    "HH GYN R4" => ["highland_gynecology"],
+    "REI Resident" => ["rei"],
+    "Swing Resident" => ["swing"],
+    "Urogyn Resident" => ["urogynecology"],
+    "Ultrasound" => ["ultrasound"],
+    "Vacation" => ["vacation"],
+    "Post-Call" => ["post_call"],
+    "SMH GYN R2 Day" => ["strong_gynecology"],
+    "SMH GYN R3 Day" => ["strong_gynecology"],
+    "SMH Gynecology Chief On Call Day" => ["strong_gynecology", "strong_weekend_days"],
+    "SMH Gynecology Intern On Call Day" => ["strong_gynecology", "strong_weekend_days"],
+    "SMH Gynecology Chief On Call Night" => ["night_float", "strong_weekend_nights"],
+    "SMH Gynecology Intern On Call Night" => ["night_float", "strong_weekend_nights"],
+    "SMH Obstetrics Resident 1st Contact Day" => ["strong_obstetrics", "strong_weekend_days"],
+    "SMH Obstetrics Resident 2nd Contact Day" => ["strong_obstetrics", "strong_weekend_days"],
+    "SMH Obstetrics Resident 3rd Contact Day" => ["strong_obstetrics", "strong_weekend_days"],
+    "SMH Obstetrics Resident 4th Contact Day" => ["strong_obstetrics", "strong_weekend_days"],
+    "SMH Obstetrics Resident 1st Contact Night" => ["night_float", "strong_weekend_nights"],
+    "SMH Obstetrics Resident 2nd Contact Night" => ["night_float", "strong_weekend_nights"],
+    "SMH Obstetrics Resident 3rd Contact Night" => ["night_float", "strong_weekend_nights"],
+    "SMH Obstetrics Resident 4th Contact Night" => ["night_float", "strong_weekend_nights"]
+  }
+
   @impl true
   def mount(_params, _session, socket) do
     current_user = socket.assigns.current_user
@@ -611,11 +649,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     |> Enum.reject(&repeats_group_heading?(&1, type))
   end
 
-  defp repeats_group_heading?(task, "ambulatory"),
-    do: task in ["Ambulatory R1", "Ambulatory R2", "Ambulatory R3", "Ambulatory R4"]
-
-  defp repeats_group_heading?(task, "elective"), do: task in ["Elective R3", "Elective R4"]
-  defp repeats_group_heading?(_task, _type), do: false
+  defp repeats_group_heading?(task, type), do: type in Map.get(@heading_equivalents, task, [])
 
   defp group_day_rows(rows) do
     rows

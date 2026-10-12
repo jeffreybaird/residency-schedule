@@ -67,3 +67,51 @@ Dependency versions are unchanged since the same-session
 [security review](qgenda-oct12-security-review.md). Its current advisory results and
 known host OTP findings remain applicable. No clean-host or production-runtime
 claim follows from functional verification; the runner did not modify production.
+
+## PR 55 approved expansion of repeated-label suppression
+
+The user reviewed and approved the proposed mapping, including the SMH labels,
+before implementation. The exact 34-label map suppresses a task only under one of
+its approved matching headings. Raw tasks and notes remain intact; unknown labels,
+wrong-heading cases, clinic details and HH night duties remain visible.
+
+The initial broader plain-label contract had 28 tests and 15 expected failures
+(exit 2, seed 0, 2.1 seconds; `/tmp/calendar-redundant-expanded-red.log`). Work paused
+for user review. After explicit approval, the writer revised the SMH expectations
+and two existing calendar assertions, and the reviewer accepted the new contract.
+
+Authoritative approved-contract red command:
+
+```sh
+MIX_ENV=test mix test test/residency_schedule_web/live/calendar_redundant_assignments_test.exs test/residency_schedule_web/live/calendar_rotation_groups_test.exs test/residency_schedule_web/live/daily_assignment_integration_test.exs --seed 0
+```
+
+Exit 2: **1 doctest, 77 tests, 43 expected failures**, 3.8 seconds.
+Log: `/tmp/calendar-redundant-approved-red.log`.
+
+Current accepted hashes, superseding previous hashes only for these revised files:
+
+```text
+27b38d61cfa711ba1a84129c1c334ee1a919a9bb3be55ad6d229047b02148255  test/residency_schedule_web/live/calendar_redundant_assignments_test.exs
+f8a0f95188190c6f8fdc63c765cce5ed73c9232bbd597956f72dc1a7f62b5ea3  test/residency_schedule_web/live/calendar_rotation_groups_test.exs
+49352f1a3c564385b3f085d1272aa4431bfc6c12aebc4511b0d04915d79cb4e9  test/residency_schedule_web/live/daily_assignment_integration_test.exs
+```
+
+After source-owner formatting:
+
+- Focused green: the three files above plus `calendar_highland_assignments_test.exs`
+  and `calendar_live_test.exs`, `MIX_ENV=test mix test ... --seed 0`: exit 0;
+  **1 doctest, 124 tests, 0 failures**, 11.6 seconds.
+  Log: `/tmp/calendar-redundant-approved-green.log`.
+- `MIX_ENV=test mix format --check-formatted`: exit 0.
+- `MIX_ENV=test mix compile --warnings-as-errors`: exit 0.
+- `MIX_ENV=test mix deps.unlock --check-unused`: exit 0.
+- `MIX_ENV=test mix credo --strict`: exit 0; 272 files, 2,215 modules/functions,
+  no issues. Log: `/tmp/calendar-redundant-approved-checks.log`.
+- `MIX_ENV=test mix test --seed 298741`: exit 0; **196 doctests, 1,510 tests,
+  0 failures**, 52.8 seconds. Log: `/tmp/calendar-redundant-approved-full.log`.
+- All three accepted test hashes remained unchanged after final execution.
+- `git diff --check`: exit 0.
+
+Dependency versions remain unchanged; the same-session security evidence and
+runtime limitations above still apply.
