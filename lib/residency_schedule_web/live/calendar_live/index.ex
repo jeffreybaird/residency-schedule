@@ -269,7 +269,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
               >
                 <.weekday_headers />
                 <%= for day <- calendar_days(@focus_date) do %>
-                  <% rotations = visible_rotations(assigns, day) %>
+                  <% groups = calendar_summary_groups(assigns, day) %>
                   <div
                     phx-click="select_day"
                     phx-value-date={Date.to_iso8601(day)}
@@ -288,7 +288,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                       {day.day}
                     </span>
                     <div class="flex flex-wrap gap-0.5 mt-1">
-                      <%= for {type, _rots} <- Enum.take(group_by_type(rotations), 6) do %>
+                      <%= for {type, _rows} <- Enum.take(groups, 6) do %>
                         <span
                           class={"w-2 h-2 rounded-full #{dot_color(type)}"}
                           title={Rotations.rotation_type_label(type)}
@@ -306,7 +306,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
               >
                 <.weekday_headers />
                 <%= for day <- week_days(@focus_date) do %>
-                  <% groups = group_by_type(visible_rotations(assigns, day)) %>
+                  <% groups = calendar_summary_groups(assigns, day) %>
                   <div
                     phx-click="select_day"
                     phx-value-date={Date.to_iso8601(day)}
@@ -340,7 +340,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
                   {Calendar.strftime(@focus_date, "%A, %B %-d, %Y")}
                 </h3>
-                <.day_activity_detail rows={day_rows_for(assigns, @focus_date)} />
+                <.day_activity_detail groups={day_groups_for(assigns, @focus_date)} />
               </div>
           <% end %>
         </div>
@@ -372,7 +372,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
               </div>
 
               <div class="overflow-y-auto px-6 pb-6">
-                <.day_activity_detail rows={day_rows_for(assigns, @selected_date)} />
+                <.day_activity_detail groups={day_groups_for(assigns, @selected_date)} />
               </div>
             </div>
           </div>
@@ -528,7 +528,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       resident_options: Enum.uniq_by(display_options, & &1.id),
       display_names: names,
       activity_index: Enum.group_by(activities, & &1.date),
-      type_options: type_options(rotations)
+      type_options: type_options(rotations, activities)
     )
   end
 
@@ -539,7 +539,12 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   end
 
   defp day_activity_detail(assigns) do
-    assigns = assign(assigns, :groups, group_day_rows(assigns.rows))
+    groups =
+      Enum.map(assigns.groups, fn {type, rows} ->
+        {type, Enum.map(rows, &Map.put(&1, :task_labels, day_task_labels(&1, type)))}
+      end)
+
+    assigns = assign(assigns, :groups, groups)
 
     ~H"""
     <section id="day-activities" class="space-y-3">
@@ -569,11 +574,11 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
               {row.name}
             </.link>
             <span
-              :if={row.activities != []}
+              :if={row.task_labels != []}
               id={"day-tasks-#{type || "daily"}-#{row.resident_id}"}
               data-role="daily-tasks"
             >
-              ({Enum.map_join(row.activities, "; ", & &1.raw_task)})
+              ({Enum.join(row.task_labels, "; ")})
             </span>
             <span class="text-xs text-gray-500 dark:text-gray-300">{row.position_code}</span>
             <span
@@ -600,6 +605,18 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   defp day_row_notes(row),
     do: row.activities |> Enum.flat_map(& &1.notes) |> Enum.uniq()
 
+  defp day_task_labels(row, type) do
+    row.activities
+    |> Enum.map(& &1.raw_task)
+    |> Enum.reject(&repeats_group_heading?(&1, type))
+  end
+
+  defp repeats_group_heading?(task, "ambulatory"),
+    do: task in ["Ambulatory R1", "Ambulatory R2", "Ambulatory R3", "Ambulatory R4"]
+
+  defp repeats_group_heading?(task, "elective"), do: task in ["Elective R3", "Elective R4"]
+  defp repeats_group_heading?(_task, _type), do: false
+
   defp group_day_rows(rows) do
     rows
     |> Enum.flat_map(&split_day_row_by_type/1)
@@ -607,13 +624,37 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     |> Enum.sort_by(fn {type, _rows} -> {is_nil(type), type} end)
   end
 
-  defp split_day_row_by_type(%{rotations: []} = row), do: [{nil, row}]
-
   defp split_day_row_by_type(row) do
-    row.rotations
-    |> Enum.group_by(& &1.rotation_type)
-    |> Enum.map(fn {type, rotations} -> {type, %{row | rotations: rotations}} end)
+    rotations = Enum.group_by(row.rotations, & &1.rotation_type)
+    activities = Enum.group_by(row.activities, &activity_calendar_type/1)
+    unclassified = Map.get(activities, nil, [])
+
+    base_groups =
+      Map.new(rotations, fn {type, entries} ->
+        {type, %{row | rotations: entries, activities: unclassified}}
+      end)
+
+    base_groups =
+      if map_size(rotations) == 0 and unclassified != [],
+        do: Map.put(base_groups, nil, %{row | rotations: [], activities: unclassified}),
+        else: base_groups
+
+    activities
+    |> Map.delete(nil)
+    |> Enum.reduce(base_groups, fn {type, tasks}, groups ->
+      Map.update(groups, type, %{row | rotations: [], activities: tasks}, fn group ->
+        %{group | activities: group.activities ++ tasks}
+      end)
+    end)
+    |> Map.to_list()
   end
+
+  defp activity_calendar_type(%{date: date, raw_task: task})
+       when task in ["HH Nights 2nd Call", "HH Nights 3rd Call", "HH Nights Extra"] do
+    if Date.day_of_week(date) == 6, do: "highland_weekend_nights"
+  end
+
+  defp activity_calendar_type(_activity), do: nil
 
   # Expands each item across its inclusive date range, grouping items by date.
   defp index_by_date(items, start_fun, end_fun) do
@@ -625,18 +666,48 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   end
 
   # Distinct rotation types appearing in the visible rotations, ordered by label.
-  defp type_options(rotations) do
-    rotations
-    |> Enum.map(& &1.rotation_type)
+  defp type_options(rotations, activities) do
+    (Enum.map(rotations, & &1.rotation_type) ++ Enum.map(activities, &activity_calendar_type/1))
+    |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
     |> Enum.sort_by(&Rotations.rotation_type_label/1)
   end
 
-  # Rotations active on a day, with the resident and rotation filters applied.
+  # Preserve the base rotation filters before resolving coverage and daily tasks.
   defp visible_rotations(assigns, day) do
     Map.get(assigns.rotation_index, day, [])
     |> Rotations.filter_rotations_by_residents(assigns.resident_filter)
     |> Rotations.filter_rotations_by_types(assigns.rotation_filter)
+  end
+
+  defp day_groups_for(assigns, date) do
+    assigns
+    |> day_rows_for(date)
+    |> group_day_rows()
+    |> Enum.filter(fn {type, _rows} ->
+      is_nil(type) or assigns.rotation_filter == [] or type in assigns.rotation_filter
+    end)
+  end
+
+  defp calendar_summary_groups(assigns, date) do
+    rotations =
+      assigns
+      |> visible_rotations(date)
+      |> Enum.map(&{&1.rotation_type, &1.schedule_resident.resident_id})
+
+    activities =
+      assigns
+      |> visible_activities(date)
+      |> Enum.map(&{activity_calendar_type(&1), &1.resident_id})
+      |> Enum.reject(fn {type, _person} -> is_nil(type) end)
+      |> Enum.filter(fn {type, _person} ->
+        assigns.rotation_filter == [] or type in assigns.rotation_filter
+      end)
+
+    (rotations ++ activities)
+    |> Enum.uniq()
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+    |> Enum.sort_by(&elem(&1, 0))
   end
 
   defp day_rows_for(assigns, date) do
@@ -689,12 +760,6 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
           })
       end
     end)
-  end
-
-  defp group_by_type(rotations) do
-    rotations
-    |> Enum.group_by(& &1.rotation_type)
-    |> Enum.sort_by(&elem(&1, 0))
   end
 
   # The inclusive date range covered by a view mode anchored on focus_date.

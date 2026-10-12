@@ -49,6 +49,17 @@ Each rotation group has one heading and a compact resident list. Daily tasks
 appear in parentheses beside the resident's name; residents without tasks have
 no assignment placeholder. Notes and coverage details remain attached to the
 resident, without duplicate rotation badges or individual bordered cards.
+Within the matching Ambulatory or Elective group, assignments that only repeat
+that rotation (`Ambulatory R1`–`R4`, `Elective R3`–`R4`) are omitted from the
+parentheses. Clinics, call responsibilities, and notes remain visible. The
+original assignments remain stored and appear normally outside that group.
+
+Saturday assignments labeled `HH Nights 2nd Call`, `HH Nights 3rd Call`, or
+`HH Nights Extra` appear in the calendar's **Weekend Nights – Highland** group,
+including its service filter and month/week summaries. The same resident counts
+once in that service when both a base rotation and imported assignment exist.
+This display classification preserves the source date and task text; it does not
+create base rotations or infer a category for other weekdays or unknown tasks.
 
 On a resident page, open a rotation to see that resident's assignments and notes
 for the rotation's date range, alongside the existing coworker information. The
