@@ -125,8 +125,10 @@ defmodule ResidencyScheduleWeb.CalendarRotationGroupsTest do
       assert has_element?(
                view,
                iris_row <> " header a + [data-role='daily-tasks']",
-               ~r/^\(GOG Continuity Clinic PM; SMH GYN R2 Day\)$/
+               "(GOG Continuity Clinic PM)"
              )
+
+      refute has_element?(view, iris_row <> " [data-role='daily-tasks']", "SMH GYN R2 Day")
 
       assert has_element?(view, iris_row, "Bring simulation kit")
       assert has_element?(view, stone_row <> " a[href='/residents/#{ctx.stone.id}']")

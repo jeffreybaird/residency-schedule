@@ -166,8 +166,10 @@ defmodule ResidencyScheduleWeb.DailyAssignmentIntegrationTest do
     assert has_element?(
              view,
              selector <> " header a + [data-role='daily-tasks']",
-             "(GOG Continuity Clinic PM; SMH GYN R2 Day)"
+             "(GOG Continuity Clinic PM)"
            )
+
+    refute has_element?(view, selector <> " [data-role='daily-tasks']", "SMH GYN R2 Day")
 
     assert has_element?(view, selector, "Bring simulation kit")
 
