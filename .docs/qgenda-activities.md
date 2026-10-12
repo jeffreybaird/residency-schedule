@@ -51,6 +51,14 @@ dialog identifies the resident and rotation dates and closes with Escape. The
 resident's date selector also provides access to assignments on days without a
 rotation.
 
+The resident's chronological schedule also shows daily assignments directly,
+including duties on dates without a base rotation. Multiple tasks on one date
+remain together with their notes. Dates with recorded assignments are excluded
+from generated OFF rows; the remaining dates in an OFF span remain visible.
+Daily assignments have their own service filter and retain the literal source
+date. Rotation statistics continue to count rotation days and do not infer
+shift counts or hours from daily task labels.
+
 Rotation pills in the schedule grid open the same daily assignment details.
 The dialog follows the dates shown by that pill, including adjacent blocks
 combined into one span. Different services and academic years remain separate.

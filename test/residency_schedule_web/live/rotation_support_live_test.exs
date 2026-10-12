@@ -43,14 +43,14 @@ defmodule ResidencyScheduleWeb.RotationSupportLiveTest do
     refute has_element?(view, "#assignment-form select option[value='scn']")
   end
 
-  test "leave of absence does not inflate resident Total Shifts", %{conn: conn} do
+  test "leave of absence does not inflate resident Rotation Days", %{conn: conn} do
     assert {:ok, result, []} = ScheduleImporter.import_csv(Fixtures.csv(["LOA", "OB", "LOA"]))
     [resident] = Residents.list_residents_for_schedule(result.schedule_id)
     {:ok, view, _} = live(conn, "/residents/#{resident.id}")
 
     assert has_element?(
              view,
-             "#sticky-stats div[title^='Total scheduled service blocks'] p.text-xl",
+             "#sticky-stats div[title^='Total scheduled rotation days'] p.text-xl",
              "1"
            )
   end
