@@ -7,6 +7,7 @@ defmodule ResidencySchedule.Rotations.Rotation do
     field :start_date, :date
     field :end_date, :date
     field :slot_index, :integer
+    field :source_assignment_date, :date, virtual: true
 
     belongs_to :schedule_resident, ResidencySchedule.Residents.ScheduleResident
 

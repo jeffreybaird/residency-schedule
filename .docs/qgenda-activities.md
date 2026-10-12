@@ -90,6 +90,15 @@ fallback, including its service filter and month/week summaries. The same reside
 counts once in a service when both a base rotation and imported assignment exist.
 These display rules preserve source dates and tasks without creating base rotations.
 
+On Fridays, an Ambulatory resident with an exact SMH Obstetrics Resident 1st–4th
+Contact Night assignment is displayed as Night Float – Strong. Any one such
+assignment makes the usual Strong Night Float team Post Call for that date in the
+same schedule. Explicit Strong night assignments and coverage overrides take
+precedence. This derived correction applies across schedule views, coworker
+queries, shift counts, assistant answers, and calendar exports; it does not change
+stored rotations or imported activities. See the
+[Friday correction contract and verification](friday-night-float-verification.md).
+
 On a resident page, open a rotation to see that resident's assignments and notes
 for the rotation's date range, alongside the existing coworker information. The
 dialog identifies the resident and rotation dates and closes with Escape. The

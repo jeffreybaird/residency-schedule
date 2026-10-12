@@ -2,9 +2,11 @@ defmodule ResidencySchedule.Rotations do
   @moduledoc "Queries rotations and their effective date assignments."
 
   import Ecto.Query
+  alias ResidencySchedule.DetailedSchedules
   alias ResidencySchedule.Repo
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Residents.ScheduleResident
+  alias ResidencySchedule.Rotations.FridayNightFloat
   alias ResidencySchedule.Rotations.Rotation
   alias ResidencySchedule.ShiftOverrides
 
@@ -164,6 +166,37 @@ defmodule ResidencySchedule.Rotations do
     |> Repo.all()
   end
 
+  @doc "Lists derived display rotations for a resident using complete schedule evidence. Exempt from doctest — database query."
+  def projected_rotations_for_resident(schedule_resident_id) do
+    case Repo.get(ScheduleResident, schedule_resident_id) do
+      nil ->
+        []
+
+      resident ->
+        resident.schedule_id
+        |> projected_rotations_for_schedule()
+        |> Enum.filter(&(&1.schedule_resident_id == schedule_resident_id))
+    end
+  end
+
+  @doc "Lists derived display rotations for a complete schedule. Exempt from doctest — database query."
+  def projected_rotations_for_schedule(schedule_id) do
+    schedule_id
+    |> list_rotations_for_schedule()
+    |> Repo.preload(schedule_resident: ScheduleResident.with_name_query())
+    |> FridayNightFloat.project(
+      DetailedSchedules.list_for_schedule(schedule_id),
+      ShiftOverrides.list_overrides_for_schedule(schedule_id)
+    )
+  end
+
+  @doc "Lists derived rotations active on a date before display filters. Exempt from doctest — database query."
+  def projected_rotations_for_date(date, schedule_id) do
+    schedule_id
+    |> projected_rotations_for_schedule()
+    |> Enum.filter(&(date in Date.range(&1.start_date, &1.end_date)))
+  end
+
   @doc """
   Returns the schedule resident's rotation containing the date, with
   `schedule_resident` (and its virtual name) preloaded, or nil.
@@ -305,6 +338,8 @@ defmodule ResidencySchedule.Rotations do
         range_start,
         range_end
       ) do
+    projected_rotations = projected_rotations_for_schedule(schedule_id)
+
     overrides =
       ShiftOverrides.list_overrides_for_schedule_in_range(
         schedule_id,
@@ -315,7 +350,11 @@ defmodule ResidencySchedule.Rotations do
     range_start
     |> Date.range(range_end)
     |> Enum.reduce(%{}, fn date, acc ->
-      rotations = list_rotations_for_date(date, schedule_id)
+      rotations =
+        Enum.filter(
+          projected_rotations,
+          &(Date.compare(&1.start_date, date) != :gt and Date.compare(&1.end_date, date) != :lt)
+        )
 
       day_overrides =
         Enum.filter(overrides, fn o ->
@@ -544,6 +583,24 @@ defmodule ResidencySchedule.Rotations do
   end
 
   @doc """
+  Lists derived display rotations overlapping dates across schedules.
+
+  Applies imported-assignment corrections within the requested date window.
+  Returned rotation spans can extend beyond that window; dates outside it are
+  not corrected by this query.
+
+  Exempt from doctest — database query.
+  """
+  def projected_rotations_in_range_all_schedules(range_start, range_end) do
+    range_start
+    |> list_rotations_in_range_all_schedules(range_end)
+    |> FridayNightFloat.project(
+      DetailedSchedules.list_in_range(range_start, range_end),
+      ShiftOverrides.list_overrides_in_range(range_start, range_end)
+    )
+  end
+
+  @doc """
   Keeps only rotations belonging to one of the given residents (people).
 
   Matches on the preloaded `schedule_resident`'s `resident_id`, so a resident is
@@ -696,7 +753,7 @@ defmodule ResidencySchedule.Rotations do
   """
   def effective_segments_for_resident(schedule_resident_id) do
     build_effective_segments(
-      list_rotations_for_resident(schedule_resident_id),
+      projected_rotations_for_resident(schedule_resident_id),
       ShiftOverrides.list_overrides_for_resident_as_original(schedule_resident_id),
       ShiftOverrides.list_overrides_for_resident_as_cover(schedule_resident_id)
     )
@@ -725,7 +782,7 @@ defmodule ResidencySchedule.Rotations do
   def effective_segments_for_schedule(schedule_id) do
     rotations_by_resident =
       schedule_id
-      |> list_rotations_for_schedule()
+      |> projected_rotations_for_schedule()
       |> Enum.group_by(& &1.schedule_resident_id)
 
     overrides = ShiftOverrides.list_overrides_for_schedule(schedule_id)
@@ -807,6 +864,7 @@ defmodule ResidencySchedule.Rotations do
         start_date: rotation.start_date,
         end_date: rotation.end_date,
         slot_index: rotation.slot_index,
+        source_assignment_date: rotation.source_assignment_date,
         is_coverage: false,
         covered_by: nil,
         original_resident: nil
@@ -818,6 +876,7 @@ defmodule ResidencySchedule.Rotations do
     base = %{
       rotation_type: rotation.rotation_type,
       slot_index: rotation.slot_index,
+      source_assignment_date: rotation.source_assignment_date,
       is_coverage: false,
       original_resident: nil,
       start_date: rotation.start_date,
@@ -875,13 +934,22 @@ defmodule ResidencySchedule.Rotations do
   are on the same shared service (see `shared_service?/1`).
   """
   def list_effective_co_service_days(schedule_resident_a_id, schedule_resident_b_id) do
-    segs_a =
-      effective_segments_for_resident(schedule_resident_a_id)
-      |> Enum.reject(fn s -> s.covered_by != nil or not shared_service?(s.rotation_type) end)
+    ids = [schedule_resident_a_id, schedule_resident_b_id]
 
-    segs_b =
-      effective_segments_for_resident(schedule_resident_b_id)
-      |> Enum.reject(fn s -> s.covered_by != nil or not shared_service?(s.rotation_type) end)
+    segments =
+      from(sr in ScheduleResident, where: sr.id in ^ids, select: sr.schedule_id, distinct: true)
+      |> Repo.all()
+      |> Enum.reduce(%{}, &Map.merge(&2, effective_segments_for_schedule(&1)))
+
+    co_service_days(
+      Map.get(segments, schedule_resident_a_id, []),
+      Map.get(segments, schedule_resident_b_id, [])
+    )
+  end
+
+  defp co_service_days(segments_a, segments_b) do
+    segs_a = Enum.filter(segments_a, &shared_segment?/1)
+    segs_b = Enum.filter(segments_b, &shared_segment?/1)
 
     for a <- segs_a,
         b <- segs_b,
@@ -898,6 +966,9 @@ defmodule ResidencySchedule.Rotations do
     |> Enum.sort_by(& &1.date, Date)
   end
 
+  defp shared_segment?(segment),
+    do: segment.covered_by == nil and shared_service?(segment.rotation_type)
+
   @doc """
   Lists every coworker of a schedule resident who shares at least one service
   day with them, each as `%{resident: ScheduleResident, shared_shifts: count}`,
@@ -912,19 +983,21 @@ defmodule ResidencySchedule.Rotations do
   """
   def list_coworker_shared_shift_counts(schedule_resident_id) do
     schedule_id = Residents.get_resident!(schedule_resident_id).schedule_id
+    segments = effective_segments_for_schedule(schedule_id)
 
     schedule_id
     |> Residents.list_residents_for_schedule()
     |> Enum.reject(&(&1.id == schedule_resident_id))
-    |> Enum.map(&build_coworker_shared_count(schedule_resident_id, &1))
+    |> Enum.map(&build_coworker_shared_count(schedule_resident_id, &1, segments))
     |> Enum.reject(&(&1.shared_shifts == 0))
     |> Enum.sort_by(&coworker_shared_count_sort_key/1)
   end
 
-  defp build_coworker_shared_count(schedule_resident_id, coworker) do
+  defp build_coworker_shared_count(schedule_resident_id, coworker, segments) do
     shared_shifts =
-      schedule_resident_id
-      |> list_effective_co_service_days(coworker.id)
+      segments
+      |> Map.get(schedule_resident_id, [])
+      |> co_service_days(Map.get(segments, coworker.id, []))
       |> length()
 
     %{resident: coworker, shared_shifts: shared_shifts}

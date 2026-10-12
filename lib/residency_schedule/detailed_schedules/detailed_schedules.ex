@@ -77,6 +77,13 @@ defmodule ResidencySchedule.DetailedSchedules do
     |> load_activities()
   end
 
+  @doc "Lists all imported detail for a schedule. Exempt from doctest — database query."
+  def list_for_schedule(schedule_id) do
+    activity_query()
+    |> where([_a, sr], sr.schedule_id == ^schedule_id)
+    |> load_activities()
+  end
+
   @doc "Lists detail for one schedule resident and date. Exempt from doctest — database query."
   def list_for_resident(schedule_resident_id, date) do
     activity_query()

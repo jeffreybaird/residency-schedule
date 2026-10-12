@@ -12,7 +12,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   @strong_night_types ~w[night_float strong_weekend_nights]
   @highland_night_types ~w[highland_night_float highland_weekend_nights]
   @night_shift_types @strong_night_types ++ @highland_night_types
-  @non_shift_types ~w[vacation leave_of_absence]
+  @non_shift_types ~w[vacation post_call leave_of_absence]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -22,6 +22,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     [resident] =
       [Residents.get_resident!(String.to_integer(id))]
       |> ResidentDisplayNames.apply_to_schedule_residents()
+
+    resident = %{resident | rotations: Rotations.projected_rotations_for_resident(resident.id)}
 
     today = ScheduleIndex.current_date()
 
@@ -1117,7 +1119,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   end
 
   defp year_entries(schedule_resident) do
-    rotations = Rotations.list_rotations_for_resident(schedule_resident.id)
+    rotations = Rotations.projected_rotations_for_resident(schedule_resident.id)
     activities = DetailedSchedules.list_for_resident(schedule_resident.id)
     effective_entries = Rotations.effective_segments_for_resident(schedule_resident.id)
 

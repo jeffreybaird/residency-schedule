@@ -426,9 +426,15 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     schedule_map = Map.new(schedules, &{&1.id, &1})
     schedule_ids = Enum.map(schedules, & &1.id)
 
+    projected_rotations =
+      schedule_ids
+      |> Enum.flat_map(&Rotations.projected_rotations_for_schedule/1)
+      |> Enum.group_by(& &1.schedule_resident_id)
+
     all_schedule_residents =
       schedule_ids
       |> Residents.list_residents_across_schedules()
+      |> Enum.map(&%{&1 | rotations: Map.get(projected_rotations, &1.id, [])})
       |> ResidentDisplayNames.apply_to_schedule_residents()
 
     residents_by_schedule = Enum.group_by(all_schedule_residents, & &1.schedule_id)
