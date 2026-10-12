@@ -154,18 +154,26 @@ defmodule ResidencyScheduleWeb.ResidentImportedScheduleTest do
     refute has_element?(view, "#shift-coworkers-modal")
   end
 
-  test "statistics explicitly count rotation days rather than imported tasks", ctx do
+  test "shift statistics retain existing counts and labels while imported tasks are displayed",
+       ctx do
     {:ok, view, _} = live(ctx.conn, "/residents/#{ctx.iris.id}")
 
     assert has_element?(view, "#rotation-table", "HH Nights 3rd Call")
 
     assert has_element?(
              view,
-             "div[title='Total scheduled rotation days (excludes vacation)']",
-             ~r/Rotation Days\s+14/i
+             "div[title='Total scheduled shift days (excludes vacation)']",
+             ~r/Total Shifts\s+14/i
            )
 
-    refute has_element?(view, "p", "Total Shifts")
+    for label <- [
+          "Schedule Stats",
+          "Shifts Remaining",
+          "Night Shifts Remaining – Strong",
+          "Night Shifts Remaining – Highland"
+        ] do
+      assert has_element?(view, "#sticky-stats", label)
+    end
   end
 
   test "an activity-only schedule renders even when no rotation date slots exist", ctx do

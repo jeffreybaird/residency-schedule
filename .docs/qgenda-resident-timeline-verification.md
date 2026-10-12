@@ -93,3 +93,43 @@ in 3.1.2; the implementer updated the lockfile to 3.1.2 before these test runs.
 Pre-existing host OTP 29.0.1 findings remain documented there, including affected
 components, patched versions, and exposure uncertainty. Functional success does
 not establish a clean host runtime or verify production's installed runtime.
+
+## PR 54 feedback: restore shift terminology
+
+Explicit PR feedback superseded only the statistics wording in the earlier
+accepted contract. Original labels are restored: Schedule Stats, Total Shifts,
+Shifts Remaining, and the Strong/Highland Night Shifts Remaining headings.
+Tooltips accurately describe shift days. Existing arithmetic is unchanged:
+two seven-day rotations contribute 14; the leave-of-absence regression still
+asserts 1. Imported daily assignments remain excluded from these counters.
+
+The spec writer revised and formatted only the wording/selectors, the reviewer
+accepted the revised contract, and the implementer made a copy-only source change.
+
+Authoritative focused command:
+
+```sh
+MIX_ENV=test mix test test/residency_schedule_web/live/resident_imported_schedule_test.exs test/residency_schedule_web/live/rotation_support_live_test.exs --seed 0
+```
+
+- Red: exit 2; 3 doctests, 11 tests, 2 expected wording failures, 0.7 seconds.
+  Log: `/tmp/qgenda-shift-wording-red.log`.
+- Green: exit 0; 3 doctests, 11 tests, 0 failures, 0.5 seconds.
+  Log: `/tmp/qgenda-shift-wording-green.log`.
+
+Current accepted test hashes (supersede the earlier wording-contract hashes):
+
+```text
+e1636eb42fbc5b585a3c2617b06392d953b19d7be171b5e9a1ab579074a9b408  test/residency_schedule_web/live/resident_imported_schedule_test.exs
+0c4e7508b805c44209a01797b107fff1c73a76933ceee31d2de7542bb4a5c78c  test/residency_schedule_web/live/rotation_support_live_test.exs
+```
+
+- `MIX_ENV=test mix format --check-formatted`: exit 0.
+- `MIX_ENV=test mix compile --warnings-as-errors`: exit 0.
+- `MIX_ENV=test mix test --seed 298741`: exit 0; **196 doctests, 1,446 tests,
+  0 failures**, 49.8 seconds. Log: `/tmp/qgenda-shift-wording-full.log`.
+- Both accepted test hashes above remained unchanged after final execution.
+
+Earlier static and security evidence remains applicable to unchanged logic and
+dependency versions; no additional advisory scan was claimed for this wording-only
+follow-up.

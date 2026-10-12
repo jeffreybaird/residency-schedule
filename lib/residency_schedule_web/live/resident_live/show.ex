@@ -379,7 +379,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                   <span class="text-gray-800 dark:text-gray-100">{@resident.name}</span>
                   <span class="text-gray-400 dark:text-gray-400 mx-1">·</span>
                   <span class="uppercase tracking-widest text-gray-500 dark:text-gray-300">
-                    Rotation Stats
+                    Schedule Stats
                   </span>
                 </span>
                 <button
@@ -414,22 +414,22 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
               <%= if @stats_expanded do %>
                 <p class="px-4 py-2 text-xs text-gray-500 dark:text-gray-300">
-                  Counts cover base rotations. Daily assignments are listed in the schedule below.
+                  Daily assignments are listed below and excluded from these counts.
                 </p>
                 <%!-- Stats grid: scrollable, capped height --%>
                 <div class="overflow-y-auto max-h-[25vh]">
                   <div class="grid grid-cols-2 divide-x divide-y divide-gray-200 dark:divide-gray-700 bg-gray-50 dark:bg-gray-950">
-                    <div class="px-4 py-3" title="Total scheduled rotation days (excludes vacation)">
+                    <div class="px-4 py-3" title="Total scheduled shift days (excludes vacation)">
                       <p class="text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wide mb-0.5">
-                        Rotation Days
+                        Total Shifts
                       </p>
                       <p class="text-xl font-bold text-gray-800 dark:text-gray-100">
                         {@total_shifts}
                       </p>
                     </div>
-                    <div class="px-4 py-3" title="Scheduled rotation days from today onward">
+                    <div class="px-4 py-3" title="Shift days from today onward">
                       <p class="text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wide mb-0.5">
-                        Rotation Days Remaining
+                        Shifts Remaining
                       </p>
                       <p class="text-xl font-bold text-gray-800 dark:text-gray-100">
                         {@shifts_remaining}
@@ -437,10 +437,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                     </div>
                     <div
                       class="px-4 py-3"
-                      title="Night float and weekend night rotation days at Strong Memorial remaining"
+                      title="Night float and weekend night shift days at Strong Memorial remaining"
                     >
                       <p class="text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wide mb-0.5">
-                        Night Rotation Days Remaining – Strong
+                        Night Shifts Remaining – Strong
                       </p>
                       <p class="text-xl font-bold text-gray-800 dark:text-gray-100">
                         {@night_shifts_remaining_strong}
@@ -448,10 +448,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                     </div>
                     <div
                       class="px-4 py-3"
-                      title="Night float and weekend night rotation days at Highland remaining"
+                      title="Night float and weekend night shift days at Highland remaining"
                     >
                       <p class="text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wide mb-0.5">
-                        Night Rotation Days Remaining – Highland
+                        Night Shifts Remaining – Highland
                       </p>
                       <p class="text-xl font-bold text-gray-800 dark:text-gray-100">
                         {@night_shifts_remaining_highland}
@@ -485,7 +485,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                             clip-rule="evenodd"
                           />
                         </svg>
-                        Night Rotation Breakdown
+                        Night Shift Breakdown
                       </span>
                       <span class={[
                         "rounded-full px-2 py-0.5 transition-colors",
