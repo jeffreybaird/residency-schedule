@@ -608,13 +608,50 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   defp fully_covered_day_row?(row),
     do: row.rotations != [] and Enum.all?(row.rotations, & &1.overridden)
 
-  defp day_row_notes(row),
-    do: row.activities |> Enum.flat_map(& &1.notes) |> Enum.uniq()
+  defp day_row_notes(row) do
+    continuity? =
+      Enum.any?(row.activities, &Regex.match?(~r/\bContinuity Clinic(?: AM| PM)?\z/, &1.raw_task))
+
+    row.activities
+    |> Enum.flat_map(& &1.notes)
+    |> Enum.uniq()
+    |> Enum.reject(&(continuity? and redundant_continuity_note?(&1)))
+  end
+
+  defp redundant_continuity_note?(note) do
+    note
+    |> String.trim()
+    |> String.downcase()
+    |> String.replace(~r/\s+/, " ")
+    |> Kernel.==("continuity clinic")
+  end
 
   defp day_task_labels(row, type) do
     row.activities
     |> Enum.map(& &1.raw_task)
     |> Enum.reject(&(row.rotations != [] and TaskEquivalence.matches_rotation?(&1, type)))
+    |> combine_clinic_periods()
+  end
+
+  defp combine_clinic_periods(labels) do
+    tasks = MapSet.new(labels)
+
+    labels
+    |> Enum.map(&combined_clinic_label(&1, tasks))
+    |> Enum.uniq()
+  end
+
+  defp combined_clinic_label(label, tasks) do
+    case Regex.run(~r/\A(.+) Clinic (?:AM|PM)\z/, label) do
+      [_, clinic] ->
+        if MapSet.member?(tasks, clinic <> " Clinic AM") and
+             MapSet.member?(tasks, clinic <> " Clinic PM"),
+           do: clinic,
+           else: label
+
+      _ ->
+        label
+    end
   end
 
   defp group_day_rows(rows) do
