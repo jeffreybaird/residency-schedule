@@ -2,6 +2,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   use ResidencyScheduleWeb, :live_view
 
   alias ResidencySchedule.DetailedSchedules
+  alias ResidencySchedule.DetailedSchedules.TaskEquivalence
   alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
@@ -329,7 +330,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
           </.form>
           <div id="resident-day-activities" class="space-y-3 text-sm">
             <h3 class="font-medium">{@resident.name}</h3>
-            <p :for={rotation <- @day_base_rotations}>
+            <p
+              :for={rotation <- @day_base_rotations}
+              :if={not described_by_activities?(rotation, @day_activities)}
+            >
               Base rotation: {Rotations.rotation_type_label(rotation.rotation_type)}
             </p>
             <DailyAssignments.activities
@@ -626,7 +630,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                         <% covered = Map.get(entry, :covered_by) %>
                         <% is_coverage = Map.get(entry, :is_coverage, false) %>
                         <% color = entry_color(entry.rotation_type) %>
-                        <% label = entry_label(entry.rotation_type) %>
+                        <% specific_tasks = Map.get(entry, :specific_tasks, []) %>
+                        <% label = schedule_entry_label(entry) %>
                         <%= if entry.rotation_type == "daily_assignments" do %>
                           <tr
                             id={entry_row_id(entry)}
@@ -676,14 +681,25 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                               <div class="flex flex-col items-start gap-0.5 text-left">
                                 <span
                                   title={label}
+                                  data-role={if specific_tasks != [], do: "specific-rotation-label"}
                                   class={[
-                                    "inline-flex h-8 w-full max-w-[11rem] shrink-0 items-center justify-center truncate rounded px-2 text-xs font-medium",
+                                    "inline-flex w-full shrink-0 items-center rounded px-2 text-xs font-medium",
+                                    if(specific_tasks == [],
+                                      do: "h-8 max-w-[11rem] justify-center truncate",
+                                      else: "min-h-8 py-2 whitespace-normal break-words"
+                                    ),
                                     color,
                                     if(covered, do: "line-through opacity-70", else: "")
                                   ]}
                                 >
                                   {label}
                                 </span>
+                                <p
+                                  :for={note <- Map.get(entry, :specific_notes, [])}
+                                  class="text-xs text-gray-500 dark:text-gray-300"
+                                >
+                                  {Calendar.strftime(note.date, "%b %-d")}: {note.text}
+                                </p>
                                 <%= if covered do %>
                                   <span class="max-w-full text-xs text-gray-400 dark:text-gray-400 italic break-words">
                                     covered by {covered.name}
@@ -953,6 +969,16 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   defp entry_label("daily_assignments"), do: "Daily assignments"
   defp entry_label(rotation_type), do: Rotations.rotation_type_label(rotation_type)
 
+  defp schedule_entry_label(%{specific_tasks: [_ | _] = tasks}), do: Enum.join(tasks, "; ")
+  defp schedule_entry_label(entry), do: entry_label(entry.rotation_type)
+
+  defp described_by_activities?(rotation, activities),
+    do:
+      Enum.any?(
+        activities,
+        &TaskEquivalence.matches_rotation?(&1.raw_task, rotation.rotation_type)
+      )
+
   defp entry_row_class("off", true), do: ["opacity-40", "bg-gray-50 dark:bg-gray-950"]
 
   defp entry_row_class("off", false),
@@ -1016,6 +1042,57 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     end)
   end
 
+  defp specific_rotation_entries(entries, activities) do
+    by_date = Enum.group_by(activities, & &1.date)
+    Enum.flat_map(entries, &split_specific_rotation(&1, by_date))
+  end
+
+  defp split_specific_rotation(entry, activities_by_date) do
+    entry.start_date
+    |> Date.range(entry.end_date)
+    |> Enum.map(fn date ->
+      tasks =
+        activities_by_date
+        |> Map.get(date, [])
+        |> Enum.filter(&TaskEquivalence.matches_rotation?(&1.raw_task, entry.rotation_type))
+
+      {date, tasks}
+    end)
+    |> Enum.chunk_by(fn {_date, tasks} -> specific_task_labels(tasks) end)
+    |> Enum.map(&specific_rotation_span(entry, &1))
+  end
+
+  defp specific_rotation_span(entry, days) do
+    {first, tasks} = hd(days)
+    {last, _tasks} = List.last(days)
+
+    entry
+    |> Map.merge(%{start_date: first, end_date: last})
+    |> Map.put(:specific_tasks, specific_task_labels(tasks))
+    |> Map.put(:specific_notes, days |> Enum.flat_map(&elem(&1, 1)) |> specific_activity_notes())
+  end
+
+  defp specific_task_labels(tasks),
+    do: tasks |> Enum.map(& &1.raw_task) |> Enum.uniq() |> Enum.sort()
+
+  defp specific_activity_notes(activities) do
+    activities
+    |> Enum.flat_map(fn activity ->
+      Enum.map(activity.notes, &%{date: activity.date, text: &1})
+    end)
+    |> Enum.uniq()
+  end
+
+  defp unmatched_activities(activities, entries) do
+    Enum.reject(activities, fn activity ->
+      Enum.any?(entries, fn entry ->
+        Date.compare(activity.date, entry.start_date) != :lt and
+          Date.compare(activity.date, entry.end_date) != :gt and
+          TaskEquivalence.matches_rotation?(activity.raw_task, entry.rotation_type)
+      end)
+    end)
+  end
+
   defp merge_effective_entries(effective_segs, off_slots) do
     (effective_segs ++ off_slots)
     |> Enum.sort_by(& &1.start_date, Date)
@@ -1042,6 +1119,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   defp year_entries(schedule_resident) do
     rotations = Rotations.list_rotations_for_resident(schedule_resident.id)
     activities = DetailedSchedules.list_for_resident(schedule_resident.id)
+    effective_entries = Rotations.effective_segments_for_resident(schedule_resident.id)
 
     off_slots =
       compute_off_slots(
@@ -1051,10 +1129,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       |> exclude_activity_dates(activities)
 
     entries =
-      schedule_resident.id
-      |> Rotations.effective_segments_for_resident()
+      effective_entries
+      |> specific_rotation_entries(activities)
       |> merge_effective_entries(off_slots)
-      |> Kernel.++(activity_entries(activities))
+      |> Kernel.++(activities |> unmatched_activities(effective_entries) |> activity_entries())
       |> Enum.map(&tag_entry_with_schedule(&1, schedule_resident))
 
     %{entries: entries, rotations: rotations}

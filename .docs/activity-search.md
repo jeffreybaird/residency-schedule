@@ -1,20 +1,11 @@
 # Activity search
 
-Open **Activities** in the navigation to search daily assignments. The page
-defaults to the newest loaded academic year and searches its full date range.
-Choose a resident or inclusive start and end dates to narrow the results.
-Filters remain in the URL so the view can be bookmarked or shared with another
-signed-in user.
+The standalone Activities page and its navigation links have been removed.
+Residents' individual schedules display imported detail directly: a specific
+assignment replaces its equivalent general rotation label on the recorded date.
+See [daily assignments](qgenda-activities.md) for display and import behavior.
 
-The search box suggests recorded activity labels as you type. Choose a
-suggestion to apply it, or keep typing a resident name, note, or other free-text
-query. Suggestions respect the selected academic year, resident, and date
-filters. Up to 20 distinct matching labels are offered; choosing one returns
-to the first results page.
-
-Suggestions appear in a dropdown below the search box. Click a label to select
-it, or use the arrow keys and Enter. Escape closes the dropdown while preserving
-the typed search. Free text remains supported; choosing a suggestion is optional.
+The read-only search context remains available to [MCP and chat](activity-search-mcp.md).
 
 Search text matches task labels, note text, and recorded resident names or
 aliases, ignoring capitalization. Percent signs, underscores, and backslashes
@@ -22,14 +13,14 @@ are literal characters. A person's recorded names can find their assignments
 across academic years; the selected year still limits which assignments appear.
 Results display the preferred full name when known.
 
-Each result is a distinct daily assignment, with its date, task, period or
+Each search result is a distinct daily assignment, with its date, task, period or
 location when recorded, and notes. Multiple commitments on a day remain
 separate. Repeated source records do not create duplicate search results.
-Results are paginated; use the page controls to inspect further matches.
+Results are paginated through the query parameters.
 
 An empty result means no recorded assignment matched the filters. It does not
 mean the resident is available or that an absent assignment was cancelled.
-The page searches daily assignments, not the underlying rotation blocks.
+The context searches daily assignments, not the underlying rotation blocks.
 
 ## Shared query contract
 
@@ -41,5 +32,5 @@ Invalid filters return an error; an unknown resident ID returns no matches.
 Filtering and pagination happen before activity hydration. Search does not
 modify assignments, notes, resident identities, or rotations.
 
-This app change introduces no schema migration. MCP integration is a separate
-change using the same query contract.
+Removing the page does not remove imported data, the query context, or the MCP
+tool, and requires no schema migration.

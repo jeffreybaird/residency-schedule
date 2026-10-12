@@ -86,7 +86,7 @@ defmodule ResidencyScheduleWeb.ResidentImportedScheduleTest do
 
     assert has_element?(
              view,
-             "#rotation-entry-strong_gynecology-1-2026-10-05-2026-10-11"
+             "#rotation-entry-strong_gynecology-1-2026-10-07-2026-10-11"
            )
 
     refute has_element?(view, "#rotation-table tbody tr", "Sick Backup")

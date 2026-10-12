@@ -102,8 +102,15 @@ defmodule ResidencyScheduleWeb.CalendarHighlandAssignmentsTest do
     assert has_element?(view, day_cell() <> " .font-mono", "1")
     open_day(view)
     assert has_element?(view, group() <> " > h3", "1 resident")
-    assert has_element?(view, person(ctx.juniper), "HH Nights 2nd Call")
-    assert has_element?(view, person(ctx.juniper), "HH Nights Extra")
+    refute has_element?(view, person(ctx.juniper), "HH Nights 2nd Call")
+    refute has_element?(view, person(ctx.juniper), "HH Nights Extra")
+
+    source_tasks =
+      DetailedSchedules.list_for_resident(ctx.juniper.id, ~D[2026-10-10])
+      |> Enum.map(& &1.raw_task)
+
+    assert "HH Nights 2nd Call" in source_tasks
+    assert "HH Nights Extra" in source_tasks
 
     assert view
            |> render()
@@ -200,6 +207,48 @@ defmodule ResidencyScheduleWeb.CalendarHighlandAssignmentsTest do
            )
 
     assert has_element?(view, "#day-activities h3", "Daily assignments")
+  end
+
+  test "a matching Saturday Night Float base does not gain a duplicate Weekend Nights category",
+       ctx do
+    import_task("HH Nights 3rd Call")
+
+    {:ok, _} =
+      Rotations.insert_rotations(ctx.juniper.id, [
+        %{
+          slot_index: 1,
+          start_date: ~D[2026-10-10],
+          end_date: ~D[2026-10-10],
+          rotation_type: :highland_night_float
+        }
+      ])
+
+    for mode <- ["month", "week"] do
+      {:ok, view, _} = live(ctx.conn, "/calendar?view=#{mode}&date=#{@day}")
+
+      if mode == "month" do
+        assert has_element?(view, day_cell() <> " span[title='Night Float – Highland']")
+        refute has_element?(view, day_cell() <> " span[title='#{@label}']")
+      else
+        assert has_element?(view, day_cell(), "Night Float – Highland")
+        refute has_element?(view, day_cell(), @label)
+      end
+
+      open_day(view)
+
+      row =
+        "#day-activities [data-rotation-type='highland_night_float'] [data-resident-id='#{ctx.juniper.resident_id}']"
+
+      assert has_element?(view, row <> " a[href='/residents/#{ctx.juniper.id}']")
+      refute has_element?(view, row <> " [data-role='daily-tasks']", "HH Nights 3rd Call")
+      refute has_element?(view, group())
+      render_click(view, "toggle_filter_panel", %{"panel" => "rotations"})
+      assert has_element?(view, "button[phx-value-type='highland_night_float']")
+      refute has_element?(view, "button[phx-value-type='highland_weekend_nights']")
+      render_click(view, "toggle_rotation_filter", %{"type" => "highland_weekend_nights"})
+      refute has_element?(view, group())
+      refute has_element?(view, "#day-activities", "HH Nights 3rd Call")
+    end
   end
 
   defp group, do: "#day-activities [data-rotation-type='#{@night_type}']"
