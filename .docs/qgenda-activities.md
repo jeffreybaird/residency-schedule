@@ -48,7 +48,8 @@ when the resident has no base rotation recorded for that date.
 Each rotation group has one heading and a compact resident list. Daily tasks
 appear in parentheses beside the resident's name; residents without tasks have
 no assignment placeholder. Notes and coverage details remain attached to the
-resident, without duplicate rotation badges or individual bordered cards.
+resident, without duplicate rotation badges or individual bordered cards. Calendar
+day details omit the resident's schedule designation (`Rn-n`).
 Assignments that only repeat their matching rotation heading are omitted from
 the parentheses. These exact labels are recognized:
 
@@ -69,6 +70,8 @@ the parentheses. These exact labels are recognized:
 | `SMH Gynecology Chief On Call Night`, `SMH Gynecology Intern On Call Night` | Night Float – Strong or Weekend Nights – Strong |
 | `SMH Obstetrics Resident 1st Contact Day`–`4th Contact Day` | Obstetrics – Strong or Weekend Days – Strong |
 | `SMH Obstetrics Resident 1st Contact Night`–`4th Contact Night` | Night Float – Strong or Weekend Nights – Strong |
+| `HH Weekend 2nd Call`, `HH Weekend 3rd Call`, `HH Weekend Extra` | Weekend Days – Highland |
+| `HH Nights 2nd Call`, `HH Nights 3rd Call`, `HH Nights Extra` | Weekend Nights – Highland or Night Float – Highland |
 
 These SMH labels were reviewed as restatements of the listed rotation headings.
 Matching uses the existing heading, without inferring a service from the weekday.
@@ -78,12 +81,14 @@ original assignments remain stored; notes remain visible even when their task
 label is omitted. Assignments appear normally outside their matching group. A
 resident with only a redundant assignment has no empty parentheses.
 
-Saturday assignments labeled `HH Nights 2nd Call`, `HH Nights 3rd Call`, or
-`HH Nights Extra` appear in the calendar's **Weekend Nights – Highland** group,
-including its service filter and month/week summaries. The same resident counts
-once in that service when both a base rotation and imported assignment exist.
-This display classification preserves the source date and task text; it does not
-create base rotations or infer a category for other weekdays or unknown tasks.
+Highland weekend-day and night-call labels use the equivalences above. A Highland
+night assignment that matches an existing Night Float – Highland or Weekend
+Nights – Highland entry uses that group. It does not create a second weekend-night
+group solely because its source date is Saturday. A Saturday night assignment
+without a matching base rotation retains the Weekend Nights – Highland calendar
+fallback, including its service filter and month/week summaries. The same resident
+counts once in a service when both a base rotation and imported assignment exist.
+These display rules preserve source dates and tasks without creating base rotations.
 
 On a resident page, open a rotation to see that resident's assignments and notes
 for the rotation's date range, alongside the existing coworker information. The
@@ -91,13 +96,22 @@ dialog identifies the resident and rotation dates and closes with Escape. The
 resident's date selector also provides access to assignments on days without a
 rotation.
 
-The resident's chronological schedule also shows daily assignments directly,
-including duties on dates without a base rotation. Multiple tasks on one date
-remain together with their notes. Dates with recorded assignments are excluded
-from generated OFF rows; the remaining dates in an OFF span remain visible.
-Daily assignments have their own service filter and retain the literal source
-date. Shift statistics count days in the base rotation schedule and do not infer
-additional shifts or hours from daily task labels.
+On a resident's chronological schedule, the specific imported task replaces its
+equivalent general rotation label on matching dates. A rotation span splits where
+the recorded tasks change; dates without matching detail retain their general
+label. The specific row keeps the original service filter, coverage information,
+and coworker lookup for its displayed dates. Task notes remain visible, and a
+matched task is not repeated in a separate daily-assignment row. The selected-date
+panel similarly omits a general base-rotation line when the equivalent specific
+task is shown.
+
+Other daily assignments remain visible, including clinics and duties without a
+matching base rotation. Multiple tasks on one date remain together with their
+notes. Dates with recorded assignments are excluded from generated OFF rows; the
+remaining dates in an OFF span remain visible. Unmatched daily assignments retain
+their own service filter and literal source dates. Shift statistics continue to
+count days in the base rotation schedule without inferring shifts or hours from
+task labels. Stored rotations and imported assignments are not rewritten.
 
 Rotation pills in the schedule grid open the same daily assignment details.
 The dialog follows the dates shown by that pill, including adjacent blocks

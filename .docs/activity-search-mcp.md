@@ -1,9 +1,8 @@
 # Activity search through MCP and chat
 
-This change depends on the shared activity search introduced by the Activities
-page in [PR #48](https://github.com/jeffreybaird/residency-schedule/pull/48).
-Its pull request is stacked on `codex/activity-search` so the MCP diff can be
-reviewed separately.
+The shared activity search was introduced with the former Activities page in
+[PR #48](https://github.com/jeffreybaird/residency-schedule/pull/48). The page has
+been removed; the query context and MCP tool remain available.
 
 The read-only `search_activities` tool searches recorded daily assignments.
 Provide `academic_year`; optional filters are `query`, `start_date`, `end_date`,

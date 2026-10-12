@@ -2,50 +2,13 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   use ResidencyScheduleWeb, :live_view
 
   alias ResidencySchedule.DetailedSchedules
+  alias ResidencySchedule.DetailedSchedules.TaskEquivalence
   alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
   alias ResidencySchedule.Schedules
   alias ResidencySchedule.ShiftOverrides
   alias ResidencyScheduleWeb.ScheduleLive.Index, as: ScheduleIndex
-
-  # Exact, reviewed display equivalents. Source assignments and notes remain intact.
-  @heading_equivalents %{
-    "Ambulatory R1" => ["ambulatory"],
-    "Ambulatory R2" => ["ambulatory"],
-    "Ambulatory R3" => ["ambulatory"],
-    "Ambulatory R4" => ["ambulatory"],
-    "Elective R3" => ["elective"],
-    "Elective R4" => ["elective"],
-    "HH GYN ONC R1" => ["oncology"],
-    "HH GYN ONC R2" => ["oncology"],
-    "HH GYN ONC R3" => ["oncology"],
-    "HH GYN ONC R4" => ["oncology"],
-    "HH GYN R1" => ["highland_gynecology"],
-    "HH GYN R2" => ["highland_gynecology"],
-    "HH GYN R3" => ["highland_gynecology"],
-    "HH GYN R4" => ["highland_gynecology"],
-    "REI Resident" => ["rei"],
-    "Swing Resident" => ["swing"],
-    "Urogyn Resident" => ["urogynecology"],
-    "Ultrasound" => ["ultrasound"],
-    "Vacation" => ["vacation"],
-    "Post-Call" => ["post_call"],
-    "SMH GYN R2 Day" => ["strong_gynecology"],
-    "SMH GYN R3 Day" => ["strong_gynecology"],
-    "SMH Gynecology Chief On Call Day" => ["strong_gynecology", "strong_weekend_days"],
-    "SMH Gynecology Intern On Call Day" => ["strong_gynecology", "strong_weekend_days"],
-    "SMH Gynecology Chief On Call Night" => ["night_float", "strong_weekend_nights"],
-    "SMH Gynecology Intern On Call Night" => ["night_float", "strong_weekend_nights"],
-    "SMH Obstetrics Resident 1st Contact Day" => ["strong_obstetrics", "strong_weekend_days"],
-    "SMH Obstetrics Resident 2nd Contact Day" => ["strong_obstetrics", "strong_weekend_days"],
-    "SMH Obstetrics Resident 3rd Contact Day" => ["strong_obstetrics", "strong_weekend_days"],
-    "SMH Obstetrics Resident 4th Contact Day" => ["strong_obstetrics", "strong_weekend_days"],
-    "SMH Obstetrics Resident 1st Contact Night" => ["night_float", "strong_weekend_nights"],
-    "SMH Obstetrics Resident 2nd Contact Night" => ["night_float", "strong_weekend_nights"],
-    "SMH Obstetrics Resident 3rd Contact Night" => ["night_float", "strong_weekend_nights"],
-    "SMH Obstetrics Resident 4th Contact Night" => ["night_float", "strong_weekend_nights"]
-  }
 
   @impl true
   def mount(_params, _session, socket) do
@@ -536,9 +499,15 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     focus_date = socket.assigns.focus_date
     {range_start, range_end} = visible_range(socket.assigns.view_mode, focus_date)
     rotations = Rotations.list_rotations_in_range_all_schedules(range_start, range_end)
+    rotation_index = index_by_date(rotations, & &1.start_date, & &1.end_date)
     overrides = ShiftOverrides.list_overrides_in_range(range_start, range_end)
     academic_year = ScheduleIndex.current_academic_year(focus_date)
-    activities = DetailedSchedules.list_in_range(range_start, range_end)
+
+    activities =
+      range_start
+      |> DetailedSchedules.list_in_range(range_end)
+      |> Enum.map(&Map.put(&1, :calendar_type, activity_calendar_type(&1, rotation_index)))
+
     options = Residents.list_resident_filter_options_for_year(academic_year)
 
     activity_options =
@@ -561,7 +530,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       )
 
     assign(socket,
-      rotation_index: index_by_date(rotations, & &1.start_date, & &1.end_date),
+      rotation_index: rotation_index,
       override_index: index_by_date(overrides, & &1.override_start_date, & &1.override_end_date),
       resident_options: Enum.uniq_by(display_options, & &1.id),
       display_names: names,
@@ -618,7 +587,6 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
             >
               ({Enum.join(row.task_labels, "; ")})
             </span>
-            <span class="text-xs text-gray-500 dark:text-gray-300">{row.position_code}</span>
             <span
               :for={rotation <- row.rotations}
               :if={rotation.overridden}
@@ -646,10 +614,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   defp day_task_labels(row, type) do
     row.activities
     |> Enum.map(& &1.raw_task)
-    |> Enum.reject(&repeats_group_heading?(&1, type))
+    |> Enum.reject(&(row.rotations != [] and TaskEquivalence.matches_rotation?(&1, type)))
   end
-
-  defp repeats_group_heading?(task, type), do: type in Map.get(@heading_equivalents, task, [])
 
   defp group_day_rows(rows) do
     rows
@@ -660,7 +626,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
   defp split_day_row_by_type(row) do
     rotations = Enum.group_by(row.rotations, & &1.rotation_type)
-    activities = Enum.group_by(row.activities, &activity_calendar_type/1)
+    activities = Enum.group_by(row.activities, & &1.calendar_type)
     unclassified = Map.get(activities, nil, [])
 
     base_groups =
@@ -690,6 +656,18 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
   defp activity_calendar_type(_activity), do: nil
 
+  defp activity_calendar_type(%{raw_task: task} = activity, rotation_index)
+       when task in ["HH Nights 2nd Call", "HH Nights 3rd Call", "HH Nights Extra"] do
+    rotation_index
+    |> Map.get(activity.date, [])
+    |> Enum.filter(&(&1.schedule_resident.resident_id == activity.resident_id))
+    |> Enum.map(& &1.rotation_type)
+    |> Enum.sort()
+    |> Enum.find(activity_calendar_type(activity), &TaskEquivalence.matches_rotation?(task, &1))
+  end
+
+  defp activity_calendar_type(activity, _rotation_index), do: activity_calendar_type(activity)
+
   # Expands each item across its inclusive date range, grouping items by date.
   defp index_by_date(items, start_fun, end_fun) do
     items
@@ -701,7 +679,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
   # Distinct rotation types appearing in the visible rotations, ordered by label.
   defp type_options(rotations, activities) do
-    (Enum.map(rotations, & &1.rotation_type) ++ Enum.map(activities, &activity_calendar_type/1))
+    (Enum.map(rotations, & &1.rotation_type) ++ Enum.map(activities, & &1.calendar_type))
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
     |> Enum.sort_by(&Rotations.rotation_type_label/1)
@@ -732,7 +710,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     activities =
       assigns
       |> visible_activities(date)
-      |> Enum.map(&{activity_calendar_type(&1), &1.resident_id})
+      |> Enum.map(&{&1.calendar_type, &1.resident_id})
       |> Enum.reject(fn {type, _person} -> is_nil(type) end)
       |> Enum.filter(fn {type, _person} ->
         assigns.rotation_filter == [] or type in assigns.rotation_filter

@@ -99,7 +99,7 @@ defmodule ResidencyScheduleWeb.DailyAssignmentIntegrationTest do
     {:ok, previous} = QgendaPreview.prepare(binary, academic_year: 2025)
     {:ok, _} = DetailedSchedules.commit(previous, ctx.admin)
     {:ok, view, _} = live(ctx.conn, "/residents/#{ctx.iris.id}")
-    view |> element("#rotation-entry-strong_gynecology-0-2025-12-28-2026-01-03") |> render_click()
+    view |> element("#rotation-entry-strong_gynecology-0-2025-12-28-2025-12-29") |> render_click()
 
     assert has_element?(
              view,
@@ -270,7 +270,7 @@ defmodule ResidencyScheduleWeb.DailyAssignmentIntegrationTest do
   defp open_rotation(view),
     do:
       view
-      |> element("#rotation-entry-strong_gynecology-0-2026-12-28-2027-01-03")
+      |> element("#rotation-entry-strong_gynecology-0-2026-12-28-2026-12-29")
       |> render_click()
 
   defp outside_preview do

@@ -88,7 +88,7 @@ defmodule ResidencyScheduleWeb.ImportedResidentNamesTest do
 
   test "rotation coworker modal and coworkers tab show the preferred names", ctx do
     {:ok, view, _} = live(ctx.conn, "/residents/#{ctx.iris.id}")
-    view |> element("#rotation-entry-strong_gynecology-0-2026-12-28-2027-01-03") |> render_click()
+    view |> element("#rotation-entry-strong_gynecology-0-2026-12-28-2026-12-29") |> render_click()
     assert has_element?(view, "#shift-coworkers-list", "Juniper Vale")
     refute has_element?(view, "#shift-coworkers-list", "Juniper Vail")
     assert has_element?(view, "#shift-coworkers-list", "Juniper Other")

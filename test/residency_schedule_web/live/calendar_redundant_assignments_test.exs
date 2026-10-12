@@ -33,6 +33,15 @@ defmodule ResidencyScheduleWeb.CalendarRedundantAssignmentsTest do
         {"Ultrasound", :ultrasound},
         {"Vacation", :vacation},
         {"Post-Call", :post_call},
+        {"HH Weekend 2nd Call", :highland_weekend_days},
+        {"HH Weekend 3rd Call", :highland_weekend_days},
+        {"HH Weekend Extra", :highland_weekend_days},
+        {"HH Nights 2nd Call", :highland_weekend_nights},
+        {"HH Nights 3rd Call", :highland_weekend_nights},
+        {"HH Nights Extra", :highland_weekend_nights},
+        {"HH Nights 2nd Call", :highland_night_float},
+        {"HH Nights 3rd Call", :highland_night_float},
+        {"HH Nights Extra", :highland_night_float},
         {"SMH GYN R2 Day", :strong_gynecology},
         {"SMH GYN R3 Day", :strong_gynecology},
         {"SMH Gynecology Chief On Call Day", :strong_gynecology},
@@ -64,7 +73,6 @@ defmodule ResidencyScheduleWeb.CalendarRedundantAssignmentsTest do
       task = unquote(task)
       type = unquote(type)
       import_task(task)
-      insert_rotation(ctx.iris.id, type, ~D[2026-12-29])
 
       comparison_type =
         if String.starts_with?(task, "SMH"), do: :oncology, else: :strong_gynecology
@@ -72,6 +80,16 @@ defmodule ResidencyScheduleWeb.CalendarRedundantAssignmentsTest do
       if comparison_type == :oncology,
         do: insert_rotation(ctx.iris.id, comparison_type, ~D[2026-12-29])
 
+      # Check the unrelated heading before a matching base can classify the task elsewhere.
+      {:ok, unrelated, _} = live(ctx.conn, "/calendar?view=day&date=2026-12-29")
+
+      assert has_element?(
+               unrelated,
+               resident_row(comparison_type, ctx.iris) <> " [data-role='daily-tasks']",
+               task
+             )
+
+      insert_rotation(ctx.iris.id, type, ~D[2026-12-29])
       {:ok, view, _} = live(ctx.conn, "/calendar?view=day&date=2026-12-29")
       row = resident_row(type, ctx.iris)
 
@@ -84,13 +102,6 @@ defmodule ResidencyScheduleWeb.CalendarRedundantAssignmentsTest do
       assert has_element?(view, row <> " [data-role='daily-tasks']", "(GOG Continuity Clinic PM)")
       refute has_element?(view, row <> " [data-role='daily-tasks']", task)
       assert has_element?(view, row, "Bring simulation kit")
-
-      # The same source task remains meaningful beneath a different rotation.
-      assert has_element?(
-               view,
-               resident_row(comparison_type, ctx.iris) <> " [data-role='daily-tasks']",
-               task
-             )
 
       assert Enum.any?(
                DetailedSchedules.list_for_resident(ctx.iris.id, ~D[2026-12-29]),
@@ -134,7 +145,7 @@ defmodule ResidencyScheduleWeb.CalendarRedundantAssignmentsTest do
         {"SMH Obstetrics Resident 4th Contact Night", :strong_obstetrics},
         {"SMH Obstetrics Resident 5th Contact Day", :strong_obstetrics},
         {"HH OB Day R2", :highland_obstetrics},
-        {"HH Nights 3rd Call", :highland_weekend_nights}
+        {"HH Nights 3rd Call Extra", :highland_weekend_nights}
       ] do
     test "#{task} retains duty detail beneath #{type}", ctx do
       task = unquote(task)

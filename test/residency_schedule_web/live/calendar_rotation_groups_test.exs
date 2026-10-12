@@ -258,7 +258,7 @@ defmodule ResidencyScheduleWeb.CalendarRotationGroupsTest do
     refute has_element?(view, "#day-activities [data-resident-id]", "Oncology")
     refute has_element?(view, "#day-activities [data-resident-id]", "Obstetrics")
 
-    assert has_element?(
+    refute has_element?(
              view,
              "#day-activities [data-resident-id='#{ctx.tiff.resident_id}'] header",
              ctx.tiff.position_code
