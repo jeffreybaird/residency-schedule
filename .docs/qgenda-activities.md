@@ -50,6 +50,15 @@ appear in parentheses beside the resident's name; residents without tasks have
 no assignment placeholder. Notes and coverage details remain attached to the
 resident, without duplicate rotation badges or individual bordered cards. Calendar
 day details omit the resident's schedule designation (`Rn-n`).
+
+When the same resident has both `<name> Clinic AM` and `<name> Clinic PM` on
+one date, calendar details show `<name>` once. For example, `COB Continuity Clinic
+AM` plus `COB Continuity Clinic PM` displays as `COB Continuity`. A lone AM or PM
+assignment keeps its full label, and different clinics or sites are not combined.
+A note consisting only of `Continuity clinic` is omitted when that resident already
+has a continuity-clinic assignment. Notes containing additional instructions stay
+visible. These are calendar display rules; source tasks and notes remain stored.
+
 Assignments that only repeat their matching rotation heading are omitted from
 the parentheses. These exact labels are recognized:
 
