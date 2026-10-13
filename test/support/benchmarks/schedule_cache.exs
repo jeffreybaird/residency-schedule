@@ -157,6 +157,36 @@ try do
       {{mounted.assigns.all_slots, mounted.assigns.unified_residents}, html}
     end)
 
+  {slots, rows} = elem(reference, 0)
+
+  expected_cells =
+    Enum.map(rows, &ResidencySchedule.ScheduleCellReference.groups(slots, &1.rotation_lookup))
+
+  for {label, builder} <- [
+        {"reference", &ResidencySchedule.ScheduleCellReference.groups/2},
+        {"current", &ResidencyScheduleWeb.ScheduleLive.Index.cell_groups_unified/2}
+      ],
+      run <- 1..5 do
+    {:reductions, before_reductions} = Process.info(self(), :reductions)
+
+    {microseconds, cells} =
+      :timer.tc(fn -> Enum.map(rows, &builder.(slots, &1.rotation_lookup)) end)
+
+    {:reductions, after_reductions} = Process.info(self(), :reductions)
+    unless cells == expected_cells, do: raise("cell builder changed annotated output")
+
+    IO.puts(
+      Jason.encode!(%{
+        phase: "schedule.cells.#{label}.#{run}",
+        wall_ms: microseconds / 1000,
+        reductions: after_reductions - before_reductions,
+        rows: length(rows),
+        slots: length(slots),
+        exact_reference_match: true
+      })
+    )
+  end
+
   outputs =
     for run <- 1..5 do
       socket = %Phoenix.LiveView.Socket{
