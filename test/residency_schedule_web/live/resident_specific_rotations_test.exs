@@ -16,6 +16,64 @@ defmodule ResidencyScheduleWeb.ResidentSpecificRotationsTest do
     data
   end
 
+  for {task, type, base_label} <- [
+        {"Vacation", :vacation, "Vacation"},
+        {"Ambulatory R4", :ambulatory, "Ambulatory"}
+      ] do
+    test "#{task} uses the same bounded centered pill style as its base rotation", ctx do
+      task = unquote(task)
+      type = unquote(type)
+      base_label = unquote(base_label)
+
+      workbook =
+        mutate_detail_workbook(
+          "xl/sharedStrings.xml",
+          &String.replace(&1, "SMH GYN R2 Day", task)
+        )
+
+      {:ok, preview} = detail_preview(workbook)
+
+      {:ok, _} =
+        DetailedSchedules.commit(preview, ResidencySchedule.ScheduleFixtures.admin_user())
+
+      {:ok, _} =
+        Rotations.insert_rotations(ctx.iris.id, [
+          %{
+            slot_index: 1,
+            start_date: ~D[2026-12-28],
+            end_date: ~D[2027-01-03],
+            rotation_type: type
+          }
+        ])
+
+      {:ok, view, _} = live(ctx.conn, "/residents/#{ctx.iris.id}")
+      specific_row = rotation_row(type, "2026-12-28", "2026-12-29")
+      specific_pill = specific_row <> " [data-role='specific-rotation-label']"
+      base_pill = rotation_row(type, "2026-12-30", "2027-01-03") <> " span[title='#{base_label}']"
+      assert has_element?(view, specific_pill, task)
+      assert has_element?(view, base_pill, base_label)
+      assert pill_classes(view, specific_pill) == pill_classes(view, base_pill)
+
+      for token <- [
+            "w-full",
+            "max-w-[11rem]",
+            "min-h-8",
+            "justify-center",
+            "text-center",
+            "items-center",
+            "whitespace-normal",
+            "break-words",
+            "px-2"
+          ] do
+        assert token in pill_classes(view, specific_pill)
+      end
+
+      refute "truncate" in pill_classes(view, specific_pill)
+      assert has_element?(view, specific_row <> " p", "Coverage discussion")
+      refute has_element?(view, specific_pill, "Coverage discussion")
+    end
+  end
+
   test "specific tasks replace matching general labels only on their actual dates", ctx do
     before = Rotations.list_rotations_for_resident(ctx.iris.id)
     {:ok, view, _} = live(ctx.conn, "/residents/#{ctx.iris.id}")
@@ -225,4 +283,14 @@ defmodule ResidencyScheduleWeb.ResidentSpecificRotationsTest do
 
   defp activity_row(date),
     do: "#rotation-table tr[data-entry-kind='activity'][data-date='#{date}']"
+
+  defp pill_classes(view, selector) do
+    view
+    |> render()
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.query(selector)
+    |> LazyHTML.attribute("class")
+    |> Enum.flat_map(&String.split/1)
+    |> Enum.sort()
+  end
 end
