@@ -667,7 +667,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                             id={entry_row_id(entry)}
                             data-rotation-type={entry.rotation_type}
                             data-today-anchor={if entry_row_id(entry) == @today_anchor_id, do: "true"}
-                            phx-click="open_shift_coworkers"
+                            phx-click={
+                              if entry.rotation_type != "qgenda_assignment",
+                                do: "open_shift_coworkers"
+                            }
                             phx-value-rotation-type={entry.rotation_type}
                             phx-value-slot-index={entry.slot_index}
                             phx-value-schedule-id={entry.schedule_id}
@@ -972,6 +975,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   defp entry_label(rotation_type), do: Rotations.rotation_type_label(rotation_type)
 
   defp schedule_entry_label(%{specific_tasks: [_ | _] = tasks}), do: Enum.join(tasks, "; ")
+  defp schedule_entry_label(%{source_tasks: [_ | _] = tasks}), do: Enum.join(tasks, "; ")
   defp schedule_entry_label(entry), do: entry_label(entry.rotation_type)
 
   defp described_by_activities?(rotation, activities),
@@ -1056,7 +1060,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       tasks =
         activities_by_date
         |> Map.get(date, [])
-        |> Enum.filter(&TaskEquivalence.matches_rotation?(&1.raw_task, entry.rotation_type))
+        |> Enum.filter(
+          &(TaskEquivalence.matches_rotation?(&1.raw_task, entry.rotation_type) or
+              &1.raw_task in Map.get(entry, :source_tasks, []))
+        )
 
       {date, tasks}
     end)
@@ -1090,7 +1097,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       Enum.any?(entries, fn entry ->
         Date.compare(activity.date, entry.start_date) != :lt and
           Date.compare(activity.date, entry.end_date) != :gt and
-          TaskEquivalence.matches_rotation?(activity.raw_task, entry.rotation_type)
+          (TaskEquivalence.matches_rotation?(activity.raw_task, entry.rotation_type) or
+             activity.raw_task in Map.get(entry, :source_tasks, []))
       end)
     end)
   end
@@ -1333,21 +1341,26 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
   defp compute_total_shifts(rotations) do
     rotations
-    |> Enum.reject(fn r -> r.rotation_type in @non_shift_types end)
-    |> Enum.map(fn r -> Date.diff(r.end_date, r.start_date) + 1 end)
-    |> Enum.sum()
+    |> Enum.reject(fn r ->
+      r.rotation_type in @non_shift_types or r.rotation_type == "qgenda_assignment"
+    end)
+    |> Enum.flat_map(&Date.range(&1.start_date, &1.end_date))
+    |> Enum.uniq()
+    |> length()
   end
 
   defp compute_shifts_remaining(rotations, today) do
     rotations
     |> Enum.reject(fn r ->
-      r.rotation_type in @non_shift_types or Date.compare(r.end_date, today) == :lt
+      r.rotation_type in @non_shift_types or r.rotation_type == "qgenda_assignment" or
+        Date.compare(r.end_date, today) == :lt
     end)
-    |> Enum.map(fn r ->
+    |> Enum.flat_map(fn r ->
       effective_start = Enum.max([r.start_date, today], Date)
-      Date.diff(r.end_date, effective_start) + 1
+      Date.range(effective_start, r.end_date)
     end)
-    |> Enum.sum()
+    |> Enum.uniq()
+    |> length()
   end
 
   defp compute_night_shifts_remaining(rotations, today, types) do
@@ -1379,6 +1392,9 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     end)
     |> Enum.sort_by(fn {type, _} -> Enum.find_index(@night_shift_types, &(&1 == type)) end)
   end
+
+  defp open_coworker_modal("qgenda_assignment", _sd, _ed, _schedule_id, socket),
+    do: {:noreply, socket}
 
   defp open_coworker_modal(type, sd, ed, schedule_id, socket) do
     cond do

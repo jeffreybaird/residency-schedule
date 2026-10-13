@@ -382,9 +382,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
             <div class="flex items-start justify-between gap-4 mb-4">
               <div>
                 <h2 id="gantt-rotation-modal-title" class="text-lg font-semibold">
-                  {@rotation_modal.name} — {Rotations.rotation_type_label(
-                    @rotation_modal.rotation_type
-                  )}
+                  {@rotation_modal.name} — {Rotations.assignment_label(@rotation_modal)}
                 </h2>
                 <p
                   id="gantt-rotation-dates"
@@ -660,7 +658,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   defp annotate_cell(rotation, schedule_id, first, last) do
     token =
-      {schedule_id, Map.get(rotation, :id), first, last}
+      {schedule_id, Map.get(rotation, :schedule_resident_id), Map.get(rotation, :id),
+       rotation.rotation_type, Map.get(rotation, :source_tasks, []), first, last}
       |> :erlang.term_to_binary()
       |> then(&:crypto.hash(:sha256, &1))
       |> Base.url_encode64(padding: false)
@@ -717,8 +716,10 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   defp rotation_cell_key(nil), do: :blank
-  defp rotation_cell_key(%{rotations: rotations}), do: Enum.map(rotations, & &1.rotation_type)
-  defp rotation_cell_key(rotation), do: rotation.rotation_type
+  defp rotation_cell_key(%{rotations: rotations}), do: Enum.map(rotations, &rotation_cell_key/1)
+
+  defp rotation_cell_key(rotation),
+    do: {rotation.rotation_type, Map.get(rotation, :source_tasks, [])}
 
   @doc false
   def cell_groups(slots, rotations) do
@@ -748,14 +749,14 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           phx-click="open_rotation_details"
           phx-value-cell-id={rotation.cell_id}
           aria-haspopup="dialog"
-          aria-label={"View #{Rotations.rotation_type_label(rotation.rotation_type)} details"}
+          aria-label={"View #{Rotations.assignment_label(rotation)} details"}
           class={[
             "inline-block rounded px-1 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:ring-1 focus-visible:ring-2 focus-visible:ring-blue-500",
             @past && "opacity-40",
             Rotations.rotation_type_color(rotation.rotation_type)
           ]}
         >
-          <span>{abbrev(rotation.rotation_type)}</span>
+          <span>{cell_label(rotation)}</span>
         </button>
       <% end %>
     <% else %>
@@ -763,6 +764,11 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     <% end %>
     """
   end
+
+  defp cell_label(%{rotation_type: "qgenda_assignment"} = rotation),
+    do: Rotations.assignment_label(rotation)
+
+  defp cell_label(rotation), do: abbrev(rotation.rotation_type)
 
   @abbrev_map %{
     "leave_of_absence" => "LOA",

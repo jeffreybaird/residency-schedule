@@ -629,7 +629,12 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   defp day_task_labels(row, type) do
     row.activities
     |> Enum.map(& &1.raw_task)
-    |> Enum.reject(&(row.rotations != [] and TaskEquivalence.matches_rotation?(&1, type)))
+    |> Enum.reject(fn task ->
+      Enum.any?(
+        row.rotations,
+        &(Map.get(&1, :source_tasks, []) == [] and TaskEquivalence.matches_rotation?(task, type))
+      )
+    end)
     |> combine_clinic_periods()
   end
 
@@ -703,7 +708,18 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     |> Enum.find(activity_calendar_type(activity), &TaskEquivalence.matches_rotation?(task, &1))
   end
 
-  defp activity_calendar_type(activity, _rotation_index), do: activity_calendar_type(activity)
+  defp activity_calendar_type(activity, rotation_index) do
+    rotation_index
+    |> Map.get(activity.date, [])
+    |> Enum.find(
+      &(&1.schedule_resident_id == activity.schedule_resident_id and
+          activity.raw_task in Map.get(&1, :source_tasks, []))
+    )
+    |> case do
+      nil -> activity_calendar_type(activity)
+      rotation -> rotation.rotation_type
+    end
+  end
 
   # Expands each item across its inclusive date range, grouping items by date.
   defp index_by_date(items, start_fun, end_fun) do

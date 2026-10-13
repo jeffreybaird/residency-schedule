@@ -4,7 +4,7 @@ defmodule ResidencySchedule.Ical do
   alias ResidencySchedule.Rotations
 
   @night_shift_types ~w[night_float strong_weekend_nights highland_night_float highland_weekend_nights]
-  @all_day_types ~w[vacation post_call float leave_of_absence]
+  @all_day_types ~w[vacation post_call float leave_of_absence qgenda_assignment]
 
   @doc """
   Builds an iCal (VCALENDAR) string from a list of effective segments for a resident.
@@ -113,6 +113,7 @@ defmodule ResidencySchedule.Ical do
   def trim_last_day?(rotation, next_rotation) do
     !night_shift?(rotation.rotation_type) &&
       night_shift?(next_rotation.rotation_type) &&
+      is_nil(Map.get(rotation, :source_assignment_date)) &&
       is_nil(Map.get(next_rotation, :source_assignment_date)) &&
       Date.diff(next_rotation.start_date, rotation.end_date) == 1
   end
@@ -148,9 +149,10 @@ defmodule ResidencySchedule.Ical do
   defp build_all_events(sorted_segments, resident) do
     imported_nights =
       sorted_segments
-      |> Enum.filter(&(&1.rotation_type == "night_float"))
-      |> Enum.map(&Map.get(&1, :source_assignment_date))
-      |> Enum.reject(&is_nil/1)
+      |> Enum.filter(
+        &(night_shift?(&1.rotation_type) and not is_nil(Map.get(&1, :source_assignment_date)))
+      )
+      |> Enum.map(&{night_site(&1.rotation_type), Map.get(&1, :source_assignment_date)})
       |> MapSet.new()
 
     sorted_segments
@@ -169,7 +171,7 @@ defmodule ResidencySchedule.Ical do
 
   defp build_all_day_event(resident, seg, trim_last) do
     uid = "seg-#{seg.rotation_type}-#{Date.to_iso8601(seg.start_date)}@residency-schedule"
-    label = Rotations.rotation_type_label(seg.rotation_type)
+    label = seg |> Rotations.assignment_label() |> escape_text()
     dtstart = format_date(seg.start_date)
     effective_end = if trim_last, do: seg.end_date, else: Date.add(seg.end_date, 1)
     dtend = format_date(effective_end)
@@ -196,7 +198,7 @@ defmodule ResidencySchedule.Ical do
 
   defp build_timed_event(resident, seg, date) do
     uid = "seg-#{seg.rotation_type}-#{Date.to_iso8601(seg.start_date)}-#{date}@residency-schedule"
-    label = Rotations.rotation_type_label(seg.rotation_type)
+    label = seg |> Rotations.assignment_label() |> escape_text()
     {dtstart, dtend} = segment_event_times(seg, date)
 
     """
@@ -211,15 +213,30 @@ defmodule ResidencySchedule.Ical do
   end
 
   defp duplicate_imported_night?(segment, date, imported_nights) do
-    segment.rotation_type == "strong_weekend_nights" and
+    segment.rotation_type in ["strong_weekend_nights", "highland_weekend_nights"] and
       is_nil(Map.get(segment, :source_assignment_date)) and
-      MapSet.member?(imported_nights, Date.add(date, -1))
+      MapSet.member?(imported_nights, {night_site(segment.rotation_type), Date.add(date, -1)})
   end
 
-  defp segment_event_times(%{rotation_type: "night_float", source_assignment_date: date}, date),
-    do: {format_datetime(date, 18), format_datetime(Date.add(date, 1), 6)}
+  defp segment_event_times(%{rotation_type: type, source_assignment_date: date}, date)
+       when type in @night_shift_types,
+       do: {format_datetime(date, 18), format_datetime(Date.add(date, 1), 6)}
 
   defp segment_event_times(segment, date), do: event_times(segment.rotation_type, date)
+
+  defp night_site(type) when type in ["highland_night_float", "highland_weekend_nights"],
+    do: :highland
+
+  defp night_site(_type), do: :strong
+
+  defp escape_text(text) do
+    text
+    |> String.replace("\\", "\\\\")
+    |> String.replace("\r\n", "\n")
+    |> String.replace("\n", "\\n")
+    |> String.replace(";", "\\;")
+    |> String.replace(",", "\\,")
+  end
 
   defp format_date(date) do
     "#{pad(date.year, 4)}#{pad(date.month, 2)}#{pad(date.day, 2)}"

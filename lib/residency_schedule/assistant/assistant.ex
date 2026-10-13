@@ -144,7 +144,7 @@ defmodule ResidencySchedule.Assistant do
          resident: resident_summary(resident, schedule),
          from: from,
          to: to,
-         count: length(days),
+         count: distinct_day_count(days),
          by_rotation: count_by_rotation(days),
          by_year: Enum.map(by_year, &year_count/1),
          counting_rule: %{
@@ -572,7 +572,7 @@ defmodule ResidencySchedule.Assistant do
   defp segment_summary(segment) do
     %{
       rotation_type: segment.rotation_type,
-      rotation_label: Rotations.rotation_type_label(segment.rotation_type),
+      rotation_label: Rotations.assignment_label(segment),
       start_date: segment.start_date,
       end_date: segment.end_date,
       is_coverage: segment.is_coverage,
@@ -598,7 +598,10 @@ defmodule ResidencySchedule.Assistant do
     |> Enum.reject(&(&1.covered_by != nil))
     |> Enum.flat_map(&segment_dates/1)
     |> Enum.filter(&(within?(&1.date, from, to) and Rotations.working_day?(&1.rotation_type)))
+    |> Enum.uniq_by(&{&1.date, &1.rotation_type})
   end
+
+  defp distinct_day_count(days), do: days |> Enum.uniq_by(& &1.date) |> length()
 
   defp year_count({appearance, days}) do
     %{
@@ -606,7 +609,7 @@ defmodule ResidencySchedule.Assistant do
       schedule: appearance.schedule.label,
       residency_year: appearance.residency_year,
       position_code: appearance.position_code,
-      days: length(days)
+      days: distinct_day_count(days)
     }
   end
 

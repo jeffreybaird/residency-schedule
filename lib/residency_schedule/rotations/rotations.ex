@@ -8,9 +8,11 @@ defmodule ResidencySchedule.Rotations do
   alias ResidencySchedule.Residents.ScheduleResident
   alias ResidencySchedule.Rotations.FridayNightFloat
   alias ResidencySchedule.Rotations.Rotation
+  alias ResidencySchedule.Rotations.ScheduleGaps
   alias ResidencySchedule.ShiftOverrides
 
   @rotation_labels %{
+    "qgenda_assignment" => "Daily assignments",
     "leave_of_absence" => "Leave of Absence",
     "admin" => "Admin Day",
     "admin_mfm" => "Admin / MFM Clinic",
@@ -184,7 +186,7 @@ defmodule ResidencySchedule.Rotations do
     schedule_id
     |> list_rotations_for_schedule()
     |> Repo.preload(schedule_resident: ScheduleResident.with_name_query())
-    |> FridayNightFloat.project(
+    |> project_assignments(
       DetailedSchedules.list_for_schedule(schedule_id),
       ShiftOverrides.list_overrides_for_schedule(schedule_id)
     )
@@ -332,6 +334,14 @@ defmodule ResidencySchedule.Rotations do
 
   Exempt from doctest — hits the database. See `RotationsTest`.
   """
+  def list_effective_coworker_rows_for_type_in_range(
+        _schedule_id,
+        "qgenda_assignment",
+        _first,
+        _last
+      ),
+      do: []
+
   def list_effective_coworker_rows_for_type_in_range(
         schedule_id,
         rotation_type,
@@ -594,10 +604,30 @@ defmodule ResidencySchedule.Rotations do
   def projected_rotations_in_range_all_schedules(range_start, range_end) do
     range_start
     |> list_rotations_in_range_all_schedules(range_end)
-    |> FridayNightFloat.project(
+    |> project_assignments(
       DetailedSchedules.list_in_range(range_start, range_end),
       ShiftOverrides.list_overrides_in_range(range_start, range_end)
     )
+  end
+
+  defp project_assignments(rotations, activities, overrides) do
+    resident_ids = Enum.map(activities, & &1.schedule_resident_id) |> Enum.uniq()
+
+    residents =
+      ScheduleResident.with_name_query()
+      |> where([sr], sr.id in ^resident_ids)
+      |> Repo.all()
+      |> Map.new(&{&1.id, &1})
+
+    activities =
+      Enum.map(
+        activities,
+        &Map.put(&1, :schedule_resident, Map.fetch!(residents, &1.schedule_resident_id))
+      )
+
+    rotations
+    |> FridayNightFloat.project(activities, overrides)
+    |> ScheduleGaps.project(activities, overrides)
   end
 
   @doc """
@@ -650,7 +680,7 @@ defmodule ResidencySchedule.Rotations do
   end
 
   # Days off: not a shift at all.
-  @non_working_rotations ~w(vacation post_call leave_of_absence)
+  @non_working_rotations ~w(vacation post_call leave_of_absence qgenda_assignment)
 
   # Working days, but the resident is alone: no other resident is on the same
   # service, so these never count as shared shifts.
@@ -705,7 +735,7 @@ defmodule ResidencySchedule.Rotations do
   Rotation types that are days off rather than shifts.
 
       iex> ResidencySchedule.Rotations.non_working_rotation_types()
-      ["vacation", "post_call", "leave_of_absence"]
+      ["vacation", "post_call", "leave_of_absence", "qgenda_assignment"]
   """
   def non_working_rotation_types, do: @non_working_rotations
 
@@ -865,6 +895,7 @@ defmodule ResidencySchedule.Rotations do
         end_date: rotation.end_date,
         slot_index: rotation.slot_index,
         source_assignment_date: rotation.source_assignment_date,
+        source_tasks: rotation.source_tasks,
         is_coverage: false,
         covered_by: nil,
         original_resident: nil
@@ -877,6 +908,7 @@ defmodule ResidencySchedule.Rotations do
       rotation_type: rotation.rotation_type,
       slot_index: rotation.slot_index,
       source_assignment_date: rotation.source_assignment_date,
+      source_tasks: rotation.source_tasks,
       is_coverage: false,
       original_resident: nil,
       start_date: rotation.start_date,
@@ -1064,8 +1096,20 @@ defmodule ResidencySchedule.Rotations do
       true
   """
   def all_rotation_types do
-    Map.keys(@rotation_labels)
+    @rotation_labels |> Map.keys() |> Enum.reject(&(&1 == "qgenda_assignment"))
   end
+
+  @doc """
+  Returns literal imported task names when an entry fills a schedule gap.
+
+      iex> ResidencySchedule.Rotations.assignment_label(%{rotation_type: "qgenda_assignment", source_tasks: ["Mystery Clinic PM"]})
+      "Mystery Clinic PM"
+
+      iex> ResidencySchedule.Rotations.assignment_label(%{rotation_type: "vacation"})
+      "Vacation"
+  """
+  def assignment_label(%{source_tasks: [_ | _] = tasks}), do: Enum.join(tasks, "; ")
+  def assignment_label(entry), do: rotation_type_label(entry.rotation_type)
 
   defp effective_rotation_rows(rot, override_by_rotation) do
     case Map.get(override_by_rotation, rot.id) do
@@ -1074,6 +1118,7 @@ defmodule ResidencySchedule.Rotations do
           %{
             resident: rot.schedule_resident,
             rotation_type: rot.rotation_type,
+            source_tasks: Map.get(rot, :source_tasks, []),
             overridden: false,
             covered_by: nil,
             is_coverage: false
