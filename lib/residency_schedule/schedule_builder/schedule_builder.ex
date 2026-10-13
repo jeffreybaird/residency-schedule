@@ -21,6 +21,7 @@ defmodule ResidencySchedule.ScheduleBuilder do
 
   alias ResidencySchedule.Importer.{CsvParser, ScheduleImporter}
   alias ResidencySchedule.{Residents, Rotations, Schedules}
+  alias ResidencySchedule.Rotations.HighlandPostCall
 
   @doc """
   Generates a new draft schedule for the given academic year using the
@@ -140,21 +141,40 @@ defmodule ResidencySchedule.ScheduleBuilder do
 
         length(indices) == length(Enum.uniq(indices)) and
           Enum.all?(rotations, fn rotation ->
-            Map.has_key?(annual_slots, rotation.slot_index) and weekly_dates?(rotation)
+            Map.has_key?(annual_slots, rotation.slot_index) and weekly_dates?(rotation, rotations)
           end)
       end)
   end
 
-  defp weekly_dates?(rotation) do
+  defp weekly_dates?(rotation, rotations) do
     shape =
       {Date.day_of_week(rotation.start_date), Date.diff(rotation.end_date, rotation.start_date)}
 
     case rotation.rotation_type do
-      "highland_night_float" -> shape == {7, 5}
-      "highland_weekend_nights" -> shape == {6, 0}
-      "float" -> shape in [{1, 4}, {1, 6}]
-      _ -> shape in [{1, 4}, {6, 1}]
+      "highland_night_float" ->
+        shape == {7, 5}
+
+      "highland_weekend_nights" ->
+        shape == {6, 0}
+
+      "float" ->
+        shape in [{1, 4}, {1, 6}]
+
+      "post_call" ->
+        shape in [{1, 4}, {6, 1}] or corrected_weekend_post_call?(rotation, rotations)
+
+      _ ->
+        shape in [{1, 4}, {6, 1}]
     end
+  end
+
+  defp corrected_weekend_post_call?(rotation, rotations) do
+    Date.day_of_week(rotation.start_date) == 6 and rotation.start_date == rotation.end_date and
+      Enum.any?(rotations, fn night ->
+        night.rotation_type == "highland_night_float" and
+          night.schedule_resident_id == rotation.schedule_resident_id and
+          night.start_date == Date.add(rotation.end_date, 1)
+      end)
   end
 
   defp noncanonical_dates?(rotation, annual_slots) do
@@ -566,7 +586,11 @@ defmodule ResidencySchedule.ScheduleBuilder do
       end
     end)
     |> Enum.sort_by(& &1.slot_index)
+    |> normalize_annual_rotations(literal_dates?)
   end
+
+  defp normalize_annual_rotations(rotations, true), do: rotations
+  defp normalize_annual_rotations(rotations, false), do: HighlandPostCall.normalize(rotations)
 
   defp assignment_dates(_rotation_type, slot, true), do: {slot.start_date, slot.end_date}
 

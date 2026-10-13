@@ -13,6 +13,7 @@ defmodule ResidencySchedule.Importer.CsvParser do
   """
 
   alias ResidencySchedule.Importer.NameNormalizer
+  alias ResidencySchedule.Rotations.HighlandPostCall
 
   defstruct [
     :position_code,
@@ -364,7 +365,7 @@ defmodule ResidencySchedule.Importer.CsvParser do
       residency_year: residency_year,
       schedule_number: schedule_number,
       name: name,
-      rotations: rotations
+      rotations: HighlandPostCall.normalize(rotations)
     }
 
     {resident, warnings}
