@@ -35,7 +35,8 @@ defmodule ResidencyScheduleWeb.ScheduleRenderUpdatesTest do
     %{state: state, row_path: row_path, data: data, earlier: earlier}
   end
 
-  test "initial grid preserves every row, slot, cell identity and column width", %{state: state} do
+  test "initial window preserves every visible row and original cell identity with bounded columns",
+       %{state: state} do
     socket = elem(state, 0)
     html = html(state)
     document = LazyHTML.from_fragment(html)
@@ -43,11 +44,17 @@ defmodule ResidencyScheduleWeb.ScheduleRenderUpdatesTest do
     assert length(
              LazyHTML.query(document, "#gantt-scroll th[data-slot-aca-year]")
              |> LazyHTML.to_tree()
-           ) == length(socket.assigns.all_slots)
+           ) == socket.assigns.schedule_window.count
+
+    assert socket.assigns.schedule_window.count <= 40
+    assert socket.assigns.schedule_window.total == length(socket.assigns.all_slots)
 
     assert names(state) == ["Clare", "Mary", "Tiff"]
 
-    for {_count, cell} <- Enum.flat_map(socket.assigns.unified_residents, & &1.cells),
+    for {_count, cell} <-
+          socket.assigns.schedule_window.groups
+          |> Enum.flat_map(&elem(&1, 1))
+          |> Enum.flat_map(& &1.cells),
         rotation <- rotations(cell) do
       assert LazyHTML.query(document, "#gantt-pill-#{rotation.cell_id}")
              |> LazyHTML.attribute("phx-value-cell-id") == [rotation.cell_id]

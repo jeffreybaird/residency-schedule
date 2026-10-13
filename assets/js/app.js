@@ -25,6 +25,7 @@ import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import {buildTour, consumeTourState} from "./tour.js"
 import {createBrowserLatencyReporter} from "./browser_latency.js"
+import {createScheduleWindowHook} from "./schedule_window.js"
 
 // YearTracker: updates a DOM element with the calendar year of the leftmost
 // visible data column in the Gantt scroll container as the user scrolls.
@@ -372,151 +373,6 @@ Hooks.ScrollToToday = {
   }
 }
 
-Hooks.YearTracker = {
-  disconnected() { browserLatency.cancelHook(this) },
-  destroyed() {
-    browserLatency.cancelHook(this)
-    clearTimeout(this._acaYearTimer)
-  },
-  mounted() {
-    this._lastAcaYear = null
-    this._acaYearTimer = null
-    this.yearEl = document.getElementById("gantt-year-indicator")
-    this.stickyWidth = 148 // @name_col_px (ID column removed)
-    this.updateYear()
-    this.updateActivePill()
-    this.scrollToToday()
-    this.updateCohortVisibility()
-    this.el.addEventListener("scroll", () => {
-      this.updateYear()
-      this.updateActivePill()
-      this.updateCohortVisibility()
-      this._pushAcaYearChange()
-    }, {passive: true})
-
-    // Listen for scroll-to-schedule events from LiveView
-    this.handleEvent("scroll-to-schedule", ({schedule_id}) => {
-      this.scrollToSchedule(schedule_id)
-    })
-  },
-
-  updated() {
-    this.updateYear()
-    this.updateActivePill()
-    this.updateCohortVisibility()
-  },
-
-  scrollToToday() {
-    const todayTh = this.el.querySelector("th[data-today-slot]")
-    if (!todayTh) return
-    const containerRect = this.el.getBoundingClientRect()
-    const thRect = todayTh.getBoundingClientRect()
-    this.el.scrollLeft += thRect.left - containerRect.left - this.stickyWidth - 8
-  },
-
-  scrollToSchedule(scheduleId) {
-    const th = this.el.querySelector(`th[data-schedule-start="${scheduleId}"]`)
-    if (!th) return
-    const containerRect = this.el.getBoundingClientRect()
-    const thRect = th.getBoundingClientRect()
-    this.el.scrollLeft += thRect.left - containerRect.left - this.stickyWidth
-    this.updateCohortVisibility()
-  },
-
-  _visibleAcaYear() {
-    const containerRect = this.el.getBoundingClientRect()
-    const firstDataX = containerRect.left + this.stickyWidth
-    const headers = this.el.querySelectorAll("th[data-slot-aca-year]")
-    for (const th of headers) {
-      if (th.getBoundingClientRect().right > firstDataX) {
-        return parseInt(th.dataset.slotAcaYear)
-      }
-    }
-    return null
-  },
-
-  _pushAcaYearChange() {
-    const acaYear = this._visibleAcaYear()
-    if (acaYear === null || acaYear === this._lastAcaYear) return
-    this._lastAcaYear = acaYear
-    clearTimeout(this._acaYearTimer)
-    this._acaYearTimer = setTimeout(() => {
-      browserLatency.measureHookEvent(this, "schedule", "view_academic_year", {aca_year: acaYear})
-    }, 300)
-  },
-
-  updateYear() {
-    if (!this.yearEl) return
-    const containerRect = this.el.getBoundingClientRect()
-    const firstDataX = containerRect.left + this.stickyWidth
-
-    const headers = this.el.querySelectorAll("th[data-slot-year]")
-    for (const th of headers) {
-      if (th.getBoundingClientRect().right > firstDataX) {
-        this.yearEl.textContent = th.dataset.slotYear
-        return
-      }
-    }
-  },
-
-  updateActivePill() {
-    const containerRect = this.el.getBoundingClientRect()
-    const firstDataX = containerRect.left + this.stickyWidth
-    let activeId = null
-
-    // Find which schedule's columns are currently visible
-    const headers = this.el.querySelectorAll("th[data-schedule-id]")
-    for (const th of headers) {
-      if (th.getBoundingClientRect().right > firstDataX) {
-        activeId = th.dataset.scheduleId
-        break
-      }
-    }
-
-    // Update pill styles
-    const pills = document.querySelectorAll("[data-schedule-pill]")
-    pills.forEach(pill => {
-      const isActive = pill.dataset.schedulePill === activeId
-      pill.classList.toggle("bg-blue-600", isActive)
-      pill.classList.toggle("text-white", isActive)
-      pill.classList.toggle("bg-gray-100", !isActive)
-      pill.classList.toggle("text-gray-700", !isActive)
-      pill.classList.toggle("dark:bg-gray-800", !isActive)
-      pill.classList.toggle("dark:text-gray-200", !isActive)
-    })
-  },
-
-  _visibleAcaYearRange() {
-    const containerRect = this.el.getBoundingClientRect()
-    const firstDataX = containerRect.left + this.stickyWidth
-    const rightEdge = containerRect.right
-    const headers = this.el.querySelectorAll("th[data-slot-aca-year]")
-    let min = null
-    let max = null
-    for (const th of headers) {
-      const rect = th.getBoundingClientRect()
-      if (rect.right < firstDataX) continue
-      if (rect.left > rightEdge) break
-      const year = parseInt(th.dataset.slotAcaYear)
-      if (min === null || year < min) min = year
-      if (max === null || year > max) max = year
-    }
-    return { min, max }
-  },
-
-  updateCohortVisibility() {
-    const { min: minAcaYear, max: maxAcaYear } = this._visibleAcaYearRange()
-    if (minAcaYear === null) return
-    const minGrad = minAcaYear
-    const maxGrad = maxAcaYear + 3
-    const rows = this.el.querySelectorAll("tr[data-cohort-graduation-year]")
-    rows.forEach(row => {
-      const gradYear = parseInt(row.dataset.cohortGraduationYear)
-      row.classList.toggle("hidden", gradYear < minGrad || gradYear > maxGrad)
-    })
-  }
-}
-
 // ResidentDrag: HTML5 drag-and-drop for moving resident names within a year group.
 // Attached to each name <td>. The input inside stays editable — drag only
 // starts when mousedown occurs on the cell itself (not inside the input).
@@ -700,6 +556,7 @@ Hooks.ResidentDrag = {
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const browserLatency = createBrowserLatencyReporter({window, document, fetch: window.fetch.bind(window), performance: window.performance, csrfToken})
+Hooks.YearTracker = createScheduleWindowHook(browserLatency)
 window.addEventListener("phx:page-loading-start", ({detail}) => browserLatency.start(detail))
 window.addEventListener("phx:page-loading-stop", ({detail}) => browserLatency.stop(detail))
 // loadEventEnd is populated after load handlers return.

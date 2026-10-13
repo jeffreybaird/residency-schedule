@@ -13,8 +13,8 @@ defmodule ResidencySchedule.Observability.RenderDiagnostics do
 
   @state {__MODULE__, :state}
   @pending {__MODULE__, :pending}
-  @flags ~w(name_col_px visible_resident_groups all_slots rotation_modal filter_year viewed_aca_year schedules unified_residents)a
-  @schedule_events ~w(scroll_to_schedule open_rotation_details close_rotation_details tour_completed restart_tour filter_year view_academic_year request_delete cancel_delete delete_schedule)
+  @flags ~w(name_col_px visible_resident_groups all_slots rotation_modal filter_year viewed_aca_year schedules unified_residents schedule_window)a
+  @schedule_events ~w(scroll_to_schedule open_rotation_details close_rotation_details tour_completed restart_tour filter_year view_academic_year request_delete cancel_delete delete_schedule update_window)
   @calendar_events ~w(set_view prev next today select_day open_day_view close_modal toggle_filter_panel toggle_resident_filter toggle_rotation_filter clear_resident_filter clear_rotation_filter restore_prefs tour_completed restart_tour)
 
   @doc false
@@ -41,21 +41,31 @@ defmodule ResidencySchedule.Observability.RenderDiagnostics do
   end
 
   @doc false
-  def assign_counts(socket, groups, slots) do
+  def assign_counts(socket, groups, slots, rendered_window \\ nil) do
     if enabled?() do
-      rows = Enum.flat_map(groups, &elem(&1, 1))
+      rendered = rendered_window || %{groups: groups, slots: slots}
 
-      counts = %{
-        "app.rows.count" => length(rows),
-        "app.slots.count" => length(slots),
-        "app.cells.count" => Enum.reduce(rows, 0, &(length(&1.cells) + &2)),
-        "app.cohorts.count" => length(groups)
-      }
+      counts =
+        Map.merge(
+          workload_counts(groups, slots, "app"),
+          workload_counts(rendered.groups, rendered.slots, "app.rendered")
+        )
 
       %{socket | private: Map.put(socket.private, :render_counts, counts)}
     else
       socket
     end
+  end
+
+  defp workload_counts(groups, slots, prefix) do
+    rows = Enum.flat_map(groups, &elem(&1, 1))
+
+    %{
+      "#{prefix}.rows.count" => length(rows),
+      "#{prefix}.slots.count" => length(slots),
+      "#{prefix}.cells.count" => Enum.reduce(rows, 0, &(length(&1.cells) + &2)),
+      "#{prefix}.cohorts.count" => length(groups)
+    }
   end
 
   @doc false

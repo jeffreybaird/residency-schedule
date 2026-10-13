@@ -9,6 +9,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   alias ResidencySchedule.Rotations
   alias ResidencySchedule.ScheduleCache
   alias ResidencySchedule.Schedules
+  alias ResidencySchedule.ScheduleWindow
   alias ResidencyScheduleWeb.DailyAssignments
 
   # Fixed pixel width for the sticky name column — must match left-[Xpx] values below.
@@ -39,19 +40,55 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   @impl true
   def handle_event("scroll_to_schedule", %{"id" => id}, socket) do
-    {:noreply,
-     socket |> assign(rotation_modal: nil) |> push_event("scroll-to-schedule", %{schedule_id: id})}
+    index = Enum.find_index(socket.assigns.all_slots, &(to_string(elem(&1, 0)) == id))
+
+    socket =
+      if index do
+        socket
+        |> assign(rotation_modal: nil)
+        |> assign_window_at_year(index, socket.assigns.schedule_window.count, index)
+      else
+        assign(socket, rotation_modal: nil)
+      end
+
+    {:noreply, push_event(socket, "scroll-to-schedule", %{schedule_id: id})}
+  end
+
+  @impl true
+  def handle_event("update_window", params, socket) do
+    socket = update_window(socket, params)
+    window = socket.assigns.schedule_window
+    {:reply, %{start: window.start, count: window.count}, socket}
   end
 
   @impl true
   def handle_event("open_rotation_details", params, socket) do
     modal = find_rotation_details(socket.assigns, Map.get(params, "cell-id"))
-    {:noreply, assign(socket, rotation_modal: modal)}
+
+    origin = %{
+      start: socket.assigns.schedule_window.start,
+      count: socket.assigns.schedule_window.count,
+      first: socket.assigns.window_first
+    }
+
+    {:noreply, assign(socket, rotation_modal: modal, modal_origin: origin)}
   end
 
   @impl true
   def handle_event("close_rotation_details", _params, socket) do
-    {:noreply, assign(socket, rotation_modal: nil)}
+    case socket.assigns.rotation_modal do
+      nil ->
+        {:noreply, socket}
+
+      modal ->
+        origin = socket.assigns.modal_origin
+
+        {:noreply,
+         socket
+         |> assign(rotation_modal: nil)
+         |> assign_window_at_year(origin.start, origin.count, origin.first)
+         |> push_event("restore-schedule-focus", %{cell_id: modal.cell_id, index: origin.first})}
+    end
   end
 
   @impl true
@@ -256,8 +293,33 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           </div>
         </div>
 
-        <div id="gantt-scroll" phx-hook="YearTracker" class="overflow-x-auto">
-          <table class="border-separate border-spacing-0 text-xs">
+        <div
+          id="gantt-scroll"
+          phx-hook="YearTracker"
+          class="overflow-x-auto"
+          tabindex="0"
+          role="region"
+          aria-label="Schedule timeline"
+          data-slot-metadata={@slot_metadata}
+          data-today-index={@today_index}
+          data-window-start={@schedule_window.start}
+          data-window-count={@schedule_window.count}
+          data-slot-width="80"
+          data-name-width={@name_col_px}
+        >
+          <table
+            class="table-fixed border-separate border-spacing-0 text-xs"
+            style={"width: #{@name_col_px + @schedule_window.total * 80}px"}
+          >
+            <colgroup>
+              <col style={"width: #{@name_col_px}px"} />
+              <col :if={@schedule_window.left_px > 0} style={"width: #{@schedule_window.left_px}px"} />
+              <col :for={_ <- @schedule_window.slots} style="width: 80px" />
+              <col
+                :if={@schedule_window.right_px > 0}
+                style={"width: #{@schedule_window.right_px}px"}
+              />
+            </colgroup>
             <thead>
               <tr class="bg-gray-100 dark:bg-gray-800 sticky top-0 z-30">
                 <th
@@ -266,12 +328,19 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 >
                   Name
                 </th>
-                <%= for {schedule_id, _idx, start_date, end_date, first_in_schedule?} <- @all_slots do %>
+                <th
+                  :if={@schedule_window.left_px > 0}
+                  data-window-spacer="left"
+                  aria-hidden="true"
+                  class="p-0"
+                >
+                </th>
+                <%= for {schedule_id, _idx, start_date, end_date, first_in_schedule?} <- @schedule_window.slots do %>
                   <% slot_past = Date.compare(end_date, @today) == :lt %>
                   <% slot_today = not slot_past and Date.compare(start_date, @today) != :gt %>
                   <th
                     class={[
-                      "px-1 py-2 text-center font-medium border-b border-gray-200 dark:border-gray-700 whitespace-nowrap",
+                      "px-1 py-2 h-12 text-center font-medium border-b border-gray-200 dark:border-gray-700 whitespace-normal overflow-hidden",
                       if(slot_past,
                         do: "text-gray-300 dark:text-gray-500",
                         else: "text-gray-500 dark:text-gray-300"
@@ -281,7 +350,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                         else: ""
                       )
                     ]}
-                    style="min-width: 52px"
+                    style="width: 80px; max-width: 80px"
                     data-slot-year={start_date.year}
                     data-slot-aca-year={
                       if start_date.month >= 7, do: start_date.year, else: start_date.year - 1
@@ -293,10 +362,17 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                     {slot_header_label(start_date, end_date)}
                   </th>
                 <% end %>
+                <th
+                  :if={@schedule_window.right_px > 0}
+                  data-window-spacer="right"
+                  aria-hidden="true"
+                  class="p-0"
+                >
+                </th>
               </tr>
             </thead>
             <tbody>
-              <%= for {graduation_year, year_residents} <- @visible_resident_groups do %>
+              <%= for {graduation_year, year_residents} <- @schedule_window.groups do %>
                 <% cohort_level = hd(year_residents).cohort_level %>
                 <% initially_hidden = cohort_level not in 1..4 %>
                 <tr
@@ -313,7 +389,14 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                   >
                     {cohort_separator_label(cohort_level, graduation_year)}
                   </td>
-                  <td colspan="9999" class="bg-gray-100 dark:bg-gray-800"></td>
+                  <td
+                    colspan={
+                      @schedule_window.count + if(@schedule_window.left_px > 0, do: 1, else: 0) +
+                        if(@schedule_window.right_px > 0, do: 1, else: 0)
+                    }
+                    class="bg-gray-100 dark:bg-gray-800"
+                  >
+                  </td>
                 </tr>
                 <%= for resident <- year_residents do %>
                   <tr
@@ -336,15 +419,29 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                         {resident.name}
                       </.link>
                     </td>
+                    <td
+                      :if={@schedule_window.left_px > 0}
+                      data-window-spacer="left"
+                      aria-hidden="true"
+                      class="p-0"
+                    >
+                    </td>
                     <%= for {colspan, rotation} <- resident.cells do %>
                       <% past = rotation != nil && Date.compare(rotation.end_date, @today) == :lt %>
                       <td
                         colspan={colspan}
-                        class="px-0.5 py-0.5 text-center border-r border-gray-100 dark:border-gray-700"
+                        class="px-0.5 py-0.5 text-center border-r border-gray-100 dark:border-gray-700 overflow-hidden"
                       >
                         <.rotation_cell rotation={rotation} past={past} />
                       </td>
                     <% end %>
+                    <td
+                      :if={@schedule_window.right_px > 0}
+                      data-window-spacer="right"
+                      aria-hidden="true"
+                      class="p-0"
+                    >
+                    </td>
                   </tr>
                 <% end %>
               <% end %>
@@ -433,10 +530,28 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   def load_all_schedules(socket, today) do
     Tracing.phase(:schedule_load, fn ->
       prepared = ScheduleCache.fetch(today, fn -> prepare_all_schedules(today) end)
+      start = ScheduleWindow.initial_start(prepared.all_slots, today)
+
+      today_index =
+        Enum.find_index(prepared.all_slots, fn {_, _, first, last, _} ->
+          Date.compare(first, today) != :gt and Date.compare(last, today) != :lt
+        end)
+
+      metadata =
+        Enum.map(prepared.all_slots, fn {schedule_id, _, date, _, _} ->
+          [date.year, academic_year_for(date), schedule_id]
+        end)
 
       socket
       |> assign(prepared)
-      |> assign(rotation_modal: nil, filter_year: nil)
+      |> assign(
+        rotation_modal: nil,
+        filter_year: nil,
+        schedule_window: %{start: start, count: 40},
+        window_first: today_index || 0,
+        today_index: today_index || -1,
+        slot_metadata: Jason.encode!(metadata)
+      )
       |> assign_visible_resident_groups()
     end)
   end
@@ -588,22 +703,69 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
         socket.assigns.viewed_aca_year
       )
 
-    refresh_counts? =
-      socket.assigns[:visible_resident_groups] != groups or
-        not Map.has_key?(socket.private, :render_counts) or
-        Map.has_key?(socket.assigns.__changed__ || %{}, :all_slots)
+    socket
+    |> assign(visible_resident_groups: groups)
+    |> assign_window(socket.assigns.schedule_window.start, socket.assigns.schedule_window.count)
+  end
 
-    socket = assign(socket, visible_resident_groups: groups)
+  defp assign_window(socket, start, count) do
+    window =
+      ScheduleWindow.build(
+        socket.assigns.all_slots,
+        socket.assigns.visible_resident_groups,
+        start,
+        count
+      )
+
+    refresh_counts? =
+      socket.assigns.schedule_window != window or not Map.has_key?(socket.private, :render_counts)
+
+    socket = assign(socket, schedule_window: window)
 
     if refresh_counts?,
       do:
         RenderDiagnostics.assign_counts(
           socket,
-          groups,
-          socket.assigns.all_slots
+          socket.assigns.visible_resident_groups,
+          socket.assigns.all_slots,
+          window
         ),
       else: socket
   end
+
+  defp update_window(socket, params) do
+    with {:ok, start} <- parse_window_integer(params["start"]),
+         {:ok, count} <- parse_window_integer(params["count"]),
+         {:ok, first} <- parse_window_integer(params["first"]),
+         range = ScheduleWindow.build(socket.assigns.all_slots, [], start, count),
+         true <- first >= range.start and first < range.finish do
+      assign_window_at_year(socket, range.start, range.count, first)
+    else
+      _ -> socket
+    end
+  end
+
+  defp assign_window_at_year(socket, start, count, first) do
+    {_, _, date, _, _} = Enum.at(socket.assigns.all_slots, first)
+    year = academic_year_for(date)
+    groups = residents_by_year(socket.assigns.unified_residents, socket.assigns.filter_year, year)
+
+    socket
+    |> assign(window_first: first, viewed_aca_year: year, visible_resident_groups: groups)
+    |> assign_window(start, count)
+  end
+
+  defp parse_window_integer(value) when is_integer(value), do: {:ok, value}
+
+  defp parse_window_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {number, ""} -> {:ok, number}
+      _ -> :error
+    end
+  end
+
+  defp parse_window_integer(_), do: :error
+  defp academic_year_for(date), do: if(date.month >= 7, do: date.year, else: date.year - 1)
 
   defp residents_by_year(unified_residents, filter_year, viewed_aca_year) do
     unified_residents
@@ -878,8 +1040,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           phx-value-cell-id={rotation.cell_id}
           aria-haspopup="dialog"
           aria-label={"View #{Rotations.assignment_label(rotation)} details"}
+          title={Rotations.assignment_label(rotation)}
           class={[
-            "inline-block rounded px-1 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:ring-1 focus-visible:ring-2 focus-visible:ring-blue-500",
+            "inline-block max-w-full overflow-hidden text-ellipsis rounded px-1 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:ring-1 focus-visible:ring-2 focus-visible:ring-blue-500",
             @past && "opacity-40",
             Rotations.rotation_type_color(rotation.rotation_type)
           ]}

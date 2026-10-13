@@ -13,7 +13,7 @@ defmodule ResidencyScheduleWeb.RenderDiagnosticsTest do
   alias ResidencyScheduleWeb.{CalendarLive, LiveSerializer, ScheduleLive}
 
   @secret "PRIVATE_RENDER_DIAGNOSTICS_SENTINEL"
-  @flags ~w(name_col_px visible_resident_groups all_slots rotation_modal filter_year viewed_aca_year schedules unified_residents)a
+  @flags ~w(name_col_px visible_resident_groups all_slots rotation_modal filter_year viewed_aca_year schedules unified_residents schedule_window)a
 
   setup :authenticate_session
 
@@ -71,6 +71,10 @@ defmodule ResidencyScheduleWeb.RenderDiagnosticsTest do
     assert attrs["app.cells.count"] == 3
     assert attrs["app.slots.count"] == 4
     assert attrs["app.cohorts.count"] == 1
+    assert attrs["app.rendered.rows.count"] == 1
+    assert attrs["app.rendered.slots.count"] == 2
+    assert attrs["app.rendered.cells.count"] == 1
+    assert attrs["app.rendered.cohorts.count"] == 1
 
     assert is_integer(attrs["app.process.reductions.delta"]) and
              attrs["app.process.reductions.delta"] > 0
@@ -79,10 +83,11 @@ defmodule ResidencyScheduleWeb.RenderDiagnosticsTest do
 
     expected =
       ~w(view operation lifecycle db.query.count db.query.duration_ms db.queue.duration_ms db.decode.duration_ms db.total.duration_ms db.query.coverage app.spans.dropped app.render.sequence app.render.initial app.render.force app.render.changed app.render.trigger app.render.event deployment.sha app.rows.count app.slots.count app.cells.count app.cohorts.count app.process.reductions.delta app.process.memory.before_bytes app.process.memory.after_bytes app.process.mailbox.before_count app.process.mailbox.after_count) ++
+        ~w(app.rendered.rows.count app.rendered.slots.count app.rendered.cells.count app.rendered.cohorts.count) ++
         Enum.map(@flags, &"app.render.changed.#{&1}")
 
     assert Enum.sort(Map.keys(attrs)) == Enum.sort(expected)
-    assert map_size(attrs) == 34
+    assert map_size(attrs) == 39
     assert attrs["deployment.sha"] == Observability.deployment_version()
   end
 
@@ -307,7 +312,8 @@ defmodule ResidencyScheduleWeb.RenderDiagnosticsTest do
     RenderDiagnostics.assign_counts(
       socket,
       [{2028, [%{cells: [{1, nil}, {1, nil}]}, %{cells: [{1, nil}]}]}],
-      [1, 2, 3, 4]
+      [1, 2, 3, 4],
+      %{slots: [1, 2], groups: [{2028, [%{cells: [{2, nil}]}]}]}
     )
   end
 
