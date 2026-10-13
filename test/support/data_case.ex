@@ -16,6 +16,7 @@ defmodule ResidencySchedule.DataCase do
 
   use ExUnit.CaseTemplate
 
+  alias Ecto.Adapters.SQL
   alias Ecto.Adapters.SQL.Sandbox
   alias ResidencySchedule.Importer.ScheduleImporter
 
@@ -73,6 +74,16 @@ defmodule ResidencySchedule.DataCase do
   def setup_sandbox(tags) do
     pid = Sandbox.start_owner!(ResidencySchedule.Repo, shared: not tags[:async])
     on_exit(fn -> Sandbox.stop_owner(pid) end)
+
+    # Sandbox transactions never publish shared cache entries. Avoid serializing
+    # independent fixtures on the production revision row for their whole lifetime.
+    SQL.query!(
+      ResidencySchedule.Repo.get_dynamic_repo(),
+      "SELECT set_config('residency_schedule.skip_cache_revision', 'on', true)",
+      []
+    )
+
+    :ok
   end
 
   @doc """

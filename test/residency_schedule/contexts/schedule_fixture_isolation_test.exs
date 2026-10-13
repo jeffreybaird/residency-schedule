@@ -31,6 +31,7 @@ defmodule ResidencySchedule.ScheduleFixtureIsolationTest do
     :ok = Sandbox.checkout(Repo)
 
     try do
+      Repo.query!("SELECT set_config('residency_schedule.skip_cache_revision', 'on', true)")
       %{rows: [[backend]]} = Repo.query!("SELECT pg_backend_pid()")
       {:ok, _} = Schedules.upsert_schedule(first, Schedules.academic_year_label(first))
       send(parent, {:ready, label, backend})

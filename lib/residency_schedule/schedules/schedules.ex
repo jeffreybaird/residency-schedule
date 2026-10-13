@@ -5,6 +5,7 @@ defmodule ResidencySchedule.Schedules do
   alias ResidencySchedule.DetailedSchedules
   alias ResidencySchedule.Repo
   alias ResidencySchedule.Residents
+  alias ResidencySchedule.ScheduleCache.Revision
   alias ResidencySchedule.Schedules.Schedule
 
   @doc """
@@ -73,6 +74,7 @@ defmodule ResidencySchedule.Schedules do
   """
   def delete_schedule(id) do
     Repo.transaction(fn ->
+      Revision.lock()
       schedule = Repo.one(from s in Schedule, where: s.id == ^id, lock: "FOR UPDATE")
       if is_nil(schedule), do: Repo.rollback(:not_found)
 
