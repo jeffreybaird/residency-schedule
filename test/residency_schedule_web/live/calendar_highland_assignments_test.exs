@@ -183,7 +183,8 @@ defmodule ResidencyScheduleWeb.CalendarHighlandAssignmentsTest do
     assert has_element?(month, day_cell() <> " span[title='Oncology']")
   end
 
-  test "unclassified tasks remain visible when their base rotation is excluded", ctx do
+  test "unclassified tasks are excluded with their base rotation until filters are cleared",
+       ctx do
     import_task("HH Nights 3rd Call")
 
     {:ok, _} =
@@ -200,13 +201,20 @@ defmodule ResidencyScheduleWeb.CalendarHighlandAssignmentsTest do
     render_click(view, "toggle_rotation_filter", %{"type" => @night_type})
     refute has_element?(view, "#day-activities [data-rotation-type='oncology']")
 
-    assert has_element?(
+    refute has_element?(
              view,
              "#day-activities [data-resident-id='#{ctx.iris.resident_id}']",
              "HH Nights 3rd Call"
            )
 
-    assert has_element?(view, "#day-activities h3", "Daily assignments")
+    refute has_element?(view, "#day-activities h3", "Daily assignments")
+    render_click(view, "clear_rotation_filter", %{})
+
+    assert has_element?(
+             view,
+             "#day-activities [data-rotation-type='oncology']",
+             "HH Nights 3rd Call"
+           )
   end
 
   test "a matching Saturday Night Float base does not gain a duplicate Weekend Nights category",

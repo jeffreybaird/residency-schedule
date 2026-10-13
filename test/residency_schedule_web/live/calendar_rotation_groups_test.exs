@@ -101,6 +101,87 @@ defmodule ResidencyScheduleWeb.CalendarRotationGroupsTest do
       data
     end
 
+    test "rotation filters exclude unrelated daily assignments while retaining selected residents' clinics",
+         ctx do
+      workbook =
+        mutate_detail_workbook(
+          "xl/sharedStrings.xml",
+          fn xml ->
+            xml
+            |> String.replace("December 30, 2026", "December 29, 2026")
+            |> String.replace("December 31, 2026", "December 29, 2026")
+          end
+        )
+
+      {:ok, preview} = detail_preview(workbook)
+      {:ok, _} = DetailedSchedules.commit(preview, admin_user())
+
+      for {resident, type} <- [{ctx.iris, :oncology}, {ctx.stone, :elective}] do
+        {:ok, _} =
+          Rotations.insert_rotations(resident.id, [
+            %{
+              slot_index: 1,
+              start_date: ~D[2026-12-29],
+              end_date: ~D[2026-12-29],
+              rotation_type: type
+            }
+          ])
+      end
+
+      for mode <- ["day", "month", "week"] do
+        {:ok, view, _} = live(ctx.conn, "/calendar?view=#{mode}&date=2026-12-29")
+        if mode != "day", do: open_day(view, "2026-12-29")
+
+        assert has_element?(
+                 view,
+                 "#day-activities [data-resident-id='#{ctx.juniper.resident_id}']",
+                 "Sick Backup"
+               )
+
+        render_click(view, "toggle_rotation_filter", %{"type" => "oncology"})
+        assert group_types(view) == ["oncology"]
+
+        assert has_element?(
+                 view,
+                 group(:oncology) <> " [data-resident-id='#{ctx.iris.resident_id}']",
+                 "GOG Continuity Clinic PM"
+               )
+
+        assert has_element?(view, group(:oncology), "Bring simulation kit")
+
+        refute has_element?(
+                 view,
+                 "#day-activities [data-resident-id='#{ctx.juniper.resident_id}']"
+               )
+
+        refute has_element?(view, "#day-activities [data-resident-id='#{ctx.stone.resident_id}']")
+        refute has_element?(view, "#day-activities h3", "Daily assignments")
+
+        render_click(view, "toggle_rotation_filter", %{"type" => "elective"})
+        assert group_types(view) == ["elective", "oncology"]
+
+        assert has_element?(
+                 view,
+                 group(:elective) <> " [data-resident-id='#{ctx.stone.resident_id}']"
+               )
+
+        refute has_element?(
+                 view,
+                 "#day-activities [data-resident-id='#{ctx.juniper.resident_id}']"
+               )
+
+        render_click(view, "clear_rotation_filter", %{})
+
+        assert has_element?(
+                 view,
+                 "#day-activities [data-resident-id='#{ctx.juniper.resident_id}']",
+                 "Sick Backup"
+               )
+
+        assert has_element?(view, group(:strong_gynecology))
+      end
+    end
+
     test "residents sharing a rotation retain their own daily tasks and notes", ctx do
       {:ok, _} =
         Rotations.insert_rotations(ctx.stone.id, [
