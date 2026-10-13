@@ -134,6 +134,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       id="guided-tour"
       phx-hook="GuidedTour"
       data-tour-page="schedule"
+      data-latency-view="schedule"
       data-tour-role={to_string(@current_user.role)}
       class="min-h-screen bg-gray-50 dark:bg-gray-950"
     >
@@ -146,7 +147,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           <%= for s <- @schedules do %>
             <div class="flex items-center gap-0.5">
               <button
-                phx-click="scroll_to_schedule"
+                data-action="scroll_to_schedule"
+                phx-click={JS.push("scroll_to_schedule", page_loading: true)}
                 phx-value-id={s.id}
                 class={[
                   "px-3 py-1 text-sm font-medium transition-colors",
@@ -159,7 +161,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
               </button>
               <%= if @is_admin do %>
                 <button
-                  phx-click="request_delete"
+                  data-action="request_delete"
+                  phx-click={JS.push("request_delete", page_loading: true)}
                   phx-value-id={s.id}
                   class="px-1.5 py-1 rounded-r-full text-sm font-medium transition-colors bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700 dark:hover:text-red-300"
                   title={"Delete #{s.label}"}
@@ -173,7 +176,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           <%= if @delete_confirm_id do %>
             <% target = Enum.find(@schedules, &(&1.id == @delete_confirm_id)) %>
             <form
-              phx-submit="delete_schedule"
+              data-action="delete_schedule"
+              phx-submit={JS.push("delete_schedule", page_loading: true)}
               class="flex items-center gap-2 ml-2 pl-3 border-l border-gray-200 dark:border-gray-700"
             >
               <input type="hidden" name="schedule_id" value={@delete_confirm_id} />
@@ -200,7 +204,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
               </button>
               <button
                 type="button"
-                phx-click="cancel_delete"
+                data-action="cancel_delete"
+                phx-click={JS.push("cancel_delete", page_loading: true)}
                 class="px-3 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >
                 Cancel
@@ -215,7 +220,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           <div id="tour-year-filter" class="flex flex-wrap items-center gap-2">
             <span class="text-sm text-gray-500 dark:text-gray-300 font-medium">Year:</span>
             <button
-              phx-click="filter_year"
+              id="schedule-year-all"
+              data-action="filter_year"
+              phx-click={JS.push("filter_year", page_loading: true)}
               phx-value-year="all"
               class={filter_tab_class(@filter_year, nil)}
             >
@@ -223,7 +230,9 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
             </button>
             <%= for y <- 1..4 do %>
               <button
-                phx-click="filter_year"
+                id={"schedule-year-#{y}"}
+                data-action="filter_year"
+                phx-click={JS.push("filter_year", page_loading: true)}
                 phx-value-year={y}
                 class={filter_tab_class(@filter_year, y)}
               >
@@ -234,7 +243,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
           <div class="ml-auto flex items-center gap-3">
             <button
-              phx-click="restart_tour"
+              data-action="restart_tour"
+              phx-click={JS.push("restart_tour", page_loading: true)}
               class="text-sm text-blue-500 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
               title="Take a guided tour"
             >
@@ -370,7 +380,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
         >
           <div
             data-role="backdrop"
-            phx-click="close_rotation_details"
+            data-action="close_rotation_details"
+            phx-click={JS.push("close_rotation_details", page_loading: true)}
             class="absolute inset-0 bg-black/40"
             aria-hidden="true"
           >
@@ -400,7 +411,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
                 id="gantt-close-details"
                 type="button"
                 aria-label="Close"
-                phx-click="close_rotation_details"
+                data-action="close_rotation_details"
+                phx-click={JS.push("close_rotation_details", page_loading: true)}
                 class="rounded p-2 hover:bg-gray-100 dark:hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 ×
@@ -746,7 +758,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
           id={"gantt-pill-#{rotation.cell_id}"}
           type="button"
           data-rotation-id={rotation.id}
-          phx-click="open_rotation_details"
+          data-action="open_rotation_details"
+          phx-click={JS.push("open_rotation_details", page_loading: true)}
           phx-value-cell-id={rotation.cell_id}
           aria-haspopup="dialog"
           aria-label={"View #{Rotations.assignment_label(rotation)} details"}

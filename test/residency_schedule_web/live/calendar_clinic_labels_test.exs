@@ -120,7 +120,8 @@ defmodule ResidencyScheduleWeb.CalendarClinicLabelsTest do
     {:ok, view, _} = live(conn, "/calendar?view=#{mode}&date=#{date}")
 
     if mode != "day",
-      do: view |> element("[phx-click='select_day'][phx-value-date='#{date}']") |> render_click()
+      do:
+        view |> element("[data-action='select_day'][phx-value-date='#{date}']") |> render_click()
 
     view
   end

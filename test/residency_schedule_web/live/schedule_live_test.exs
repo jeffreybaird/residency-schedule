@@ -271,22 +271,22 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
 
     test "deletes the schedule with the admin's account password", %{view: view} do
-      view |> element("button[phx-click='request_delete']") |> render_click()
+      view |> element("button[data-action='request_delete']") |> render_click()
 
       html =
         view
-        |> form("form[phx-submit='delete_schedule']", %{"password" => "adminsecret99"})
+        |> form("form[data-action='delete_schedule']", %{"password" => "adminsecret99"})
         |> render_submit()
 
       assert html =~ "No schedule uploaded yet"
     end
 
     test "rejects a wrong password", %{view: view} do
-      view |> element("button[phx-click='request_delete']") |> render_click()
+      view |> element("button[data-action='request_delete']") |> render_click()
 
       html =
         view
-        |> form("form[phx-submit='delete_schedule']", %{"password" => "not-the-password"})
+        |> form("form[data-action='delete_schedule']", %{"password" => "not-the-password"})
         |> render_submit()
 
       assert html =~ "Incorrect password."
@@ -306,11 +306,11 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
 
     test "refuses deletion and points at the Admin page", %{view: view} do
-      view |> element("button[phx-click='request_delete']") |> render_click()
+      view |> element("button[data-action='request_delete']") |> render_click()
 
       html =
         view
-        |> form("form[phx-submit='delete_schedule']", %{"password" => "anything"})
+        |> form("form[data-action='delete_schedule']", %{"password" => "anything"})
         |> render_submit()
 
       assert html =~ "Set a password for your account on the Admin page first."

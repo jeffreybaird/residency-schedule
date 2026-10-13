@@ -60,7 +60,7 @@ defmodule ResidencyScheduleWeb.CalendarHighlandAssignmentsTest do
 
     assert has_element?(
              week,
-             "button[phx-click='toggle_rotation_filter'][phx-value-type='#{@night_type}']",
+             "button[data-action='toggle_rotation_filter'][phx-value-type='#{@night_type}']",
              @label
            )
 
@@ -261,7 +261,7 @@ defmodule ResidencyScheduleWeb.CalendarHighlandAssignmentsTest do
 
   defp group, do: "#day-activities [data-rotation-type='#{@night_type}']"
   defp person(resident), do: group() <> " [data-resident-id='#{resident.resident_id}']"
-  defp day_cell, do: "[phx-click='select_day'][phx-value-date='#{@day}']"
+  defp day_cell, do: "[data-action='select_day'][phx-value-date='#{@day}']"
   defp open_day(view), do: view |> element(day_cell()) |> render_click()
 
   defp import_task(task) do

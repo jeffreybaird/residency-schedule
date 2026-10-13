@@ -150,7 +150,7 @@ defmodule ResidencyScheduleWeb.DemoModeTest do
 
       html = render_click(view, "request_delete", %{"id" => to_string(schedule.id)})
 
-      refute html =~ ~s(phx-submit="delete_schedule")
+      refute html =~ ~s(data-action="delete_schedule")
     end
 
     test "the walkthrough auto-starts for a demo visitor" do

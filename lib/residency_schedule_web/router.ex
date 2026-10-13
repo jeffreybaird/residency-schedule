@@ -108,6 +108,7 @@ defmodule ResidencyScheduleWeb.Router do
       get "/residents/:id/calendar.ics", IcalController, :show
       post "/set-home/:resident_id", AuthController, :set_home
       post "/unset-home", AuthController, :unset_home
+      post "/observability/browser-latency", BrowserLatencyController, :create
     end
   end
 

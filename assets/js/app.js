@@ -24,6 +24,7 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import {buildTour, consumeTourState} from "./tour.js"
+import {createBrowserLatencyReporter} from "./browser_latency.js"
 
 // YearTracker: updates a DOM element with the calendar year of the leftmost
 // visible data column in the Gantt scroll container as the user scrolls.
@@ -80,10 +81,13 @@ Hooks.GuidedTour = {
   // LiveView, so it is closed here, and nothing is pushed to a view that is
   // already gone.
   destroyed() {
+    browserLatency.cancelHook(this)
     window.removeEventListener("start-tour", this._startTour)
     this._gone = true
     if (this._tour && this._tour.isActive()) this._tour.cancel()
   },
+
+  disconnected() { browserLatency.cancelHook(this) },
 
   // localStorage can throw or be unavailable (private mode, blocked cookies).
   // Failing to read means "not seen", so the tour still runs.
@@ -117,13 +121,13 @@ Hooks.GuidedTour = {
     this._tour = tour
     tour.on("complete", () => {
       this._markDemoTourSeen()
-      if (!this._gone) this.pushEvent("tour_completed", {})
+      if (!this._gone) browserLatency.measureHookEvent(this, this._page, "tour_completed", {})
     })
     tour.on("cancel", () => {
       // Navigation cancels save state before calling cancel — don't mark complete
       if (!sessionStorage.getItem("guided_tour_state")) {
         this._markDemoTourSeen()
-        if (!this._gone) this.pushEvent("tour_completed", {})
+        if (!this._gone) browserLatency.measureHookEvent(this, this._page, "tour_completed", {})
       }
     })
     tour.start()
@@ -139,9 +143,12 @@ Hooks.CalendarPrefs = {
 
   mounted() {
     const saved = this.read()
-    if (saved) this.pushEvent("restore_prefs", saved)
+    if (saved) browserLatency.measureHookEvent(this, "calendar", "restore_prefs", saved)
     this.handleEvent("save_calendar_prefs", prefs => this.write(prefs))
   },
+
+  disconnected() { browserLatency.cancelHook(this) },
+  destroyed() { browserLatency.cancelHook(this) },
 
   read() {
     try {
@@ -165,6 +172,7 @@ Hooks.CalendarPrefs = {
 // moves to the next/previous period. The LiveView's "prev"/"next" events are
 // already view-aware (day/week/month), so the hook just pushes them.
 Hooks.CalendarSwipe = {
+  disconnected() { browserLatency.cancelHook(this) },
   mounted() {
     this.startX = null
     this.startY = null
@@ -194,7 +202,7 @@ Hooks.CalendarSwipe = {
       if (Math.abs(dy) > Math.abs(dx) * MAX_VERTICAL_RATIO) return
 
       // Swipe left → forward (next); swipe right → backward (prev).
-      this.pushEvent(dx < 0 ? "next" : "prev", {})
+      browserLatency.measureHookEvent(this, "calendar", dx < 0 ? "next" : "prev", {})
     }
 
     this.el.addEventListener("touchstart", this._onTouchStart, {passive: true})
@@ -202,6 +210,7 @@ Hooks.CalendarSwipe = {
   },
 
   destroyed() {
+    browserLatency.cancelHook(this)
     this.el.removeEventListener("touchstart", this._onTouchStart)
     this.el.removeEventListener("touchend", this._onTouchEnd)
   }
@@ -210,6 +219,7 @@ Hooks.CalendarSwipe = {
 // Positions #service-filter-panel with fixed coordinates under #service-filter-toggle so the
 // menu is not clipped by #rotation-table-scroll (overflow-auto).
 Hooks.ServiceFilterAnchored = {
+  disconnected() { browserLatency.cancelHook(this) },
   mounted() {
     this._position = () => this.positionPanel()
     this.scheduleAlignPanel = () => {
@@ -224,7 +234,7 @@ Hooks.ServiceFilterAnchored = {
       const toggle = document.getElementById("service-filter-toggle")
       if (!panel) return
       if ((toggle && toggle.contains(e.target)) || panel.contains(e.target)) return
-      this.pushEvent("close_service_filter_menu", {})
+      browserLatency.measureHookEvent(this, "schedule", "close_service_filter_menu", {})
     }
     document.addEventListener("click", this._docClick, true)
     // After LiveView patches DOM, hook updated() runs *after* phx:update; defer past ScrollToToday et al.
@@ -251,6 +261,7 @@ Hooks.ServiceFilterAnchored = {
     this.scheduleAlignPanel()
   },
   destroyed() {
+    browserLatency.cancelHook(this)
     document.removeEventListener("click", this._docClick, true)
     document.removeEventListener("phx:update", this._phxUpdate)
     window.removeEventListener("resize", this._position)
@@ -362,6 +373,11 @@ Hooks.ScrollToToday = {
 }
 
 Hooks.YearTracker = {
+  disconnected() { browserLatency.cancelHook(this) },
+  destroyed() {
+    browserLatency.cancelHook(this)
+    clearTimeout(this._acaYearTimer)
+  },
   mounted() {
     this._lastAcaYear = null
     this._acaYearTimer = null
@@ -425,7 +441,7 @@ Hooks.YearTracker = {
     this._lastAcaYear = acaYear
     clearTimeout(this._acaYearTimer)
     this._acaYearTimer = setTimeout(() => {
-      this.pushEvent("view_academic_year", {aca_year: acaYear})
+      browserLatency.measureHookEvent(this, "schedule", "view_academic_year", {aca_year: acaYear})
     }, 300)
   },
 
@@ -683,11 +699,19 @@ Hooks.ResidentDrag = {
 }
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
+const browserLatency = createBrowserLatencyReporter({window, document, fetch: window.fetch.bind(window), performance: window.performance, csrfToken})
+window.addEventListener("phx:page-loading-start", ({detail}) => browserLatency.start(detail))
+window.addEventListener("phx:page-loading-stop", ({detail}) => browserLatency.stop(detail))
+// loadEventEnd is populated after load handlers return.
+window.addEventListener("load", () => setTimeout(() => browserLatency.reportPageLoad(), 0), {once: true})
+if (document.readyState === "complete") browserLatency.reportPageLoad()
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
   hooks: {...Hooks},
 })
+liveSocket.getSocket().onClose(() => browserLatency.clear())
+liveSocket.getSocket().onError(() => browserLatency.clear())
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})

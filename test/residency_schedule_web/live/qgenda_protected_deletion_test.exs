@@ -39,10 +39,10 @@ defmodule ResidencyScheduleWeb.QgendaProtectedDeletionTest do
   test "schedule delete shows an actionable error after valid password confirmation", ctx do
     before = snapshot()
     {:ok, view, _} = live(ctx.conn, "/schedule")
-    view |> element("button[phx-click='request_delete']") |> render_click()
+    view |> element("button[data-action='request_delete']") |> render_click()
 
     view
-    |> form("form[phx-submit='delete_schedule']", %{"password" => "synthetic-admin-password"})
+    |> form("form[data-action='delete_schedule']", %{"password" => "synthetic-admin-password"})
     |> render_submit()
 
     assert has_element?(view, "#schedule-delete-error", "QGenda")
