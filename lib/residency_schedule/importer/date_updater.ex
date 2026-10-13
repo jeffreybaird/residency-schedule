@@ -10,6 +10,7 @@ defmodule ResidencySchedule.Importer.DateUpdater do
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Residents.ScheduleResident
   alias ResidencySchedule.Rotations.Rotation
+  alias ResidencySchedule.ScheduleCache.Revision
   alias ResidencySchedule.Schedules
   alias ResidencySchedule.ShiftOverrides.ShiftOverride
 
@@ -44,6 +45,8 @@ defmodule ResidencySchedule.Importer.DateUpdater do
   """
   def commit(parsed, year, links) do
     Repo.transaction(fn ->
+      Revision.lock()
+
       schedule =
         case target_schedule(year) do
           {:ok, schedule} ->

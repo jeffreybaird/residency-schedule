@@ -14,6 +14,7 @@ defmodule ResidencySchedule.Application do
         [
           ResidencyScheduleWeb.Telemetry,
           ResidencySchedule.Repo,
+          ResidencySchedule.ScheduleCache,
           {DNSCluster,
            query: Application.get_env(:residency_schedule, :dns_cluster_query) || :ignore},
           {Phoenix.PubSub, name: ResidencySchedule.PubSub}

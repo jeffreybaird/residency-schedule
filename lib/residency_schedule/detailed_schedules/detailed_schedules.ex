@@ -13,6 +13,7 @@ defmodule ResidencySchedule.DetailedSchedules do
   alias ResidencySchedule.Repo
   alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents.{Resident, ScheduleResident}
+  alias ResidencySchedule.ScheduleCache.Revision
   alias ResidencySchedule.Schedules.Schedule
 
   @doc """
@@ -21,6 +22,7 @@ defmodule ResidencySchedule.DetailedSchedules do
   """
   def commit(%{schedule_id: schedule_id, academic_year: year} = preview, %User{id: user_id}) do
     Repo.transaction(fn ->
+      Revision.lock()
       require_admin(user_id)
       schedule = Repo.one(from s in Schedule, where: s.id == ^schedule_id, lock: "FOR UPDATE")
 

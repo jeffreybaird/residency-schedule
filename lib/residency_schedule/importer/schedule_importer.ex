@@ -16,6 +16,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Residents.ScheduleResident
   alias ResidencySchedule.Rotations
+  alias ResidencySchedule.ScheduleCache.Revision
   alias ResidencySchedule.Schedules
 
   import Ecto.Query
@@ -184,6 +185,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
     label = Schedules.academic_year_label(academic_year)
 
     Repo.transaction(fn ->
+      Revision.lock()
       {:ok, schedule} = Schedules.upsert_schedule(academic_year, label)
 
       if DetailedSchedules.has_detail?(schedule.id),

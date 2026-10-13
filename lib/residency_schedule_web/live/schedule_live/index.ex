@@ -7,6 +7,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
+  alias ResidencySchedule.ScheduleCache
   alias ResidencySchedule.Schedules
   alias ResidencyScheduleWeb.DailyAssignments
 
@@ -15,20 +16,8 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    schedules = Schedules.list_schedules()
     today = current_date()
-
-    socket =
-      if schedules != [] do
-        load_all_schedules(socket, schedules, today)
-      else
-        assign(socket,
-          schedules: [],
-          all_slots: [],
-          unified_residents: [],
-          filter_year: nil
-        )
-      end
+    socket = load_all_schedules(socket, today)
 
     {:ok,
      assign(socket,
@@ -433,11 +422,18 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   # --- Private helpers ---
 
   @doc false
-  def load_all_schedules(socket, schedules, today) do
-    Tracing.phase(:schedule_load, fn -> assign_all_schedules(socket, schedules, today) end)
+  def load_all_schedules(socket, today) do
+    Tracing.phase(:schedule_load, fn ->
+      prepared = ScheduleCache.fetch(today, fn -> prepare_all_schedules(today) end)
+
+      socket
+      |> assign(prepared)
+      |> assign(rotation_modal: nil, filter_year: nil)
+    end)
   end
 
-  defp assign_all_schedules(socket, schedules, today) do
+  defp prepare_all_schedules(today) do
+    schedules = Schedules.list_schedules()
     schedule_map = Map.new(schedules, &{&1.id, &1})
     schedule_ids = Enum.map(schedules, & &1.id)
 
@@ -487,13 +483,11 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
         rows
       end)
 
-    assign(socket,
+    %{
       schedules: schedules,
       all_slots: all_slots,
-      unified_residents: unified_residents,
-      rotation_modal: nil,
-      filter_year: nil
-    )
+      unified_residents: unified_residents
+    }
   end
 
   defp build_slot_sections(schedules, residents_by_schedule) do
@@ -919,14 +913,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   defp refresh_after_delete(socket) do
-    socket =
-      case Schedules.list_schedules() do
-        [] ->
-          assign(socket, schedules: [], all_slots: [], unified_residents: [], filter_year: nil)
-
-        remaining ->
-          load_all_schedules(socket, remaining, current_date())
-      end
+    socket = load_all_schedules(socket, current_date())
 
     assign(socket, delete_confirm_id: nil, delete_error: nil)
   end

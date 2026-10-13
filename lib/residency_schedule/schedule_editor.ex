@@ -10,6 +10,7 @@ defmodule ResidencySchedule.ScheduleEditor do
   alias ResidencySchedule.Residents.ScheduleResident
   alias ResidencySchedule.Rotations
   alias ResidencySchedule.Rotations.Rotation
+  alias ResidencySchedule.ScheduleCache.Revision
   alias ResidencySchedule.Schedules.Schedule
   alias ResidencySchedule.ShiftOverrides.ShiftOverride
 
@@ -26,6 +27,7 @@ defmodule ResidencySchedule.ScheduleEditor do
   def commit(%{schedule_id: id, snapshot: snapshot} = state, operations)
       when is_integer(id) and id > 0 and id <= 9_223_372_036_854_775_807 and is_list(operations) do
     Repo.transaction(fn ->
+      Revision.lock()
       current = read_state(id, "FOR UPDATE")
 
       if current.snapshot != snapshot,
