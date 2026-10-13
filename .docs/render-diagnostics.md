@@ -26,9 +26,10 @@ Info/async hooks clear the cause to `unknown`: Phoenix supplies no corresponding
 completion telemetry to prove that a later render was caused by that callback.
 Raw event arguments and payloads are never exported.
 
-Eight `app.render.changed.*` booleans capture the change map at render **start**:
+Nine `app.render.changed.*` booleans capture the change map at render **start**:
 `name_col_px`, `visible_resident_groups`, `all_slots`, `rotation_modal`,
-`filter_year`, `viewed_aca_year`, `schedules`, and `unified_residents`. A nil change
+`filter_year`, `viewed_aca_year`, `schedules`, `unified_residents`, and
+`schedule_window`. A nil change
 map denotes full evaluation. Stop metadata is unsuitable for this purpose because
 Phoenix clears the change map before emitting the stop event.
 
@@ -38,6 +39,12 @@ Phoenix clears the change map before emitting the stop event.
 describe the available schedule workload. They are precomputed when visible
 groups change. They do **not** count cells actually visited during this diff:
 unchanged groups can be skipped even when their available cell count is large.
+The corresponding `app.rendered.rows.count`, `app.rendered.slots.count`,
+`app.rendered.cells.count`, and `app.rendered.cohorts.count` describe the
+materialized date window. Cells are merged cell groups, excluding spacer cells;
+these counts likewise do not measure how many cells a diff actually visits.
+See [schedule date window](schedule-date-window.md) for the geometry and bounded
+`update_window` event contract.
 
 `app.process.reductions.delta` measures BEAM process reductions during the render.
 It is not CPU time. `app.process.memory.before_bytes` and `after_bytes` are process
@@ -73,7 +80,7 @@ They are not falsely attached to a render. No cross-process payload tokens or
 unbounded context queue is introduced.
 
 All labels and attribute names are fixed. A fully populated render has at most
-34 attributes, including existing database fields and deployment SHA; the SDK
+39 attributes, including existing database fields and deployment SHA; the SDK
 cap is 64 with events and links still disabled. No SQL, resident/session identifiers, names, URLs,
 headers, payloads, exception messages, stacktraces, or arbitrary assign keys enter
 these diagnostics.

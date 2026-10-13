@@ -85,15 +85,19 @@ export function createBrowserLatencyReporter({window, document, performance, fet
     hookGenerations.set(hook, (hookGenerations.get(hook) || 0) + 1)
     for (const record of pending) if (record.hook === hook) discard(record)
   }
-  const measureHookEvent = (hook, view, event, params) => {
+  const measureHookEvent = (hook, view, event, params, onReply) => {
     const generation = hookGenerations.get(hook) || 0
     const record = begin(view, "event", {hook})
-    return hook.pushEvent(event, params, () => {
+    let replied = false
+    return hook.pushEvent(event, params, reply => {
+      if (replied) return
+      replied = true
       if ((hookGenerations.get(hook) || 0) !== generation || hook.el?.isConnected === false) {
         if (record) discard(record)
         return
       }
       complete(record)
+      onReply?.(reply)
     })
   }
   const reportPageLoad = () => {

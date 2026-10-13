@@ -7,8 +7,10 @@ const { test } = require("node:test");
 // The runner may supply a pristine baseline file for authoritative red evidence.
 const filename = process.env.APP_JS_UNDER_TEST || path.resolve(__dirname, "../../assets/js/app.js");
 const source = fs.readFileSync(filename, "utf8");
-const yearTracker = source.slice(source.indexOf("Hooks.YearTracker ="), source.indexOf("// ResidentDrag:"));
+const yearTracker = source.match(/Hooks\.YearTracker\s*=\s*createScheduleWindowHook\(browserLatency\)/)?.[0];
+assert.ok(yearTracker, "YearTracker must install the bounded schedule window hook");
 const builderHelpers = source.slice(source.indexOf("function checkAllDuplicateNames()"), source.indexOf("Hooks.ResidentDrag ="));
+const windowSource = fs.readFileSync(path.resolve(__dirname, "../../assets/js/schedule_window.js"), "utf8").replace(/export\s+(?=function|const|class)/g, "");
 
 function element(dataset = {}) {
   const classes = new Set();
@@ -26,7 +28,7 @@ function element(dataset = {}) {
 }
 
 function runtime(nodes) {
-  const context = vm.createContext({ Hooks: {}, window: {}, document: {
+  const context = vm.createContext({ Hooks: {}, browserLatency: {}, window: {}, document: {
     querySelectorAll: selector => {
       if (selector === "[data-schedule-pill]") return nodes.pills || [];
       if (selector.includes("input[type='text']")) return nodes.inputs || [];
@@ -35,7 +37,7 @@ function runtime(nodes) {
       return (nodes.cells || []).filter(cell => cell.dataset.resYear === year);
     }
   }});
-  vm.runInContext(yearTracker + "\n" + builderHelpers, context);
+  vm.runInContext(windowSource + "\n" + yearTracker + "\n" + builderHelpers, context);
   return context;
 }
 
@@ -44,11 +46,8 @@ test("active schedule pills remove inactive dark styles and restore them when sc
   const context = runtime({ pills });
   let active = "one";
   const hook = {
-    stickyWidth: 148,
-    el: {
-      getBoundingClientRect: () => ({ left: 0 }),
-      querySelectorAll: () => [{ dataset: { scheduleId: active }, getBoundingClientRect: () => ({ right: 400 }) }]
-    }
+    _slots: [[2026, 2026, "one"], [2027, 2027, "two"]],
+    visibleRange: () => ({first: active === "one" ? 0 : 1})
   };
   context.Hooks.YearTracker.updateActivePill.call(hook);
   assert.ok(pills[0].classes.has("bg-blue-600"));

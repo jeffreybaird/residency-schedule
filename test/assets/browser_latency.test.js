@@ -137,6 +137,20 @@ test("full document timing emits once only after navigation load completes", () 
   assert.deepEqual(page.requests.map(r => r.sample), [{view: "calendar", operation: "page_load", duration_ms: 4523}]);
 });
 
+test("hook control acknowledgments run once even without a performance clock and reject canceled generations", () => {
+  const page = browser();
+  const replies = [], accepted = [];
+  const hook = {el: element("schedule"), pushEvent: (_name, _params, reply) => replies.push(reply)};
+  page.performance.now = () => null;
+  page.reporter.measureHookEvent(hook, "schedule", "update_window", {start: 8, count: 40}, value => accepted.push(value));
+  replies[0]({start: 8}); replies[0]({start: 8});
+  assert.deepEqual(accepted, [{start: 8}]);
+  page.reporter.measureHookEvent(hook, "schedule", "update_window", {start: 40}, value => accepted.push(value));
+  page.reporter.cancelHook(hook);
+  replies[1]({start: 40});
+  assert.deepEqual(accepted, [{start: 8}]);
+});
+
 test("deferred full document timing keeps the original page attribution after LiveView navigation", () => {
   const page = browser({entry: {duration: 4321, loadEventEnd: 4321}});
   page.window.location.href = "https://schedule.example.test/schedule";
