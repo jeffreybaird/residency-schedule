@@ -17,7 +17,11 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     today = current_date()
-    socket = load_all_schedules(socket, today)
+
+    socket =
+      socket
+      |> assign(name_col_px: @name_col_px, viewed_aca_year: current_academic_year(today))
+      |> load_all_schedules(today)
 
     {:ok,
      assign(socket,
@@ -26,8 +30,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
        rotation_modal: nil,
        demo_mode: ResidencySchedule.demo_mode?(),
        is_admin: Accounts.User.admin?(socket.assigns.current_user),
-       today: today,
-       viewed_aca_year: current_academic_year(today)
+       today: today
      )}
   end
 
@@ -68,12 +71,19 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   @impl true
   def handle_event("filter_year", %{"year" => year}, socket) do
     filter_year = if year == "all", do: nil, else: String.to_integer(year)
-    {:noreply, assign(socket, filter_year: filter_year, rotation_modal: nil)}
+
+    {:noreply,
+     socket
+     |> assign(filter_year: filter_year, rotation_modal: nil)
+     |> assign_visible_resident_groups()}
   end
 
   @impl true
   def handle_event("view_academic_year", %{"aca_year" => aca_year}, socket) do
-    {:noreply, assign(socket, viewed_aca_year: to_integer(aca_year), rotation_modal: nil)}
+    {:noreply,
+     socket
+     |> assign(viewed_aca_year: to_integer(aca_year), rotation_modal: nil)
+     |> assign_visible_resident_groups()}
   end
 
   @impl true
@@ -117,8 +127,6 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   @impl true
   def render(assigns) do
-    assigns = assign(assigns, :name_col_px, @name_col_px)
-
     ~H"""
     <div
       id="guided-tour"
@@ -288,7 +296,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
               </tr>
             </thead>
             <tbody>
-              <%= for {graduation_year, year_residents} <- residents_by_year(@unified_residents, @filter_year, @viewed_aca_year) do %>
+              <%= for {graduation_year, year_residents} <- @visible_resident_groups do %>
                 <% cohort_level = hd(year_residents).cohort_level %>
                 <% initially_hidden = cohort_level not in 1..4 %>
                 <tr
@@ -429,6 +437,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       socket
       |> assign(prepared)
       |> assign(rotation_modal: nil, filter_year: nil)
+      |> assign_visible_resident_groups()
     end)
   end
 
@@ -569,6 +578,17 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   defp build_rotation_lookup(schedule_residents) do
     Map.new(schedule_residents, &{&1.schedule_id, &1.rotations})
+  end
+
+  defp assign_visible_resident_groups(socket) do
+    groups =
+      residents_by_year(
+        socket.assigns.unified_residents,
+        socket.assigns.filter_year,
+        socket.assigns.viewed_aca_year
+      )
+
+    assign(socket, visible_resident_groups: groups)
   end
 
   defp residents_by_year(unified_residents, filter_year, viewed_aca_year) do
