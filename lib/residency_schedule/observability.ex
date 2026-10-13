@@ -15,6 +15,29 @@ defmodule ResidencySchedule.Observability do
   @browser_operations ~w(initial patch navigate event page_load)
 
   @doc """
+  Reads the packaged deployment commit, returning `"unknown"` for unavailable or
+  invalid build metadata.
+
+      iex> path = Path.join(System.tmp_dir!(), "deployment-version-" <> Integer.to_string(System.unique_integer([:positive])))
+      iex> try do
+      ...>   File.write!(path, String.duplicate("a", 40) <> "\\n")
+      ...>   ResidencySchedule.Observability.deployment_version(path)
+      ...> after
+      ...>   File.rm!(path)
+      ...> end
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  """
+  def deployment_version(path \\ Application.app_dir(:residency_schedule, "priv/deploy_sha")) do
+    with {:ok, value} <- File.read(path),
+         sha = String.trim(value),
+         true <- Regex.match?(~r/\A[0-9a-f]{40}\z/, sha) do
+      sha
+    else
+      _ -> "unknown"
+    end
+  end
+
+  @doc """
   Validates a browser latency sample against the fixed ingestion schema.
 
       iex> sample = %{"view" => "calendar", "operation" => "event", "duration_ms" => 125.5}
@@ -128,10 +151,13 @@ defmodule ResidencySchedule.Observability do
 
   @impl true
   def init(opts) do
+    version = deployment_version()
+    :persistent_term.put({__MODULE__, :deployment_version}, version)
+
     # SDK 1.7 stores span limits globally, even for a named provider. Initialize
     # its version-pinned limits API without starting a global provider or exporter.
     :otel_span_limits.set(%{
-      attribute_count_limit: 32,
+      attribute_count_limit: 64,
       attribute_value_length_limit: 64,
       event_count_limit: 0,
       link_count_limit: 0,
@@ -141,7 +167,10 @@ defmodule ResidencySchedule.Observability do
 
     shared = [
       service_name: "residency-schedule",
-      resource: %{"deployment.environment.name" => Keyword.fetch!(opts, :environment)},
+      resource: %{
+        "deployment.environment.name" => Keyword.fetch!(opts, :environment),
+        "service.version" => version
+      },
       headers: [{"authorization", "Bearer " <> Keyword.fetch!(opts, :token)}],
       flush_ms: Keyword.get(opts, :flush_ms, 5_000),
       timeout: 5_000,

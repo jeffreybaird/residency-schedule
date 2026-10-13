@@ -95,6 +95,9 @@ jobs:
 
       - run: mix deps.get --only prod
 
+      - name: Package deployment commit
+        run: printf '%s\n' "$GITHUB_SHA" > priv/deploy_sha
+
       - run: mix assets.deploy
         env:
           MIX_ENV: prod

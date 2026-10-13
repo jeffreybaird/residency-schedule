@@ -79,7 +79,10 @@ defmodule ResidencyScheduleWeb.Router do
 
   scope "/", ResidencyScheduleWeb do
     live_session :authenticated,
-      on_mount: [{ResidencyScheduleWeb.UserAuth, :ensure_authenticated}],
+      on_mount: [
+        {ResidencyScheduleWeb.UserAuth, :ensure_authenticated},
+        {ResidencySchedule.Observability.RenderDiagnostics, :default}
+      ],
       layout: {ResidencyScheduleWeb.Layouts, :site} do
       scope "/" do
         pipe_through [:browser, :authenticated]

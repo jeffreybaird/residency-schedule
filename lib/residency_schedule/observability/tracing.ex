@@ -6,6 +6,7 @@ defmodule ResidencySchedule.Observability.Tracing do
   inherit counters; arbitrary tasks and explicitly overridden preload hooks do not.
   """
   alias ResidencySchedule.Observability
+  alias ResidencySchedule.Observability.RenderDiagnostics
 
   @state {__MODULE__, :state}
   @queries {__MODULE__, :queries}
@@ -126,6 +127,10 @@ defmodule ResidencySchedule.Observability.Tracing do
     with {:ok, attributes} <- live_attributes(metadata),
          {:ok, context} <- Map.fetch(metadata, :telemetry_span_context) do
       id = {operation, context}
+
+      attributes =
+        safely(fn -> render_attributes(operation, stage, metadata, attributes) end, attributes)
+
       handle_lifecycle(stage, id, operation, attributes)
     end
 
@@ -133,6 +138,106 @@ defmodule ResidencySchedule.Observability.Tracing do
   end
 
   def handle_event(_, _, _, _), do: :ok
+
+  @doc false
+  def encode(kind, fun) do
+    if Process.whereis(Observability.RequestHandler) do
+      measured_encode(kind, fun)
+    else
+      RenderDiagnostics.clear()
+      fun.()
+    end
+  end
+
+  defp measured_encode(kind, fun) do
+    context = :otel_ctx.get_current()
+    state = Process.get(@state)
+    queries = Process.get(@queries)
+    id = safely(fn -> prepare_encoding(kind) end, nil)
+
+    try do
+      started = System.monotonic_time()
+      encoded = fun.()
+      elapsed = System.monotonic_time() - started
+      safely(fn -> record_encoding(id, encoded, elapsed) end, :ok)
+      encoded
+    catch
+      class, reason ->
+        stack = __STACKTRACE__
+        safely(fn -> if id, do: mark_error(id) end, :ok)
+        :erlang.raise(class, reason, stack)
+    after
+      safely(fn -> if id, do: finish_span(id) end, :ok)
+      restore_process_value(@state, state)
+      restore_process_value(@queries, queries)
+      safely(fn -> :otel_ctx.attach(context) end, :ok)
+    end
+  end
+
+  defp restore_process_value(key, nil), do: Process.delete(key)
+  defp restore_process_value(key, value), do: Process.put(key, value)
+
+  defp prepare_encoding(kind) do
+    pending = RenderDiagnostics.take_encoding(kind)
+
+    if kind in [:join, :diff, :reply] and Process.whereis(Observability.RequestHandler) do
+      attributes = %{
+        "operation" => "encode",
+        "app.encode.kind" => Atom.to_string(kind),
+        "app.encode.correlation" => if(pending, do: "render", else: "unavailable")
+      }
+
+      {attributes, context} =
+        if pending do
+          {Map.merge(attributes, pending.attributes),
+           :otel_tracer.set_current_span(:otel_ctx.new(), pending.span)}
+        else
+          {attributes, :otel_ctx.new()}
+        end
+
+      id = make_ref()
+      begin_span(id, "LiveView encode", attributes, :internal, context)
+      id
+    end
+  end
+
+  defp record_encoding(nil, _, _), do: :ok
+
+  defp record_encoding(_, {:socket_push, _, data}, elapsed) do
+    set_attributes(%{
+      "app.encode.bytes" => IO.iodata_length(data),
+      "app.encode.duration_ms" => elapsed / System.convert_time_unit(1, :millisecond, :native)
+    })
+  end
+
+  defp safely(fun, fallback) do
+    fun.()
+  catch
+    _, _ -> fallback
+  end
+
+  defp render_attributes(:render, :start, metadata, attributes),
+    do: Map.merge(attributes, RenderDiagnostics.start(metadata))
+
+  defp render_attributes(:render, stage, _, attributes) when stage in [:stop, :exception] do
+    set_attributes(RenderDiagnostics.finish(stage, current_span()))
+    attributes
+  end
+
+  defp render_attributes(operation, stage, metadata, attributes)
+       when operation in [:handle_event, :handle_params] and stage in [:stop, :exception] do
+    RenderDiagnostics.callback_finished(stage, metadata)
+    attributes
+  end
+
+  defp render_attributes(_, _, _, attributes), do: attributes
+
+  defp set_attributes(attributes) do
+    case current_span() do
+      nil -> :ok
+      span -> :otel_span.set_attributes(span, attributes)
+    end
+  end
 
   @doc false
   def current_span do
@@ -187,13 +292,15 @@ defmodule ResidencySchedule.Observability.Tracing do
     finish_span(id)
   end
 
-  defp begin_span(id, name, attributes, kind) do
+  defp begin_span(id, name, attributes, kind, parent_context \\ nil) do
     state = Process.get(@state, %{frames: [], created: 0, dropped: 0})
     previous_queries = Process.get(@queries)
 
     {frame, state} =
       if state.created < @span_budget do
-        context = if state.frames == [], do: :otel_ctx.new(), else: :otel_ctx.get_current()
+        context =
+          parent_context ||
+            if(state.frames == [], do: :otel_ctx.new(), else: :otel_ctx.get_current())
 
         tracer =
           :otel_tracer_provider.get_tracer(
