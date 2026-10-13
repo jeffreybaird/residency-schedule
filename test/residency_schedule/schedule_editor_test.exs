@@ -297,7 +297,24 @@ defmodule ResidencySchedule.ScheduleEditorTest do
     {:ok, summary, _} = ScheduleImporter.import_csv(csv)
     before = snapshot()
     {:ok, state} = ScheduleEditor.load(summary.schedule_id)
-    assert length(state.rotations) == 3042
+    # R2-5's single-day June 27 Post Call is fully occupied by shifted HNF.
+    assert length(state.rotations) == 3041
+    resident = Enum.find(state.residents, &(&1.position_code == "R2-5"))
+
+    refute Enum.any?(
+             state.rotations,
+             &(&1.schedule_resident_id == resident.id and
+                 &1.rotation_type == "post_call" and &1.slot_index == 9)
+           )
+
+    assert Enum.any?(
+             state.rotations,
+             &(&1.schedule_resident_id == resident.id and
+                 &1.rotation_type == "highland_night_float" and
+                 Date.compare(&1.start_date, ~D[2026-06-27]) != :gt and
+                 Date.compare(&1.end_date, ~D[2026-06-27]) != :lt)
+           )
+
     assert Enum.any?(state.rotations, &(&1.slot_index >= 100))
     assert {:ok, _} = ScheduleEditor.commit(state, [])
     assert snapshot() == before

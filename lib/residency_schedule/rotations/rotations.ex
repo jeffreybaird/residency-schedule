@@ -7,6 +7,7 @@ defmodule ResidencySchedule.Rotations do
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Residents.ScheduleResident
   alias ResidencySchedule.Rotations.FridayNightFloat
+  alias ResidencySchedule.Rotations.HighlandPostCall
   alias ResidencySchedule.Rotations.Rotation
   alias ResidencySchedule.Rotations.ScheduleGaps
   alias ResidencySchedule.ShiftOverrides
@@ -642,6 +643,10 @@ defmodule ResidencySchedule.Rotations do
       DetailedSchedules.list_in_range(range_start, range_end),
       ShiftOverrides.list_overrides_in_range(range_start, range_end)
     )
+    |> Enum.filter(fn rotation ->
+      Date.compare(rotation.start_date, range_end) != :gt and
+        Date.compare(rotation.end_date, range_start) != :lt
+    end)
   end
 
   defp project_assignments(rotations, activities, overrides) do
@@ -660,6 +665,7 @@ defmodule ResidencySchedule.Rotations do
       )
 
     rotations
+    |> HighlandPostCall.normalize()
     |> FridayNightFloat.project(activities, overrides)
     |> ScheduleGaps.project(activities, overrides)
   end
