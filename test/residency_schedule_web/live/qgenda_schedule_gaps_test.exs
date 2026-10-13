@@ -255,7 +255,7 @@ defmodule ResidencyScheduleWeb.QgendaScheduleGapsTest do
       if mode != "day",
         do:
           view
-          |> element("[phx-click='select_day'][phx-value-date='2026-10-10']")
+          |> element("[data-action='select_day'][phx-value-date='2026-10-10']")
           |> render_click()
 
       assert has_element?(
@@ -363,7 +363,7 @@ defmodule ResidencyScheduleWeb.QgendaScheduleGapsTest do
     {:ok, grid, _} = live(ctx.conn, "/schedule")
 
     grid
-    |> element("button[phx-click='open_rotation_details']", "Other Mystery")
+    |> element("button[data-action='open_rotation_details']", "Other Mystery")
     |> render_click()
 
     assert has_element?(grid, "#gantt-rotation-modal-title", ctx.iris.name)

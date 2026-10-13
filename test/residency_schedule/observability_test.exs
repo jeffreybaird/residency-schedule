@@ -1,6 +1,7 @@
 defmodule ResidencySchedule.ObservabilityTest do
   use ExUnit.Case, async: false
 
+  alias OtlpShipper.Metrics.Definition
   alias ResidencySchedule.Observability
 
   setup do
@@ -54,9 +55,17 @@ defmodule ResidencySchedule.ObservabilityTest do
     assert Observability.request_attributes(%{}) == %{"http.request.method" => "_OTHER"}
   end
 
-  test "exported metric definitions are tagless bounded aggregates" do
+  test "existing metric definitions remain tagless bounded aggregates" do
     metrics = Observability.metrics()
-    assert Enum.all?(metrics, &(&1.tags == []))
+
+    existing_metrics =
+      Enum.reject(metrics, fn metric ->
+        match?([:phoenix, :live_view | _], metric.event_name) or
+          metric.event_name == [:browser, :live_view, :round_trip]
+      end)
+
+    assert length(existing_metrics) == 11
+    assert Enum.all?(existing_metrics, &(&1.tags == []))
 
     assert Enum.any?(
              metrics,
@@ -96,6 +105,60 @@ defmodule ResidencySchedule.ObservabilityTest do
 
     for %Telemetry.Metrics.Distribution{} = metric <- metrics do
       assert [_ | _] = metric.reporter_options[:buckets]
+    end
+  end
+
+  test "LiveView operation durations have only a bounded view tag" do
+    metrics =
+      Observability.metrics()
+      |> Enum.filter(&match?([:phoenix, :live_view | _], &1.event_name))
+
+    assert length(metrics) == 4
+
+    for operation <- [:mount, :handle_params, :handle_event, :render] do
+      metric = Enum.find(metrics, &(&1.event_name == [:phoenix, :live_view, operation, :stop]))
+      assert %Telemetry.Metrics.Distribution{} = metric
+      assert metric.measurement != nil
+      assert metric.tags == [:view]
+      assert metric.unit == :millisecond
+      assert metric.reporter_options[:buckets] == [1, 5, 10, 25, 50, 100, 250, 500, 1000, 5000]
+
+      {:ok, [definition]} = Definition.new([metric])
+
+      for metadata <- [
+            %{socket: %Phoenix.LiveView.Socket{view: ResidencyScheduleWeb.CompareLive.Index}},
+            %{socket: %Phoenix.LiveView.Socket{view: "private-resident-value"}},
+            %{socket: %Phoenix.LiveView.Socket{view: nil}},
+            %{socket: nil},
+            %{}
+          ] do
+        assert Definition.sample(definition, %{duration: 1}, metadata) == :skip
+      end
+    end
+  end
+
+  test "browser round trip duration has only bounded view and operation tags" do
+    [metric] =
+      Enum.filter(
+        Observability.metrics(),
+        &(&1.event_name == [:browser, :live_view, :round_trip])
+      )
+
+    assert %Telemetry.Metrics.Distribution{} = metric
+    assert metric.name == [:browser, :live_view, :round_trip, :duration]
+    assert metric.measurement == :duration_ms
+    assert metric.tags == [:view, :operation]
+    assert metric.unit == :millisecond
+    assert metric.reporter_options[:buckets] == [1, 5, 10, 25, 50, 100, 250, 500, 1000, 5000]
+    {:ok, [definition]} = Definition.new([metric])
+
+    for metadata <- [
+          %{view: "resident/private", operation: "event"},
+          %{view: "calendar", operation: "restore_prefs"},
+          %{view: nil, operation: "event"},
+          %{}
+        ] do
+      assert Definition.sample(definition, %{duration_ms: 12}, metadata) == :skip
     end
   end
 end

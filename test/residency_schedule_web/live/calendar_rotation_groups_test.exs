@@ -20,17 +20,17 @@ defmodule ResidencyScheduleWeb.CalendarRotationGroupsTest do
         open_day(view, "2026-07-06")
 
         assert_grouped_roster(view, ctx)
-        assert has_element?(view, "button[phx-click='open_day_view']")
+        assert has_element?(view, "button[data-action='open_day_view']")
       end
     end
 
     test "opening the full day view preserves the modal's rotation groups", ctx do
       {:ok, view, _} = live(ctx.conn, "/calendar?view=week&date=2026-07-06")
       open_day(view, "2026-07-06")
-      view |> element("button[phx-click='open_day_view']") |> render_click()
+      view |> element("button[data-action='open_day_view']") |> render_click()
 
       assert_grouped_roster(view, ctx)
-      refute has_element?(view, "button[phx-click='open_day_view']")
+      refute has_element?(view, "button[data-action='open_day_view']")
     end
 
     test "filters remove excluded residents and rotation groups from the modal", ctx do
@@ -300,7 +300,7 @@ defmodule ResidencyScheduleWeb.CalendarRotationGroupsTest do
   end
 
   defp open_day(view, date) do
-    view |> element("[phx-click='select_day'][phx-value-date='#{date}']") |> render_click()
+    view |> element("[data-action='select_day'][phx-value-date='#{date}']") |> render_click()
   end
 
   defp group(type), do: "#day-activities [data-rotation-type='#{type}']"

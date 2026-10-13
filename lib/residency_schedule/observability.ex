@@ -11,6 +11,40 @@ defmodule ResidencySchedule.Observability do
   alias OtlpShipper.{Buffer, Config, Encoder, MetricsReporter, TraceExporter, Transport}
 
   @methods ~w(GET HEAD POST PUT DELETE CONNECT OPTIONS TRACE PATCH)
+  @browser_views ~w(calendar schedule)
+  @browser_operations ~w(initial patch navigate event page_load)
+
+  @doc """
+  Validates a browser latency sample against the fixed ingestion schema.
+
+      iex> sample = %{"view" => "calendar", "operation" => "event", "duration_ms" => 125.5}
+      iex> ResidencySchedule.Observability.browser_latency_sample(sample)
+      {:ok, %{"view" => "calendar", "operation" => "event", "duration_ms" => 125.5}}
+  """
+  def browser_latency_sample(
+        %{"view" => view, "operation" => operation, "duration_ms" => duration} = sample
+      )
+      when map_size(sample) == 3 and view in @browser_views and operation in @browser_operations and
+             is_number(duration) and duration >= 0 and duration <= 60_000,
+      do: {:ok, sample}
+
+  def browser_latency_sample(_), do: {:error, :invalid_sample}
+
+  @doc """
+  Emits a validated browser duration for aggregate export.
+
+      iex> ResidencySchedule.Observability.record_browser_latency(%{"view" => "schedule", "operation" => "navigate", "duration_ms" => 1200})
+      :ok
+  """
+  def record_browser_latency(sample) do
+    with {:ok, sample} <- browser_latency_sample(sample) do
+      :telemetry.execute(
+        [:browser, :live_view, :round_trip],
+        %{duration_ms: sample["duration_ms"]},
+        %{view: sample["view"], operation: sample["operation"]}
+      )
+    end
+  end
 
   @doc """
   Returns the configured optional supervision child.
@@ -63,10 +97,17 @@ defmodule ResidencySchedule.Observability do
   def request_attributes(_), do: %{"http.request.method" => "_OTHER"}
 
   @doc """
-  Defines tagless request, database, and VM aggregates.
+  Defines request, database, VM, and bounded LiveView operation aggregates.
 
-      iex> ResidencySchedule.Observability.metrics() |> Enum.all?(&(&1.tags == []))
-      true
+  LiveView durations measure server callbacks separately from rendering. They
+  include only calendar and schedule views, identified by a fixed `view` tag.
+
+      iex> metrics = ResidencySchedule.Observability.metrics()
+      iex> metric = Enum.find(metrics, &(&1.event_name == [:phoenix, :live_view, :mount, :stop]))
+      iex> metric.tag_values.(%{socket: %Phoenix.LiveView.Socket{view: ResidencyScheduleWeb.CalendarLive.Index}})
+      %{view: "calendar"}
+      iex> metric.unit
+      :millisecond
   """
   def metrics do
     [counter("phoenix.endpoint.stop.count", measurement: :duration)] ++
@@ -81,7 +122,8 @@ defmodule ResidencySchedule.Observability do
         )
       ) ++
       [last_value("vm.memory.total", unit: :byte)] ++
-      Enum.map(~w(total cpu io), &last_value("vm.total_run_queue_lengths.#{&1}"))
+      Enum.map(~w(total cpu io), &last_value("vm.total_run_queue_lengths.#{&1}")) ++
+      live_view_metrics() ++ [browser_latency_metric()]
   end
 
   @impl true
@@ -121,7 +163,8 @@ defmodule ResidencySchedule.Observability do
            metrics: metrics(),
            name: __MODULE__.Metrics,
            finch_name: __MODULE__.MetricsFinch,
-           max_series: 16
+           # Eleven existing, eight server LiveView, and ten browser series.
+           max_series: 32
          ]},
       TraceExporter.pool_child_spec(__MODULE__.TraceFinch),
       %{
@@ -151,6 +194,44 @@ defmodule ResidencySchedule.Observability do
     do: Map.put(attrs, "http.response.status_code", status)
 
   defp put_status(attrs, _), do: attrs
+
+  defp live_view_metrics do
+    Enum.map(~w(mount handle_params handle_event render), fn operation ->
+      distribution("phoenix.live_view.#{operation}.stop.duration",
+        unit: {:native, :millisecond},
+        tags: [:view],
+        tag_values: &live_view_attributes/1,
+        keep: &(live_view_attributes(&1) != %{}),
+        reporter_options: [buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 5000]]
+      )
+    end)
+  end
+
+  defp live_view_attributes(%{socket: %{view: ResidencyScheduleWeb.CalendarLive.Index}}),
+    do: %{view: "calendar"}
+
+  defp live_view_attributes(%{socket: %{view: ResidencyScheduleWeb.ScheduleLive.Index}}),
+    do: %{view: "schedule"}
+
+  defp live_view_attributes(_), do: %{}
+
+  defp browser_latency_metric do
+    distribution("browser.live_view.round_trip.duration",
+      measurement: :duration_ms,
+      unit: :millisecond,
+      tags: [:view, :operation],
+      keep: &bounded_browser_metadata?/1,
+      tag_values: &Map.take(&1, [:view, :operation]),
+      reporter_options: [
+        buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 5000]
+      ]
+    )
+  end
+
+  defp bounded_browser_metadata?(%{view: view, operation: operation}),
+    do: view in @browser_views and operation in @browser_operations
+
+  defp bounded_browser_metadata?(_), do: false
 
   defp log_export(config) do
     fn records ->

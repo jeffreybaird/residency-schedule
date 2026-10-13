@@ -194,6 +194,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
       id="guided-tour"
       phx-hook="GuidedTour"
       data-tour-page="calendar"
+      data-latency-view="calendar"
       data-tour-role={to_string(@current_user.role)}
       data-auto-start={to_string(@show_tour)}
       class="max-w-4xl mx-auto py-10 px-4"
@@ -203,7 +204,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         <div class="flex items-center gap-3">
           <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Calendar</h1>
           <button
-            phx-click="restart_tour"
+            data-action="restart_tour"
+            phx-click={JS.push("restart_tour", page_loading: true)}
             class="text-sm text-blue-500 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
             title="Take a guided tour"
           >
@@ -216,7 +218,9 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         >
           <%= for {mode, label} <- [{:month, "Month"}, {:week, "Week"}, {:day, "Day"}] do %>
             <button
-              phx-click="set_view"
+              id={"calendar-view-#{mode}"}
+              data-action="set_view"
+              phx-click={JS.push("set_view", page_loading: true)}
               phx-value-view={mode}
               class={view_btn_class(@view_mode, mode)}
             >
@@ -237,7 +241,9 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
         <div id="tour-month-nav" class="flex items-center justify-between mb-4">
           <button
-            phx-click="prev"
+            id="calendar-prev"
+            data-action="prev"
+            phx-click={JS.push("prev", page_loading: true)}
             class="px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium transition-colors"
           >
             ← Prev
@@ -247,14 +253,18 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
               {period_label(@view_mode, @focus_date)}
             </h2>
             <button
-              phx-click="today"
+              id="calendar-today"
+              data-action="today"
+              phx-click={JS.push("today", page_loading: true)}
               class="px-2 py-1 rounded-md text-xs font-medium text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
             >
               Today
             </button>
           </div>
           <button
-            phx-click="next"
+            id="calendar-next"
+            data-action="next"
+            phx-click={JS.push("next", page_loading: true)}
             class="px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium transition-colors"
           >
             Next →
@@ -272,7 +282,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                 <%= for day <- calendar_days(@focus_date) do %>
                   <% groups = calendar_summary_groups(assigns, day) %>
                   <div
-                    phx-click="select_day"
+                    data-action="select_day"
+                    phx-click={JS.push("select_day", page_loading: true)}
                     phx-value-date={Date.to_iso8601(day)}
                     class={[
                       "relative bg-white dark:bg-gray-900 p-1 sm:p-2 h-14 sm:h-20 cursor-pointer border-0 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950",
@@ -309,7 +320,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                 <%= for day <- week_days(@focus_date) do %>
                   <% groups = calendar_summary_groups(assigns, day) %>
                   <div
-                    phx-click="select_day"
+                    data-action="select_day"
+                    phx-click={JS.push("select_day", page_loading: true)}
                     phx-value-date={Date.to_iso8601(day)}
                     class="bg-white dark:bg-gray-900 p-2 min-h-[8rem] cursor-pointer transition-colors hover:bg-blue-50 dark:hover:bg-blue-950"
                   >
@@ -349,7 +361,12 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
         <%!-- Day detail modal (month and week views) --%>
         <%= if @selected_date && @view_mode in [:month, :week] do %>
           <div class="fixed inset-0 z-50 flex items-center justify-center">
-            <div phx-click="close_modal" class="absolute inset-0 bg-black/40"></div>
+            <div
+              data-action="close_modal"
+              phx-click={JS.push("close_modal", page_loading: true)}
+              class="absolute inset-0 bg-black/40"
+            >
+            </div>
             <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full mx-4 z-10 max-h-[80vh] flex flex-col">
               <div class="flex items-start justify-between p-6 pb-4 shrink-0">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
@@ -357,14 +374,16 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
                 </h3>
                 <div class="flex items-center gap-3 ml-4">
                   <button
-                    phx-click="open_day_view"
+                    data-action="open_day_view"
+                    phx-click={JS.push("open_day_view", page_loading: true)}
                     phx-value-date={Date.to_iso8601(@selected_date)}
                     class="text-xs font-medium text-blue-600 dark:text-blue-300 hover:underline whitespace-nowrap"
                   >
                     Day view
                   </button>
                   <button
-                    phx-click="close_modal"
+                    data-action="close_modal"
+                    phx-click={JS.push("close_modal", page_loading: true)}
                     class="text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none"
                   >
                     ✕
@@ -405,14 +424,16 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     <div id="tour-calendar-filters" class="mb-4">
       <div class="flex flex-wrap items-center gap-2">
         <button
-          phx-click="toggle_filter_panel"
+          data-action="toggle_filter_panel"
+          phx-click={JS.push("toggle_filter_panel", page_loading: true)}
           phx-value-panel="residents"
           class={filter_toggle_class(@filter_panel == :residents, @resident_filter != [])}
         >
           Residents{filter_count_suffix(@resident_filter)}
         </button>
         <button
-          phx-click="toggle_filter_panel"
+          data-action="toggle_filter_panel"
+          phx-click={JS.push("toggle_filter_panel", page_loading: true)}
           phx-value-panel="rotations"
           class={filter_toggle_class(@filter_panel == :rotations, @rotation_filter != [])}
         >
@@ -427,7 +448,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
               Residents
             </span>
             <button
-              phx-click="clear_resident_filter"
+              data-action="clear_resident_filter"
+              phx-click={JS.push("clear_resident_filter", page_loading: true)}
               class="text-xs text-blue-600 dark:text-blue-300 hover:underline"
             >
               All
@@ -439,7 +461,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
             <div class="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
               <%= for resident <- @resident_options do %>
                 <button
-                  phx-click="toggle_resident_filter"
+                  data-action="toggle_resident_filter"
+                  phx-click={JS.push("toggle_resident_filter", page_loading: true)}
                   phx-value-id={resident.id}
                   class={filter_chip_class(resident.id in @resident_filter)}
                 >
@@ -459,7 +482,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
               Rotations
             </span>
             <button
-              phx-click="clear_rotation_filter"
+              data-action="clear_rotation_filter"
+              phx-click={JS.push("clear_rotation_filter", page_loading: true)}
               class="text-xs text-blue-600 dark:text-blue-300 hover:underline"
             >
               All
@@ -471,7 +495,8 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
             <div class="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
               <%= for type <- @type_options do %>
                 <button
-                  phx-click="toggle_rotation_filter"
+                  data-action="toggle_rotation_filter"
+                  phx-click={JS.push("toggle_rotation_filter", page_loading: true)}
                   phx-value-type={type}
                   class={[
                     "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium transition-colors",

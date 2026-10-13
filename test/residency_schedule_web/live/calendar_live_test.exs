@@ -39,20 +39,20 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
 
     test "prev navigates backward and changes the period label", %{view: view} do
       html_before = render(view)
-      html_after = view |> element("button[phx-click='prev']") |> render_click()
+      html_after = view |> element("button[data-action='prev']") |> render_click()
       refute html_before == html_after
     end
 
     test "next navigates forward and changes the period label", %{view: view} do
       html_before = render(view)
-      html_after = view |> element("button[phx-click='next']") |> render_click()
+      html_after = view |> element("button[data-action='next']") |> render_click()
       refute html_before == html_after
     end
 
     test "today returns to the current period", %{view: view} do
       view |> element("button[phx-value-view='month']") |> render_click()
-      view |> element("button[phx-click='prev']") |> render_click()
-      html = view |> element("button[phx-click='today']") |> render_click()
+      view |> element("button[data-action='prev']") |> render_click()
+      html = view |> element("button[data-action='today']") |> render_click()
       assert html =~ Calendar.strftime(Date.utc_today(), "%B %Y")
     end
   end
@@ -82,13 +82,13 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
 
     test "week navigation shifts by seven days", %{view: view} do
       view |> element("button[phx-value-view='week']") |> render_click()
-      html = view |> element("button[phx-click='next']") |> render_click()
+      html = view |> element("button[data-action='next']") |> render_click()
       assert html =~ "Jul 9 – Jul 15, 2023"
     end
 
     test "day navigation shifts by one day", %{view: view} do
       view |> element("button[phx-value-view='day']") |> render_click()
-      html = view |> element("button[phx-click='next']") |> render_click()
+      html = view |> element("button[data-action='next']") |> render_click()
       assert html =~ Calendar.strftime(~D[2023-07-06], "%A, %B %-d, %Y")
     end
   end
@@ -124,19 +124,19 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
 
     test "residents panel lists residents in view", %{view: view} do
       view |> element("button[phx-value-panel='residents']") |> render_click()
-      assert has_element?(view, "button[phx-click='toggle_resident_filter']")
+      assert has_element?(view, "button[data-action='toggle_resident_filter']")
     end
 
     test "rotations panel lists rotation types in view", %{view: view} do
       view |> element("button[phx-value-panel='rotations']") |> render_click()
-      assert has_element?(view, "button[phx-click='toggle_rotation_filter']")
+      assert has_element?(view, "button[data-action='toggle_rotation_filter']")
     end
 
     test "toggling the panel again closes it", %{view: view} do
       view |> element("button[phx-value-panel='residents']") |> render_click()
-      assert has_element?(view, "button[phx-click='toggle_resident_filter']")
+      assert has_element?(view, "button[data-action='toggle_resident_filter']")
       view |> element("button[phx-value-panel='residents']") |> render_click()
-      refute has_element?(view, "button[phx-click='toggle_resident_filter']")
+      refute has_element?(view, "button[data-action='toggle_resident_filter']")
     end
 
     test "selecting a rotation type filters the day view to that type", %{view: view} do
@@ -162,7 +162,7 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
       view |> element("button[phx-value-type='#{type}']") |> render_click()
       assert render(view) =~ "Rotations (1)"
 
-      html = view |> element("button[phx-click='clear_rotation_filter']") |> render_click()
+      html = view |> element("button[data-action='clear_rotation_filter']") |> render_click()
       refute html =~ "Rotations (1)"
     end
 
@@ -315,21 +315,21 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
     test "selecting a day opens the detail modal", %{view: view} do
       html =
         view
-        |> element("div[phx-click='select_day'][phx-value-date='2023-07-05']")
+        |> element("div[data-action='select_day'][phx-value-date='2023-07-05']")
         |> render_click()
 
       assert html =~ Calendar.strftime(~D[2023-07-05], "%A, %B %-d, %Y")
-      assert has_element?(view, "button[phx-click='open_day_view']")
+      assert has_element?(view, "button[data-action='open_day_view']")
     end
 
     test "modal day-view link switches to day view", %{view: view} do
       view
-      |> element("div[phx-click='select_day'][phx-value-date='2023-07-05']")
+      |> element("div[data-action='select_day'][phx-value-date='2023-07-05']")
       |> render_click()
 
-      html = view |> element("button[phx-click='open_day_view']") |> render_click()
+      html = view |> element("button[data-action='open_day_view']") |> render_click()
       assert html =~ Calendar.strftime(~D[2023-07-05], "%A, %B %-d, %Y")
-      refute has_element?(view, "div[phx-click='close_modal']")
+      refute has_element?(view, "div[data-action='close_modal']")
     end
   end
 
@@ -381,7 +381,7 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
 
       assert html =~ Calendar.strftime(~D[2023-07-05], "%A, %B %-d, %Y")
       assert html =~ "Residents (1)"
-      assert has_element?(view, "button[phx-click='toggle_resident_filter']")
+      assert has_element?(view, "button[data-action='toggle_resident_filter']")
     end
 
     test "restoring an empty resident filter clears the default selection",
@@ -411,7 +411,12 @@ defmodule ResidencyScheduleWeb.CalendarLiveTest do
 
   # Pulls a resident id out of an open residents filter panel.
   defp resident_filter_value(html) do
-    [_, id] = Regex.run(~r/phx-click="toggle_resident_filter"\s+phx-value-id="([^"]+)"/, html)
+    [id | _] =
+      html
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query("button[data-action='toggle_resident_filter']")
+      |> LazyHTML.attribute("phx-value-id")
+
     id
   end
 end

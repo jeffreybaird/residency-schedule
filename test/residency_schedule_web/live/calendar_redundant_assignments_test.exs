@@ -168,7 +168,7 @@ defmodule ResidencyScheduleWeb.CalendarRedundantAssignmentsTest do
     import_task("HH GYN ONC R4")
     insert_rotation(ctx.iris.id, :oncology, ~D[2026-12-29])
     {:ok, view, _} = live(ctx.conn, "/calendar?view=month&date=2026-12-29")
-    view |> element("[phx-click='select_day'][phx-value-date='2026-12-29']") |> render_click()
+    view |> element("[data-action='select_day'][phx-value-date='2026-12-29']") |> render_click()
     row = resident_row(:oncology, ctx.iris)
 
     assert has_element?(view, "#day-activities [data-rotation-type='oncology'] > h3", "Oncology")
