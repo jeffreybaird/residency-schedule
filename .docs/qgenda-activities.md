@@ -136,6 +136,9 @@ matched task is not repeated in a separate daily-assignment row. The selected-da
 panel similarly omits a general base-rotation line when the equivalent specific
 task is shown.
 
+Imported and general rotation labels share the same centered pill layout and
+maximum width. Long labels wrap within the pill; task notes stay below it.
+
 Other daily assignments remain visible, including clinics and duties without a
 matching base rotation. Multiple tasks on one date remain together with their
 notes. Dates with recorded assignments are excluded from generated OFF rows; the

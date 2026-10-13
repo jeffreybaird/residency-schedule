@@ -688,11 +688,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                                   title={label}
                                   data-role={if specific_tasks != [], do: "specific-rotation-label"}
                                   class={[
-                                    "inline-flex w-full shrink-0 items-center rounded px-2 text-xs font-medium",
-                                    if(specific_tasks == [],
-                                      do: "h-8 max-w-[11rem] justify-center truncate",
-                                      else: "min-h-8 py-2 whitespace-normal break-words"
-                                    ),
+                                    "inline-flex w-full max-w-[11rem] min-h-8 shrink-0 items-center justify-center rounded px-2 py-2 text-center text-xs font-medium whitespace-normal break-words",
                                     color,
                                     if(covered, do: "line-through opacity-70", else: "")
                                   ]}
