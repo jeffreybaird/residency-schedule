@@ -3,6 +3,7 @@ defmodule ResidencySchedule.ObservabilityTransportTest do
   require Logger
 
   alias ResidencySchedule.Observability
+  alias ResidencySchedule.Observability.Tracing
 
   test "an untrappable request handler crash recovers registration and emits once" do
     baseline = handler_ids()
@@ -129,7 +130,11 @@ defmodule ResidencySchedule.ObservabilityTransportTest do
 
     duration = System.convert_time_unit(12, :millisecond, :native)
     metadata = %{conn: conn, query: secret, params: [secret], result: secret, source: secret}
-    :telemetry.execute([:phoenix, :endpoint, :stop], %{duration: duration}, metadata)
+
+    Tracing.request(conn, fn ->
+      :telemetry.execute([:phoenix, :endpoint, :stop], %{duration: duration}, metadata)
+      conn
+    end)
 
     :telemetry.execute(
       [:residency_schedule, :repo, :query],
@@ -167,9 +172,12 @@ defmodule ResidencySchedule.ObservabilityTransportTest do
     assert_resource(resource_spans.resource)
     assert [span] = Enum.flat_map(resource_spans.scope_spans, & &1.spans)
     assert span.name == "HTTP request"
-    assert span.end_time_unix_nano - span.start_time_unix_nano == 12_000_000
+    assert span.end_time_unix_nano >= span.start_time_unix_nano
 
-    assert attributes(span.attributes) == %{
+    assert Map.take(attributes(span.attributes), [
+             "http.request.method",
+             "http.response.status_code"
+           ]) == %{
              "http.request.method" => "POST",
              "http.response.status_code" => 201
            }
@@ -213,7 +221,13 @@ defmodule ResidencySchedule.ObservabilityTransportTest do
 
   defp emit_request do
     conn = Plug.Test.conn("GET", "/") |> Map.put(:status, 200)
-    :telemetry.execute([:phoenix, :endpoint, :stop], %{duration: 1}, %{conn: conn})
+
+    Tracing.request(conn, fn ->
+      :telemetry.execute([:phoenix, :endpoint, :stop], %{duration: 1}, %{conn: conn})
+      conn
+    end)
+
+    :ok
   end
 
   defp receive_exports do

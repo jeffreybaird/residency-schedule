@@ -3,6 +3,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   alias ResidencySchedule.Accounts
   alias ResidencySchedule.DetailedSchedules
+  alias ResidencySchedule.Observability.Tracing
   alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
@@ -433,27 +434,58 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   @doc false
   def load_all_schedules(socket, schedules, today) do
+    Tracing.phase(:schedule_load, fn -> assign_all_schedules(socket, schedules, today) end)
+  end
+
+  defp assign_all_schedules(socket, schedules, today) do
     schedule_map = Map.new(schedules, &{&1.id, &1})
     schedule_ids = Enum.map(schedules, & &1.id)
 
     projected_rotations =
-      schedule_ids
-      |> Enum.flat_map(&Rotations.projected_rotations_for_schedule/1)
-      |> Enum.group_by(& &1.schedule_resident_id)
+      Tracing.phase(:schedule_project, fn ->
+        rotations = Enum.flat_map(schedule_ids, &Rotations.projected_rotations_for_schedule/1)
+        Tracing.count(:results, length(rotations))
+        Enum.group_by(rotations, & &1.schedule_resident_id)
+      end)
 
     all_schedule_residents =
-      schedule_ids
-      |> Residents.list_residents_across_schedules()
-      |> Enum.map(&%{&1 | rotations: Map.get(projected_rotations, &1.id, [])})
-      |> ResidentDisplayNames.apply_to_schedule_residents()
+      Tracing.phase(:schedule_residents, fn ->
+        residents =
+          schedule_ids
+          |> Residents.list_residents_across_schedules()
+          |> Enum.map(&%{&1 | rotations: Map.get(projected_rotations, &1.id, [])})
+          |> ResidentDisplayNames.apply_to_schedule_residents()
 
-    residents_by_schedule = Enum.group_by(all_schedule_residents, & &1.schedule_id)
-    sections = build_slot_sections(schedules, residents_by_schedule)
-    all_slots = build_combined_slots(sections)
+        Tracing.count(:residents, length(residents))
+        residents
+      end)
+
+    all_slots =
+      Tracing.phase(:schedule_slots, fn ->
+        residents_by_schedule = Enum.group_by(all_schedule_residents, & &1.schedule_id)
+        slots = schedules |> build_slot_sections(residents_by_schedule) |> build_combined_slots()
+        Tracing.count(:slots, length(slots))
+        slots
+      end)
 
     unified_residents =
-      build_unified_residents(all_schedule_residents, schedule_map, today)
-      |> Enum.map(&Map.put(&1, :cells, cell_groups_unified(all_slots, &1.rotation_lookup)))
+      Tracing.phase(:schedule_rows, fn ->
+        rows = build_unified_residents(all_schedule_residents, schedule_map, today)
+        Tracing.count(:rows, length(rows))
+        rows
+      end)
+
+    unified_residents =
+      Tracing.phase(:schedule_cells, fn ->
+        rows =
+          Enum.map(
+            unified_residents,
+            &Map.put(&1, :cells, cell_groups_unified(all_slots, &1.rotation_lookup))
+          )
+
+        Tracing.count(:cells, Enum.sum(Enum.map(rows, &length(&1.cells))))
+        rows
+      end)
 
     assign(socket,
       schedules: schedules,

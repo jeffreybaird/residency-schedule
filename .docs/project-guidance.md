@@ -376,8 +376,13 @@ The variables required at runtime are:
 - `OTEL_HUB_TOKEN` — production GitHub Secret; source-scoped ingest token, required when `OTEL_ENABLED=true`; never log or commit it
 
 OTel Hub receives only fixed HTTP completion summaries, bounded method/status
-attributes, and aggregate metrics. Do not export resident data, chat content,
-request URLs or headers, SQL text or parameters, or arbitrary application logs.
+attributes, aggregate metrics, and bounded calendar/schedule operation traces.
+Operation traces may include fixed view/lifecycle/phase labels, numeric result
+counts, aggregate database query counts and timings, attribution coverage, and
+dropped-span counts as specified in [operation tracing](operation-tracing.md).
+Do not export resident data, names or identifiers, chat content, request URLs or
+headers, SQL text or parameters, request/event payloads, arbitrary event labels,
+exception messages or stacktraces, or arbitrary application logs.
 Keep administrator-supplied `OTEL_RESOURCE_ATTRIBUTES` free of sensitive data.
 
 ### `config/runtime.exs` is the only place for prod config
