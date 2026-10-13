@@ -131,7 +131,7 @@ defmodule ResidencySchedule.Observability do
     # SDK 1.7 stores span limits globally, even for a named provider. Initialize
     # its version-pinned limits API without starting a global provider or exporter.
     :otel_span_limits.set(%{
-      attribute_count_limit: 2,
+      attribute_count_limit: 32,
       attribute_value_length_limit: 64,
       event_count_limit: 0,
       link_count_limit: 0,

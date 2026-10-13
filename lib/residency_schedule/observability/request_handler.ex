@@ -4,6 +4,7 @@ defmodule ResidencySchedule.Observability.RequestHandler do
 
   alias OtlpShipper.{Buffer, Value}
   alias ResidencySchedule.Observability
+  alias ResidencySchedule.Observability.Tracing
 
   @doc false
   def start_link(_opts), do: GenServer.start_link(__MODULE__, [], name: __MODULE__)
@@ -12,18 +13,12 @@ defmodule ResidencySchedule.Observability.RequestHandler do
   def init(_) do
     Process.flag(:trap_exit, true)
 
-    state = %{
-      buffer: Buffer.handle(Observability.LogBuffer),
-      tracer:
-        :otel_tracer_provider.get_tracer(
-          Observability.Traces,
-          "residency-schedule",
-          "0.1.0",
-          :undefined
-        )
-    }
+    state = %{buffer: Buffer.handle(Observability.LogBuffer)}
 
     :telemetry.detach(__MODULE__)
+    :telemetry.detach(Tracing)
+
+    :ok = :telemetry.attach_many(Tracing, Tracing.events(), &Tracing.handle_event/4, nil)
 
     :ok =
       :telemetry.attach(
@@ -47,25 +42,20 @@ defmodule ResidencySchedule.Observability.RequestHandler do
     attributes = Observability.request_attributes(metadata)
     ended = :opentelemetry.timestamp()
 
-    span =
-      :otel_tracer.start_span(:otel_ctx.new(), state.tracer, "HTTP request", %{
-        kind: :server,
-        start_time: ended - duration,
-        attributes: attributes
+    Tracing.set_http_attributes(metadata)
+
+    if span = Tracing.current_span() do
+      Buffer.enqueue(state.buffer, %{
+        time_unix_nano: :opentelemetry.timestamp_to_nano(ended),
+        severity_number: 9,
+        severity_text: "info",
+        body: Value.encode("HTTP request completed"),
+        attributes: Value.attributes(attributes),
+        trace_id: <<:otel_span.trace_id(span)::128>>,
+        span_id: <<:otel_span.span_id(span)::64>>,
+        flags: 1
       })
-
-    :otel_span.end_span(span, ended)
-
-    Buffer.enqueue(state.buffer, %{
-      time_unix_nano: :opentelemetry.timestamp_to_nano(ended),
-      severity_number: 9,
-      severity_text: "info",
-      body: Value.encode("HTTP request completed"),
-      attributes: Value.attributes(attributes),
-      trace_id: <<:otel_span.trace_id(span)::128>>,
-      span_id: <<:otel_span.span_id(span)::64>>,
-      flags: 1
-    })
+    end
 
     :ok
   end
@@ -75,6 +65,7 @@ defmodule ResidencySchedule.Observability.RequestHandler do
   @impl true
   def terminate(_, _) do
     :telemetry.detach(__MODULE__)
+    :telemetry.detach(Tracing)
     :ok
   end
 end

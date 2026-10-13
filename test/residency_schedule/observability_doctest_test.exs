@@ -5,6 +5,7 @@ defmodule ResidencySchedule.ObservabilityDoctestTest do
 
   doctest ResidencySchedule.Observability
   doctest ResidencySchedule.Observability.RequestHandler
+  doctest ResidencySchedule.Observability.Tracing
 
   test "missing or invalid request durations are ignored without requiring exporter state" do
     for measurements <- [%{}, %{duration: nil}, %{duration: "12"}, %{duration: -1}] do

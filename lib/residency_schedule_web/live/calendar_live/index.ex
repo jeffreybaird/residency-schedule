@@ -3,6 +3,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
 
   alias ResidencySchedule.DetailedSchedules
   alias ResidencySchedule.DetailedSchedules.TaskEquivalence
+  alias ResidencySchedule.Observability.Tracing
   alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
@@ -523,18 +524,47 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
   defp assign_view_data(socket) do
     focus_date = socket.assigns.focus_date
     {range_start, range_end} = visible_range(socket.assigns.view_mode, focus_date)
-    rotations = Rotations.projected_rotations_in_range_all_schedules(range_start, range_end)
-    rotation_index = index_by_date(rotations, & &1.start_date, & &1.end_date)
-    overrides = ShiftOverrides.list_overrides_in_range(range_start, range_end)
+
+    {rotations, rotation_index} =
+      Tracing.phase(:calendar_project, fn ->
+        rotations = Rotations.projected_rotations_in_range_all_schedules(range_start, range_end)
+        Tracing.count(:results, length(rotations))
+        {rotations, index_by_date(rotations, & &1.start_date, & &1.end_date)}
+      end)
+
+    overrides =
+      Tracing.phase(:calendar_overrides, fn ->
+        overrides = ShiftOverrides.list_overrides_in_range(range_start, range_end)
+        Tracing.count(:results, length(overrides))
+        overrides
+      end)
+
     academic_year = ScheduleIndex.current_academic_year(focus_date)
 
     activities =
-      range_start
-      |> DetailedSchedules.list_in_range(range_end)
-      |> Enum.map(&Map.put(&1, :calendar_type, activity_calendar_type(&1, rotation_index)))
+      Tracing.phase(:calendar_activities, fn ->
+        activities =
+          range_start
+          |> DetailedSchedules.list_in_range(range_end)
+          |> Enum.map(&Map.put(&1, :calendar_type, activity_calendar_type(&1, rotation_index)))
 
-    options = Residents.list_resident_filter_options_for_year(academic_year)
+        Tracing.count(:results, length(activities))
+        activities
+      end)
 
+    options =
+      Tracing.phase(:calendar_options, fn ->
+        options = Residents.list_resident_filter_options_for_year(academic_year)
+        Tracing.count(:results, length(options))
+        options
+      end)
+
+    Tracing.phase(:calendar_build, fn ->
+      assign_calendar_data(socket, rotations, rotation_index, overrides, activities, options)
+    end)
+  end
+
+  defp assign_calendar_data(socket, rotations, rotation_index, overrides, activities, options) do
     activity_options =
       Enum.map(
         activities,
