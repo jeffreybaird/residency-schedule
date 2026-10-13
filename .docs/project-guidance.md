@@ -380,6 +380,14 @@ attributes, aggregate metrics, and bounded calendar/schedule operation traces.
 Operation traces may include fixed view/lifecycle/phase labels, numeric result
 counts, aggregate database query counts and timings, attribution coverage, and
 dropped-span counts as specified in [operation tracing](operation-tracing.md).
+Render diagnostics may additionally include validated deployment SHA, fixed
+callback/event labels and changed-assign flags, process reduction deltas and
+memory/mailbox snapshots, and encoding duration/byte counts as specified in
+[render diagnostics](render-diagnostics.md). Local profiling is explicit,
+synthetic-only work; it is not a permanent production profiler.
+Generic V2 encoding spans may cover any LiveView; only proven calendar/schedule
+render correlation receives a view label, and no topic/reference identifiers or
+payload contents are exported.
 Do not export resident data, names or identifiers, chat content, request URLs or
 headers, SQL text or parameters, request/event payloads, arbitrary event labels,
 exception messages or stacktraces, or arbitrary application logs.

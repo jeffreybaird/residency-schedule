@@ -4,6 +4,27 @@ defmodule ResidencySchedule.ObservabilityTest do
   alias OtlpShipper.Metrics.Definition
   alias ResidencySchedule.Observability
 
+  @tag :tmp_dir
+  test "deployment version accepts only packaged complete commit hashes", %{tmp_dir: directory} do
+    path = Path.join(directory, "deploy_sha")
+    assert Observability.deployment_version(path) == "unknown"
+    sha = String.duplicate("a1", 20)
+    File.write!(path, sha <> "\n")
+    assert Observability.deployment_version(path) == sha
+
+    for invalid <- ["", "abcdef", String.duplicate("z", 40), sha <> " private-data"] do
+      File.write!(path, invalid)
+      assert Observability.deployment_version(path) == "unknown"
+    end
+  end
+
+  test "deployment packages its actual commit before compiling assets and release" do
+    workflow = File.read!(".github/workflows/deploy.yml")
+    [before_assets | _] = String.split(workflow, "mix assets.deploy", parts: 2)
+    assert before_assets =~ "GITHUB_SHA"
+    assert before_assets =~ "priv/deploy_sha"
+  end
+
   setup do
     previous = Application.get_env(:residency_schedule, :observability)
 

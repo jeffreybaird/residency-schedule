@@ -14,6 +14,11 @@ defmodule ResidencyScheduleWeb.OperationTracingTest do
   @count_keys ~w(app.rows.count app.residents.count app.slots.count app.cells.count app.results.count)
   @attribute_keys @db_keys ++
                     @count_keys ++
+                    ~w(deployment.sha app.cohorts.count app.render.sequence app.render.initial app.render.force app.render.changed app.render.trigger app.render.event app.encode.kind app.encode.bytes app.encode.duration_ms app.encode.correlation app.process.reductions.delta app.process.memory.before_bytes app.process.memory.after_bytes app.process.mailbox.before_count app.process.mailbox.after_count) ++
+                    Enum.map(
+                      ~w(name_col_px visible_resident_groups all_slots rotation_modal filter_year viewed_aca_year schedules unified_residents),
+                      &"app.render.changed.#{&1}"
+                    ) ++
                     ~w(view operation lifecycle http.request.method http.response.status_code db.query.coverage app.spans.dropped)
   @phases ~w(schedule.load schedule.project schedule.residents schedule.slots schedule.rows schedule.cells calendar.project calendar.activities calendar.overrides calendar.options calendar.build)
 

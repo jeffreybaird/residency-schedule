@@ -15,8 +15,20 @@ defmodule ResidencyScheduleWeb.Endpoint do
   ]
 
   socket "/live", Phoenix.LiveView.Socket,
-    websocket: [connect_info: [session: @session_options]],
-    longpoll: [connect_info: [session: @session_options]]
+    websocket: [
+      connect_info: [session: @session_options],
+      serializer: [
+        {Phoenix.Socket.V1.JSONSerializer, "~> 1.0.0"},
+        {ResidencyScheduleWeb.LiveSerializer, "~> 2.0.0"}
+      ]
+    ],
+    longpoll: [
+      connect_info: [session: @session_options],
+      serializer: [
+        {Phoenix.Socket.V1.JSONSerializer, "~> 1.0.0"},
+        {ResidencyScheduleWeb.LiveSerializer, "~> 2.0.0"}
+      ]
+    ]
 
   # Serve at "/" the static files from "priv/static" directory.
   #

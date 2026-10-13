@@ -3,7 +3,7 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
 
   alias ResidencySchedule.Accounts
   alias ResidencySchedule.DetailedSchedules
-  alias ResidencySchedule.Observability.Tracing
+  alias ResidencySchedule.Observability.{RenderDiagnostics, Tracing}
   alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
@@ -588,7 +588,21 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
         socket.assigns.viewed_aca_year
       )
 
-    assign(socket, visible_resident_groups: groups)
+    refresh_counts? =
+      socket.assigns[:visible_resident_groups] != groups or
+        not Map.has_key?(socket.private, :render_counts) or
+        Map.has_key?(socket.assigns.__changed__ || %{}, :all_slots)
+
+    socket = assign(socket, visible_resident_groups: groups)
+
+    if refresh_counts?,
+      do:
+        RenderDiagnostics.assign_counts(
+          socket,
+          groups,
+          socket.assigns.all_slots
+        ),
+      else: socket
   end
 
   defp residents_by_year(unified_residents, filter_year, viewed_aca_year) do

@@ -50,7 +50,7 @@ time overlaps its query/queue/decode components; it is not an additional cost.
 
 Each operation tree permits at most 128 spans, including its root. The root's
 `app.spans.dropped` reports omitted descendants. Each connected callback begins
-a fresh budget. Span attributes are capped at 32, values at 64 characters;
+a fresh budget. Span attributes are capped at 64, values at 64 characters;
 events and links remain disabled. Exceptions set sanitized error status while
 preserving application exceptions and restoring the caller's tracing context.
 
