@@ -750,7 +750,7 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     |> day_rows_for(date)
     |> group_day_rows()
     |> Enum.filter(fn {type, _rows} ->
-      is_nil(type) or assigns.rotation_filter == [] or type in assigns.rotation_filter
+      assigns.rotation_filter == [] or type in assigns.rotation_filter
     end)
   end
 

@@ -90,6 +90,10 @@ original assignments remain stored; notes remain visible even when their task
 label is omitted. Assignments appear normally outside their matching group. A
 resident with only a redundant assignment has no empty parentheses.
 
+Rotation filters apply to every group in the day view and day modal. Unclassified
+assignments do not bypass an active rotation filter. Task details remain visible
+beside residents in a selected rotation; clearing the filter restores all groups.
+
 Highland weekend-day and night-call labels use the equivalences above. A Highland
 night assignment that matches an existing Night Float – Highland or Weekend
 Nights – Highland entry uses that group. It does not create a second weekend-night
