@@ -1,4 +1,4 @@
-# Calendar and schedule operation traces
+# Calendar, schedule, and resident operation traces
 
 Operation tracing is opt-in through the existing `OTEL_ENABLED` configuration.
 It uses the existing named OpenTelemetry provider and bounded asynchronous OTLP
@@ -6,12 +6,12 @@ exporter. It does not send collector requests synchronously during navigation.
 
 ## Trace contract
 
-An `HTTP request` server span covers the endpoint call. Calendar and schedule
+An `HTTP request` server span covers the endpoint call. Calendar, schedule, and resident
 static `LiveView mount` and `LiveView handle_params` spans are children of that
 request. Connected LiveView callbacks have separate operation roots when no
 parent operation exists. Names are fixed: `LiveView mount`,
 `LiveView handle_params`, `LiveView handle_event`, and `LiveView render`.
-Attributes identify `view` (`calendar` or `schedule`), `operation`, and
+Attributes identify `view` (`calendar`, `schedule`, or `resident`), `operation`, and
 `lifecycle` (`static` or `connected`). Browser timing metrics remain separate;
 these traces do not claim browser-to-server navigation correlation.
 Each locally rooted operation begins a fresh trace; incoming `traceparent`
@@ -31,6 +31,14 @@ loading, slot construction, row construction, and cell construction. Calendar
 phases separate projection, activities, overrides, filter options, and building
 view data. Each phase wraps a collection operation, never an individual cell or
 database query. Numeric result counts use only fixed `app.*.count` keys.
+Resident phases are `resident.load`, `resident.career`, `resident.project`, and
+`resident.coworkers`. The project phase loads one academic-year appearance using
+complete schedule evidence; its name never includes a resident or schedule ID.
+Coworkers are loaded when that tab is first selected, so that phase is absent
+from the default resident mount. Resident callbacks use generic operation and
+database diagnostics; schedule-specific render flags are not applied to them.
+The fixed resident view is also available on LiveView duration metrics. Browser
+latency ingestion retains its existing calendar/schedule contract.
 Schedule `app.residents.count` counts loaded schedule-resident records;
 `app.rows.count` counts unified resident rows; `app.slots.count` counts combined
 date slots; and `app.cells.count` counts rendered grouped cells after adjacent
@@ -61,6 +69,13 @@ Large database totals indicate query work; large queue totals indicate waiting
 for a connection. Long phases with little database time point toward application
 processing. This is attribution, not proof of a particular CPU bottleneck;
 profiling remains useful before optimizing.
+
+For a resident page, compare `resident.project` work inside `resident.career`
+with the connected render span. Career content and statistics span every
+appearance; a long mount does not by itself imply that the resident table needs
+windowing. A first coworkers-tab selection intentionally includes its data load;
+later selections reuse that LiveView's already-loaded result, including an empty
+result.
 
 Connected render time covers the server's render/diff work. Browser metrics
 include additional transport and client work. Differences between them cannot

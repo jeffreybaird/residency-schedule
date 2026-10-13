@@ -182,4 +182,24 @@ defmodule ResidencySchedule.ObservabilityTest do
       assert Definition.sample(definition, %{duration_ms: 12}, metadata) == :skip
     end
   end
+
+  test "resident lifecycle duration uses a fixed view label without widening browser ingestion" do
+    metric =
+      Enum.find(
+        Observability.metrics(),
+        &(&1.event_name == [:phoenix, :live_view, :mount, :stop])
+      )
+
+    assert metric.tag_values.(%{
+             socket: %Phoenix.LiveView.Socket{view: ResidencyScheduleWeb.ResidentLive.Show},
+             params: %{"id" => "PRIVATE"}
+           }) == %{view: "resident"}
+
+    assert {:error, :invalid_sample} =
+             Observability.browser_latency_sample(%{
+               "view" => "resident",
+               "operation" => "event",
+               "duration_ms" => 1
+             })
+  end
 end

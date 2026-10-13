@@ -12,6 +12,10 @@ defmodule ResidencySchedule.Observability.Tracing do
   @queries {__MODULE__, :queries}
   @operations [:mount, :handle_params, :handle_event, :render]
   @phases %{
+    resident_load: "resident.load",
+    resident_career: "resident.career",
+    resident_project: "resident.project",
+    resident_coworkers: "resident.coworkers",
     schedule_load: "schedule.load",
     schedule_project: "schedule.project",
     schedule_residents: "schedule.residents",
@@ -216,6 +220,8 @@ defmodule ResidencySchedule.Observability.Tracing do
     _, _ -> fallback
   end
 
+  defp render_attributes(_, _, _, %{"view" => "resident"} = attributes), do: attributes
+
   defp render_attributes(:render, :start, metadata, attributes),
     do: Map.merge(attributes, RenderDiagnostics.start(metadata))
 
@@ -417,5 +423,6 @@ defmodule ResidencySchedule.Observability.Tracing do
   defp live_attributes(_), do: :error
   defp view_name(ResidencyScheduleWeb.ScheduleLive.Index), do: "schedule"
   defp view_name(ResidencyScheduleWeb.CalendarLive.Index), do: "calendar"
+  defp view_name(ResidencyScheduleWeb.ResidentLive.Show), do: "resident"
   defp view_name(_), do: nil
 end

@@ -15,20 +15,14 @@ defmodule ResidencySchedule.Rotations.ScheduleGaps do
       {"vacation", ["Vacation"], nil}
   """
   def project(rotations, activities, overrides) do
-    bases = Enum.group_by(rotations, & &1.schedule_resident_id)
-    coverage = Enum.group_by(overrides, & &1.covering_schedule_resident_id)
+    occupied = index_occupied_intervals(rotations, overrides)
 
     added =
       activities
       |> Enum.reject(fn activity ->
-        Enum.any?(
-          Map.get(bases, activity.schedule_resident_id, []),
-          &(activity.date in Date.range(&1.start_date, &1.end_date))
-        ) or
-          Enum.any?(
-            Map.get(coverage, activity.schedule_resident_id, []),
-            &(activity.date in Date.range(&1.override_start_date, &1.override_end_date))
-          )
+        intervals = Map.get(occupied, activity.schedule_resident_id, {})
+        day = Date.to_gregorian_days(activity.date)
+        occupied_day?(intervals, day, 0, tuple_size(intervals) - 1)
       end)
       |> Enum.group_by(
         &{&1.schedule_resident_id, &1.date, TaskEquivalence.gap_type(&1.raw_task, &1.date)}
@@ -50,5 +44,64 @@ defmodule ResidencySchedule.Rotations.ScheduleGaps do
       rotations ++ added,
       &{Date.to_gregorian_days(&1.start_date), &1.schedule_resident_id, &1.rotation_type}
     )
+  end
+
+  defp index_occupied_intervals(rotations, overrides) do
+    bases =
+      Enum.reduce(rotations, %{}, fn rotation, acc ->
+        add_occupied_interval(
+          acc,
+          rotation.schedule_resident_id,
+          rotation.start_date,
+          rotation.end_date
+        )
+      end)
+
+    overrides
+    |> Enum.reduce(bases, fn override, acc ->
+      add_occupied_interval(
+        acc,
+        override.covering_schedule_resident_id,
+        override.override_start_date,
+        override.override_end_date
+      )
+    end)
+    |> Map.new(fn {resident_id, intervals} ->
+      merged =
+        intervals
+        |> Enum.sort()
+        |> Enum.reduce([], &merge_occupied_interval/2)
+        |> Enum.reverse()
+        |> List.to_tuple()
+
+      {resident_id, merged}
+    end)
+  end
+
+  defp add_occupied_interval(intervals, resident_id, first_date, last_date) do
+    first = Date.to_gregorian_days(first_date)
+    last = Date.to_gregorian_days(last_date)
+    # Date.range/2 includes both endpoints even when the range runs backwards.
+    interval = {min(first, last), max(first, last)}
+    Map.update(intervals, resident_id, [interval], &[interval | &1])
+  end
+
+  defp merge_occupied_interval({first, last}, [{previous_first, previous_last} | rest])
+       when first <= previous_last + 1,
+       do: [{previous_first, max(previous_last, last)} | rest]
+
+  defp merge_occupied_interval(interval, intervals), do: [interval | intervals]
+
+  defp occupied_day?(_intervals, _day, low, high) when low > high, do: false
+
+  defp occupied_day?(intervals, day, low, high) do
+    middle = div(low + high, 2)
+    {first, last} = elem(intervals, middle)
+
+    cond do
+      day < first -> occupied_day?(intervals, day, low, middle - 1)
+      day > last -> occupied_day?(intervals, day, middle + 1, high)
+      true -> true
+    end
   end
 end

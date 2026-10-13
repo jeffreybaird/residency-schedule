@@ -3,6 +3,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
   alias ResidencySchedule.DetailedSchedules
   alias ResidencySchedule.DetailedSchedules.TaskEquivalence
+  alias ResidencySchedule.Observability.Tracing
   alias ResidencySchedule.ResidentDisplayNames
   alias ResidencySchedule.Residents
   alias ResidencySchedule.Rotations
@@ -16,14 +17,16 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
+    Tracing.phase(:resident_load, fn -> load_resident(id, socket) end)
+  end
+
+  defp load_resident(id, socket) do
     current_user = socket.assigns.current_user
     home_resident_id = current_user && current_user.home_resident_id
 
     [resident] =
       [Residents.get_resident!(String.to_integer(id))]
       |> ResidentDisplayNames.apply_to_schedule_residents()
-
-    resident = %{resident | rotations: Rotations.projected_rotations_for_resident(resident.id)}
 
     today = ScheduleIndex.current_date()
 
@@ -37,7 +40,11 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
     # A resident is one entity that appears across academic years, so the table
     # spans their whole career and the stats are career-wide.
-    {all_entries, all_rotations} = build_career_entries(appearances)
+    {all_entries, all_rotations, data_by_appearance} =
+      Tracing.phase(:resident_career, fn -> build_career_entries(appearances) end)
+
+    selected_data = Map.fetch!(data_by_appearance, resident.id)
+    resident = %{resident | rotations: selected_data.rotations}
 
     scheduled_entries = Enum.reject(all_entries, &(&1.rotation_type == "off"))
     schedule_start = schedule_start_date(scheduled_entries)
@@ -61,7 +68,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
      assign(socket,
        resident: resident,
        activity_date: today,
-       day_activities: DetailedSchedules.list_for_resident(resident.id, today),
+       day_activities: Enum.filter(selected_data.activities, &(&1.date == today)),
        day_base_rotations:
          Enum.filter(
            resident.rotations,
@@ -89,10 +96,8 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
        night_shifts_expanded: false,
        shift_coworkers_modal: nil,
        active_tab: :schedule,
-       coworkers:
-         resident.id
-         |> Rotations.list_coworker_shared_shift_counts()
-         |> ResidentDisplayNames.apply_to_entries(),
+       coworkers: [],
+       coworkers_loaded?: false,
        current_user: current_user
      )}
   end
@@ -133,6 +138,21 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
   @impl true
   def handle_event("switch_tab", %{"tab" => "coworkers"}, socket) do
+    socket =
+      if socket.assigns.coworkers_loaded? do
+        socket
+      else
+        Tracing.phase(:resident_coworkers, fn ->
+          coworkers =
+            socket.assigns.resident.id
+            |> Rotations.list_coworker_shared_shift_counts()
+            |> ResidentDisplayNames.apply_to_entries()
+
+          Tracing.count(:results, length(coworkers))
+          assign(socket, coworkers: coworkers, coworkers_loaded?: true)
+        end)
+      end
+
     {:noreply, assign(socket, active_tab: :coworkers)}
   end
 
@@ -1119,18 +1139,26 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
 
     all_rotations = Enum.flat_map(per_year, & &1.rotations)
 
-    {all_entries, all_rotations}
+    data_by_appearance = Map.new(per_year, &{&1.appearance_id, &1.data})
+    Tracing.count(:rows, length(all_entries))
+    {all_entries, all_rotations, data_by_appearance}
   end
 
   defp year_entries(schedule_resident) do
-    rotations = Rotations.projected_rotations_for_resident(schedule_resident.id)
-    activities = DetailedSchedules.list_for_resident(schedule_resident.id)
-    effective_entries = Rotations.effective_segments_for_resident(schedule_resident.id)
+    data =
+      Tracing.phase(:resident_project, fn ->
+        data = Rotations.resident_schedule_data(schedule_resident)
+        Tracing.count(:results, length(data.rotations))
+        Tracing.count(:slots, length(data.date_slots))
+        data
+      end)
+
+    %{rotations: rotations, activities: activities, effective_entries: effective_entries} = data
 
     off_slots =
       compute_off_slots(
         rotations,
-        Rotations.list_schedule_date_slots(schedule_resident.schedule_id)
+        data.date_slots
       )
       |> exclude_activity_dates(activities)
 
@@ -1141,7 +1169,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       |> Kernel.++(activities |> unmatched_activities(effective_entries) |> activity_entries())
       |> Enum.map(&tag_entry_with_schedule(&1, schedule_resident))
 
-    %{entries: entries, rotations: rotations}
+    %{entries: entries, rotations: rotations, appearance_id: schedule_resident.id, data: data}
   end
 
   defp tag_entry_with_schedule(entry, schedule_resident) do
