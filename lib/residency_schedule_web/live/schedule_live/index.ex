@@ -641,9 +641,12 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
       {2, "float"}
   """
   def cell_groups_unified(all_slots, rotation_lookup) do
+    slot_rotations = index_slot_rotations(all_slots, rotation_lookup)
+
     all_slots
     |> Enum.map(fn {schedule_id, idx, start, last, _first?} ->
-      {schedule_id, start, last, lookup_slot_rotation(rotation_lookup, schedule_id, idx, start)}
+      rotation = lookup_slot_rotation(rotation_lookup, slot_rotations, schedule_id, idx, start)
+      {schedule_id, start, last, rotation}
     end)
     |> Enum.chunk_while([], &chunk_adjacent_cells/2, fn
       [] -> {:cont, []}
@@ -669,18 +672,70 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
     end
   end
 
-  defp lookup_slot_rotation(lookup, schedule_id, idx, date) do
+  defp index_slot_rotations(all_slots, lookup) do
+    all_slots
+    |> Enum.group_by(&elem(&1, 0))
+    |> Enum.reduce(%{}, fn {schedule_id, slots}, index ->
+      case Map.get(lookup, schedule_id) do
+        nil -> index
+        rotations -> Map.put(index, schedule_id, index_schedule_rotations(slots, rotations))
+      end
+    end)
+  end
+
+  defp index_schedule_rotations(slots, rotations) do
+    boundaries =
+      rotations
+      |> Enum.with_index()
+      |> Enum.map(fn {rotation, ordinal} ->
+        {Date.to_gregorian_days(rotation.start_date), Date.to_gregorian_days(rotation.end_date),
+         {rotation.rotation_type, ordinal}, rotation}
+      end)
+
+    starts = Enum.sort_by(boundaries, &elem(&1, 0))
+
+    ends =
+      boundaries
+      |> Enum.map(fn {_, last, key, _} -> {last, key} end)
+      |> Enum.sort_by(&elem(&1, 0))
+
+    slots
+    |> Enum.map(fn {_, _, first, _, _} -> Date.to_gregorian_days(first) end)
+    |> Enum.uniq()
+    |> Enum.sort()
+    |> Enum.reduce({starts, ends, :gb_trees.empty(), %{}}, &index_probe_date/2)
+    |> elem(3)
+  end
+
+  defp index_probe_date(day, {starts, ends, active, index}) do
+    {starts, active} = activate_started_rotations(starts, day, active)
+    {ends, active} = expire_finished_rotations(ends, day, active)
+    rotation = active |> :gb_trees.values() |> combine_concurrent_rotations()
+    {starts, ends, active, Map.put(index, day, rotation)}
+  end
+
+  defp activate_started_rotations([{first, last, key, rotation} | rest], day, active)
+       when first <= day do
+    # Expired and inverted intervals never become active, even when a probe skips dates.
+    active = if last >= day, do: :gb_trees.enter(key, rotation, active), else: active
+    activate_started_rotations(rest, day, active)
+  end
+
+  defp activate_started_rotations(starts, _, active), do: {starts, active}
+
+  defp expire_finished_rotations([{last, key} | rest], day, active) when last < day do
+    expire_finished_rotations(rest, day, :gb_trees.delete_any(key, active))
+  end
+
+  defp expire_finished_rotations(ends, _, active), do: {ends, active}
+
+  defp lookup_slot_rotation(lookup, slot_rotations, schedule_id, idx, date) do
     case Map.get(lookup, schedule_id) do
       nil ->
         Map.get(lookup, {schedule_id, idx})
 
-      rotations ->
-        rotations
-        |> Enum.filter(
-          &(Date.compare(&1.start_date, date) != :gt and Date.compare(&1.end_date, date) != :lt)
-        )
-        |> Enum.sort_by(& &1.rotation_type)
-        |> combine_concurrent_rotations()
+      _rotations ->
+        slot_rotations |> Map.fetch!(schedule_id) |> Map.fetch!(Date.to_gregorian_days(date))
     end
   end
 
