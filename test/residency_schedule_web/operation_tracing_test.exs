@@ -6,6 +6,7 @@ defmodule ResidencyScheduleWeb.OperationTracingTest do
   alias Ecto.Adapters.SQL.Sandbox
   alias ResidencySchedule.{Observability, Repo}
   alias ResidencySchedule.Observability.Tracing
+  alias ResidencySchedule.ResidentPerformanceFixtures
   alias ResidencySchedule.Residents.ScheduleResident
   alias ResidencyScheduleWeb.{CalendarLive, Endpoint, ScheduleLive}
 
@@ -24,6 +25,49 @@ defmodule ResidencyScheduleWeb.OperationTracingTest do
   @phases ~w(schedule.load schedule.project schedule.residents schedule.slots schedule.rows schedule.cells calendar.project calendar.activities calendar.overrides calendar.options calendar.build)
 
   setup :authenticate_session
+
+  test "resident navigation projects each career appearance once and loads coworkers only when opened",
+       %{conn: conn} do
+    appearances = ResidentPerformanceFixtures.four_year_career(@secret)
+    selected = List.last(appearances)
+    start_exporter()
+    {:ok, view, _html} = live(conn, "/residents/#{selected.id}?private=#{@secret}")
+    spans = flush_spans()
+    assert Enum.count(spans, &(&1.name == "resident.project")) == 8
+    assert Enum.count(spans, &(&1.name == "resident.career")) == 2
+    assert Enum.count(spans, &(&1.name == "resident.load")) == 2
+    refute Enum.any?(spans, &(&1.name == "resident.coworkers"))
+    callbacks = Enum.filter(spans, &(attributes(&1)["view"] == "resident"))
+
+    for lifecycle <- ~w(static connected) do
+      assert Enum.any?(
+               callbacks,
+               &(attributes(&1)["operation"] == "mount" and
+                   attributes(&1)["lifecycle"] == lifecycle)
+             )
+    end
+
+    assert Enum.any?(callbacks, &(attributes(&1)["operation"] == "render"))
+
+    for span <- callbacks do
+      assert_diagnostics(span)
+
+      refute Enum.any?(
+               Map.keys(attributes(span)),
+               &String.starts_with?(&1, "app.render.changed.")
+             )
+
+      refute Map.has_key?(attributes(span), "app.render.sequence")
+    end
+
+    view |> element("button[phx-value-tab='coworkers']") |> render_click()
+    first_tab = flush_spans()
+    assert Enum.count(first_tab, &(&1.name == "resident.coworkers")) == 1
+    view |> element("button[phx-value-tab='schedule']") |> render_click()
+    view |> element("button[phx-value-tab='coworkers']") |> render_click()
+    repeated = flush_spans()
+    refute Enum.any?(repeated, &(&1.name == "resident.coworkers"))
+  end
 
   setup do
     :otel_ctx.set_value(:operation_test_caller, @secret)

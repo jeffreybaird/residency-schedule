@@ -181,6 +181,40 @@ defmodule ResidencySchedule.Rotations do
     end
   end
 
+  @doc """
+  Loads one resident's timeline inputs using one complete schedule projection.
+
+  Date slots retain the raw roster boundaries. Incoming coverage remains scoped
+  to the covering resident, including original rotations in other schedules.
+  Exempt from doctest — database queries; equivalence tests cover detailed
+  assignments, overrides, and the complete returned maps.
+  """
+  def resident_schedule_data(%ScheduleResident{} = resident) do
+    raw_rotations = list_rotations_for_schedule(resident.schedule_id)
+    activities = DetailedSchedules.list_for_schedule(resident.schedule_id)
+    overrides = ShiftOverrides.list_overrides_for_schedule(resident.schedule_id)
+
+    rotations =
+      raw_rotations
+      |> Repo.preload(schedule_resident: ScheduleResident.with_name_query())
+      |> project_assignments(activities, overrides)
+      |> Enum.filter(&(&1.schedule_resident_id == resident.id))
+
+    effective_entries =
+      build_effective_segments(
+        rotations,
+        Enum.filter(overrides, &(&1.rotation.schedule_resident_id == resident.id)),
+        ShiftOverrides.list_overrides_for_resident_as_cover(resident.id)
+      )
+
+    %{
+      rotations: rotations,
+      activities: Enum.filter(activities, &(&1.schedule_resident_id == resident.id)),
+      effective_entries: effective_entries,
+      date_slots: date_slots(raw_rotations)
+    }
+  end
+
   @doc "Lists derived display rotations for a complete schedule. Exempt from doctest — database query."
   def projected_rotations_for_schedule(schedule_id) do
     schedule_id

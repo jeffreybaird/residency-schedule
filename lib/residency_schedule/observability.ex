@@ -242,6 +242,9 @@ defmodule ResidencySchedule.Observability do
   defp live_view_attributes(%{socket: %{view: ResidencyScheduleWeb.ScheduleLive.Index}}),
     do: %{view: "schedule"}
 
+  defp live_view_attributes(%{socket: %{view: ResidencyScheduleWeb.ResidentLive.Show}}),
+    do: %{view: "resident"}
+
   defp live_view_attributes(_), do: %{}
 
   defp browser_latency_metric do

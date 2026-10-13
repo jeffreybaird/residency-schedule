@@ -376,7 +376,7 @@ The variables required at runtime are:
 - `OTEL_HUB_TOKEN` — production GitHub Secret; source-scoped ingest token, required when `OTEL_ENABLED=true`; never log or commit it
 
 OTel Hub receives only fixed HTTP completion summaries, bounded method/status
-attributes, aggregate metrics, and bounded calendar/schedule operation traces.
+attributes, aggregate metrics, and bounded calendar/schedule/resident operation traces.
 Operation traces may include fixed view/lifecycle/phase labels, numeric result
 counts, aggregate database query counts and timings, attribution coverage, and
 dropped-span counts as specified in [operation tracing](operation-tracing.md).
