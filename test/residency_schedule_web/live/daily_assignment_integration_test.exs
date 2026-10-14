@@ -195,14 +195,18 @@ defmodule ResidencyScheduleWeb.DailyAssignmentIntegrationTest do
     refute has_element?(view, "#day-activities [data-resident-id='#{ctx.juniper.resident_id}']")
   end
 
-  test "task-only resident dates remain accessible with neutral empty-state wording", ctx do
+  test "task-only residents retain assignments in their schedule without the daily panel", ctx do
     {:ok, view, _} = live(ctx.conn, "/residents/#{ctx.juniper.id}")
-    view |> form("#resident-activity-date-form", %{"date" => "2026-12-30"}) |> render_change()
-    assert has_element?(view, "#resident-day-activities", "Sick Backup")
-    assert_neutral(view, "#resident-day-activities")
-    view |> form("#resident-activity-date-form", %{"date" => "2027-01-04"}) |> render_change()
-    assert has_element?(view, "#resident-day-activities", "No daily assignments recorded")
-    refute has_element?(view, "#resident-day-activities", "Available")
+
+    assert has_element?(
+             view,
+             "#rotation-table tr[data-rotation-type='qgenda_assignment'][phx-value-start-date='2026-12-30'][phx-value-end-date='2026-12-30']",
+             "Sick Backup"
+           )
+
+    assert_neutral(view, "#rotation-table")
+    refute has_element?(view, "#resident-activity-date-form")
+    refute has_element?(view, "#resident-day-activities")
   end
 
   test "calendar empty detail omits the assignments placeholder", ctx do

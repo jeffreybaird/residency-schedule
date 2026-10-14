@@ -89,16 +89,15 @@ defmodule ResidencyScheduleWeb.QgendaDetailsTest do
       assert has_element?(view, "#day-activities", "Juniper Vale")
     end
 
-    test "resident date detail exposes tasks and preserves unknown detail wording", ctx do
+    test "resident schedule exposes clinic tasks and notes without a daily commitments panel",
+         ctx do
       {:ok, view, _} = live(ctx.conn, "/residents/#{ctx.iris.id}")
-      view |> form("#resident-activity-date-form", %{"date" => "2026-12-29"}) |> render_change()
-      assert has_element?(view, "#resident-day-activities", "GOG Continuity Clinic PM")
-      assert has_element?(view, "#resident-day-activities", "Bring simulation kit")
-      refute has_element?(view, "#resident-day-activities", "Source details")
-      view |> form("#resident-activity-date-form", %{"date" => "2027-01-04"}) |> render_change()
-      assert has_element?(view, "#resident-day-activities", "No daily assignments recorded")
-      refute has_element?(view, "#resident-day-activities", "Off")
-      refute has_element?(view, "#resident-day-activities", "Available")
+      selector = "#rotation-table tr[data-entry-kind='activity'][data-date='2026-12-29']"
+      assert has_element?(view, selector, "GOG Continuity Clinic PM")
+      assert has_element?(view, selector, "Bring simulation kit")
+      refute has_element?(view, selector, "Source details")
+      refute has_element?(view, "#resident-activity-date-form")
+      refute has_element?(view, "#resident-day-activities")
     end
 
     test "calendar resident filters also filter detailed activities", ctx do

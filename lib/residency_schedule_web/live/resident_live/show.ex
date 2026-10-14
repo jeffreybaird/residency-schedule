@@ -67,13 +67,6 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     {:ok,
      assign(socket,
        resident: resident,
-       activity_date: today,
-       day_activities: Enum.filter(selected_data.activities, &(&1.date == today)),
-       day_base_rotations:
-         Enum.filter(
-           resident.rotations,
-           &(Date.compare(&1.start_date, today) != :gt and Date.compare(&1.end_date, today) != :lt)
-         ),
        year_history: year_history,
        appearance_ids: Map.new(appearances, &{&1.schedule_id, &1.id}),
        multi_year?: length(year_history) > 1,
@@ -100,31 +93,6 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
        coworkers_loaded?: false,
        current_user: current_user
      )}
-  end
-
-  @impl true
-  def handle_event("resident-activity-date", %{"date" => date}, socket) do
-    case Date.from_iso8601(date) do
-      {:ok, selected} ->
-        resident = socket.assigns.resident
-
-        rotations =
-          Enum.filter(
-            resident.rotations,
-            &(Date.compare(&1.start_date, selected) != :gt and
-                Date.compare(&1.end_date, selected) != :lt)
-          )
-
-        {:noreply,
-         assign(socket,
-           activity_date: selected,
-           day_activities: DetailedSchedules.list_for_resident(resident.id, selected),
-           day_base_rotations: rotations
-         )}
-
-      _ ->
-        {:noreply, socket}
-    end
   end
 
   @impl true
@@ -339,32 +307,6 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
       </div>
 
       <%= if @active_tab == :schedule do %>
-        <section class="mb-6 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
-          <h2 class="font-semibold">Daily commitments</h2>
-          <.form for={%{}} id="resident-activity-date-form" phx-change="resident-activity-date">
-            <.input
-              type="date"
-              name="date"
-              id="resident-activity-date"
-              label="Show a date"
-              value={Date.to_iso8601(@activity_date)}
-            />
-          </.form>
-          <div id="resident-day-activities" class="space-y-3 text-sm">
-            <h3 class="font-medium">{@resident.name}</h3>
-            <p
-              :for={rotation <- @day_base_rotations}
-              :if={not described_by_activities?(rotation, @day_activities)}
-            >
-              Base rotation: {Rotations.rotation_type_label(rotation.rotation_type)}
-            </p>
-            <DailyAssignments.activities
-              id="resident-day-tasks"
-              activities={@day_activities}
-              show_dates={false}
-            />
-          </div>
-        </section>
         <%= if @schedule_start && @schedule_end do %>
           <div class="mb-4 text-sm text-gray-500 dark:text-gray-300">
             {Calendar.strftime(@schedule_start, "%B %-d, %Y")} – {Calendar.strftime(
@@ -841,6 +783,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                 </div>
 
                 <DailyAssignments.activities
+                  :if={modal.activities != []}
                   id="rotation-daily-assignments"
                   activities={modal.activities}
                 />
@@ -993,13 +936,6 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   defp schedule_entry_label(%{specific_tasks: [_ | _] = tasks}), do: Enum.join(tasks, "; ")
   defp schedule_entry_label(%{source_tasks: [_ | _] = tasks}), do: Enum.join(tasks, "; ")
   defp schedule_entry_label(entry), do: entry_label(entry.rotation_type)
-
-  defp described_by_activities?(rotation, activities),
-    do:
-      Enum.any?(
-        activities,
-        &TaskEquivalence.matches_rotation?(&1.raw_task, rotation.rotation_type)
-      )
 
   defp entry_row_class("off", true), do: ["opacity-40", "bg-gray-50 dark:bg-gray-950"]
 
@@ -1433,7 +1369,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
            assign(socket,
              shift_coworkers_modal: %{
                rotation_type: "off",
-               activities: modal_activities(socket, schedule_id, start_d, end_d),
+               activities:
+                 socket
+                 |> modal_activities(schedule_id, start_d, end_d)
+                 |> reject_repeated_rotation_assignments("off"),
                start_date: start_d,
                end_date: end_d,
                coworker_rows: coworker_rows
@@ -1459,7 +1398,10 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
            assign(socket,
              shift_coworkers_modal: %{
                rotation_type: type,
-               activities: modal_activities(socket, schedule_id, start_d, end_d),
+               activities:
+                 socket
+                 |> modal_activities(schedule_id, start_d, end_d)
+                 |> reject_repeated_rotation_assignments(type),
                start_date: start_d,
                end_date: end_d,
                coworker_rows: coworker_rows
@@ -1478,5 +1420,12 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     socket.assigns.appearance_ids
     |> Map.get(schedule_id)
     |> DetailedSchedules.list_for_resident_range(first, last)
+  end
+
+  defp reject_repeated_rotation_assignments(activities, rotation_type) do
+    Enum.reject(activities, fn activity ->
+      TaskEquivalence.matches_rotation?(activity.raw_task, rotation_type) and
+        not Enum.any?(activity.notes, &(String.trim(&1) != ""))
+    end)
   end
 end

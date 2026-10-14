@@ -121,20 +121,22 @@ rotations and coverage take precedence, and no fallback is saved into the origin
 schedule. Neutral QGenda assignments do not imply working hours or a coworker
 service. See the [gap fallback contract and verification](qgenda-gap-fallback-verification.md).
 
-On a resident page, open a rotation to see that resident's assignments and notes
-for the rotation's date range, alongside the existing coworker information. The
-dialog identifies the resident and rotation dates and closes with Escape. The
-resident's date selector also provides access to assignments on days without a
-rotation.
+On a resident page, open a rotation to see that resident's additional assignments
+and notes for its date range, alongside the existing coworker information. Exact
+tasks that repeat the selected rotation are omitted when they have no meaningful
+notes. Tasks with notes, clinic assignments, and other duties remain visible.
+Dates with no additional detail are omitted, and the assignment area is hidden
+when the whole range has no additional detail. The dialog identifies the resident
+and rotation dates and closes with Escape. Assignments on days without a rotation
+remain accessible in the chronological schedule and calendar.
 
 On a resident's chronological schedule, the specific imported task replaces its
 equivalent general rotation label on matching dates. A rotation span splits where
 the recorded tasks change; dates without matching detail retain their general
 label. The specific row keeps the original service filter, coverage information,
 and coworker lookup for its displayed dates. Task notes remain visible, and a
-matched task is not repeated in a separate daily-assignment row. The selected-date
-panel similarly omits a general base-rotation line when the equivalent specific
-task is shown.
+matched task is not repeated in a separate daily-assignment row. The resident page
+has no separate Daily commitments section or date selector.
 
 Imported and general rotation labels share the same centered pill layout and
 maximum width. Long labels wrap within the pill; task notes stay below it.
@@ -161,9 +163,9 @@ For example, a resident may have both `SMH GYN R3 Day` and
 `GOG Continuity Clinic PM`. Both belong in the day's details. The clinic must not
 be collapsed into a generic GYN label.
 
-The resident's daily detail panel says "No daily assignments recorded" when
-empty; the calendar's compact list omits that message. Missing assignments do
-not establish that the resident is free, off duty, or available for surgery.
+Empty resident rotation details and the calendar's compact list omit assignment
+placeholders. Missing assignments do not establish that the resident is free,
+off duty, or available for surgery.
 Activity search and availability rules are separate capabilities.
 
 ## Repeated and partial imports
