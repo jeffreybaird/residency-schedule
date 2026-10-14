@@ -72,7 +72,7 @@ defmodule ResidencyScheduleWeb.FridayNightFloatTest do
 
       assert spans(ctx.alder) == [
                {"ambulatory", ~D[2026-10-05], ~D[2026-10-08]},
-               {"night_float", @friday, @friday},
+               {"strong_weekend_nights", @friday, @friday},
                {"ambulatory", ~D[2026-10-10], ~D[2026-10-11]}
              ]
 
@@ -157,7 +157,7 @@ defmodule ResidencyScheduleWeb.FridayNightFloatTest do
     # Deliberately overlapping dates exercise schedule identity independently of date matching.
     insert_rotation(other, :night_float, ~D[2026-10-05], ~D[2026-10-11])
     assert day_type(other, @friday) == "night_float"
-    assert day_type(ctx.alder, @friday) == "night_float"
+    assert day_type(ctx.alder, @friday) == "strong_weekend_nights"
     Repo.delete!(activity)
     assert spans(ctx.alder) == [{"ambulatory", ~D[2026-10-05], ~D[2026-10-11]}]
     assert spans(ctx.cedar) == [{"night_float", ~D[2026-10-05], ~D[2026-10-11]}]
@@ -167,7 +167,7 @@ defmodule ResidencyScheduleWeb.FridayNightFloatTest do
        ctx do
     add_activity(ctx, ctx.alder, @friday, "SMH Obstetrics Resident 1st Contact Night")
     {:ok, calendar, _} = live(ctx.conn, "/calendar?view=day&date=2026-10-09")
-    assert has_element?(calendar, calendar_person("night_float", ctx.alder))
+    assert has_element?(calendar, calendar_person("strong_weekend_nights", ctx.alder))
     assert has_element?(calendar, calendar_person("post_call", ctx.cedar))
     assert has_element?(calendar, calendar_person("ambulatory", ctx.birch))
     render_click(calendar, "toggle_resident_filter", %{"id" => to_string(ctx.cedar.resident_id)})
@@ -177,7 +177,7 @@ defmodule ResidencyScheduleWeb.FridayNightFloatTest do
     {:ok, resident, _} = live(ctx.conn, "/residents/#{ctx.alder.id}")
 
     selector =
-      "#rotation-table tr[data-rotation-type='night_float'][phx-value-start-date='2026-10-09'][phx-value-end-date='2026-10-09']"
+      "#rotation-table tr[data-rotation-type='strong_weekend_nights'][phx-value-start-date='2026-10-09'][phx-value-end-date='2026-10-09']"
 
     assert has_element?(resident, selector, "SMH Obstetrics Resident 1st Contact Night")
     resident |> form("#resident-activity-date-form", %{"date" => "2026-10-09"}) |> render_change()
@@ -202,18 +202,18 @@ defmodule ResidencyScheduleWeb.FridayNightFloatTest do
     coworkers =
       Rotations.list_effective_coworker_rows_for_type_in_range(
         ctx.schedule.id,
-        "night_float",
+        "strong_weekend_nights",
         @friday,
         @friday
       )
 
     assert Enum.map(coworkers, & &1.resident.id) == [ctx.alder.id]
-    assert {:ok, answer} = Assistant.who_is_on("strong nf", "2026-10-09")
+    assert {:ok, answer} = Assistant.who_is_on("strong weekend nights", "2026-10-09")
 
     assert Enum.map(answer.assignments, &{&1.name, &1.position_code, &1.rotation_type}) ==
-             [{ctx.alder.name, ctx.alder.position_code, "night_float"}]
+             [{ctx.alder.name, ctx.alder.position_code, "strong_weekend_nights"}]
 
-    for {resident, label} <- [{ctx.alder, "Night Float – Strong"}, {ctx.cedar, "Post Call"}] do
+    for {resident, label} <- [{ctx.alder, "Weekend Nights – Strong"}, {ctx.cedar, "Post Call"}] do
       body = ctx.conn |> get("/residents/#{resident.id}/calendar.ics") |> response(200)
 
       event =
@@ -259,9 +259,9 @@ defmodule ResidencyScheduleWeb.FridayNightFloatTest do
     {:ok, view, _} = live(ctx.conn, "/schedule")
 
     promoted =
-      "button[data-rotation-id='#{ambulatory.id}'][aria-label='View Night Float – Strong details']"
+      "button[data-rotation-id='#{ambulatory.id}'][aria-label='View Weekend Nights – Strong details']"
 
-    assert has_element?(view, promoted, "NF")
+    assert has_element?(view, promoted, "SWN")
 
     assert has_element?(
              view,
@@ -301,12 +301,76 @@ defmodule ResidencyScheduleWeb.FridayNightFloatTest do
       |> Enum.filter(&String.contains?(&1, "DTSTART:20261009T180000"))
 
     assert length(events) == 2
-    assert Enum.count(events, &String.contains?(&1, "SUMMARY:Night Float – Strong")) == 1
+    assert Enum.count(events, &String.contains?(&1, "SUMMARY:Weekend Nights – Strong")) == 1
     assert Enum.count(events, &String.contains?(&1, "SUMMARY:Night Float – Highland")) == 1
-    refute Enum.any?(events, &String.contains?(&1, "SUMMARY:Weekend Nights – Strong"))
+    refute Enum.any?(events, &String.contains?(&1, "SUMMARY:Night Float – Strong"))
     assert Enum.all?(events, &String.contains?(&1, "DTEND:20261010T060000"))
     assert body =~ "DTSTART:20261008T060000"
     assert body =~ "DTEND:20261008T180000"
+  end
+
+  test "Nov 2–19 transition renders actual night dates and exports both weekend nights before Monday ambulatory",
+       ctx do
+    [original] = Rotations.list_rotations_for_resident(ctx.alder.id)
+    Repo.delete!(original)
+
+    for {type, first, last} <- [
+          {:ambulatory, ~D[2026-11-02], ~D[2026-11-06]},
+          {:strong_weekend_nights, ~D[2026-11-07], ~D[2026-11-08]},
+          {:ambulatory, ~D[2026-11-09], ~D[2026-11-13]},
+          {:strong_weekend_nights, ~D[2026-11-14], ~D[2026-11-15]},
+          {:night_float, ~D[2026-11-16], ~D[2026-11-20]}
+        ] do
+      insert_rotation(ctx.alder, type, first, last)
+    end
+
+    body = ctx.conn |> get("/residents/#{ctx.alder.id}/calendar.ics") |> response(200)
+
+    events = String.split(body, "BEGIN:VEVENT")
+
+    for {label, start_time, end_time} <- [
+          {"Weekend Nights – Strong", "20261106T180000", "20261107T060000"},
+          {"Weekend Nights – Strong", "20261107T180000", "20261108T060000"},
+          {"Weekend Nights – Strong", "20261113T180000", "20261114T060000"},
+          {"Weekend Nights – Strong", "20261114T180000", "20261115T060000"},
+          {"Night Float – Strong", "20261115T180000", "20261116T060000"},
+          {"Night Float – Strong", "20261119T180000", "20261120T060000"},
+          {"Ambulatory", "20261109T060000", "20261109T180000"}
+        ] do
+      assert Enum.count(events, fn event ->
+               String.contains?(event, "SUMMARY:#{label}") and
+                 String.contains?(event, "DTSTART:#{start_time}") and
+                 String.contains?(event, "DTEND:#{end_time}")
+             end) == 1
+    end
+
+    refute Enum.any?(events, fn event ->
+             String.contains?(event, "SUMMARY:Weekend Nights – Strong") and
+               String.contains?(event, "DTSTART:20261108T180000")
+           end)
+
+    {:ok, calendar, _} = live(ctx.conn, "/calendar?view=day&date=2026-11-06")
+    assert has_element?(calendar, calendar_person("strong_weekend_nights", ctx.alder))
+    refute has_element?(calendar, calendar_person("ambulatory", ctx.alder))
+
+    {:ok, sunday, _} = live(ctx.conn, "/calendar?view=day&date=2026-11-15")
+    assert has_element?(sunday, calendar_person("night_float", ctx.alder))
+    refute has_element?(sunday, calendar_person("strong_weekend_nights", ctx.alder))
+
+    {:ok, monday, _} = live(ctx.conn, "/calendar?view=day&date=2026-11-09")
+    assert has_element?(monday, calendar_person("ambulatory", ctx.alder))
+
+    {:ok, resident, _} = live(ctx.conn, "/residents/#{ctx.alder.id}")
+
+    assert has_element?(
+             resident,
+             "#rotation-table tr[data-rotation-type='strong_weekend_nights'][phx-value-start-date='2026-11-06'][phx-value-end-date='2026-11-07']"
+           )
+
+    assert has_element?(
+             resident,
+             "#rotation-table tr[data-rotation-type='night_float'][phx-value-start-date='2026-11-15'][phx-value-end-date='2026-11-19']"
+           )
   end
 
   defp calendar_person(type, resident),

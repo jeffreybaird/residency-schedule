@@ -1,5 +1,5 @@
 defmodule ResidencySchedule.Rotations.FridayNightFloat do
-  @moduledoc "Derives Friday Strong night duty from literal imported assignments."
+  @moduledoc "Derives Friday Strong weekend night duty from literal imported assignments."
 
   alias ResidencySchedule.DetailedSchedules.TaskEquivalence
 
@@ -16,7 +16,7 @@ defmodule ResidencySchedule.Rotations.FridayNightFloat do
       iex> rotation = %Rotation{id: 2, schedule_resident_id: 1, schedule_resident: person, rotation_type: "ambulatory", start_date: ~D[2026-10-08], end_date: ~D[2026-10-10]}
       iex> activity = %{schedule_resident_id: 1, date: ~D[2026-10-09], raw_task: "SMH Obstetrics Resident 1st Contact Night"}
       iex> FridayNightFloat.project([rotation], [activity], []) |> Enum.map(&{&1.rotation_type, &1.start_date})
-      [{"ambulatory", ~D[2026-10-08]}, {"night_float", ~D[2026-10-09]}, {"ambulatory", ~D[2026-10-10]}]
+      [{"ambulatory", ~D[2026-10-08]}, {"strong_weekend_nights", ~D[2026-10-09]}, {"ambulatory", ~D[2026-10-10]}]
   """
   def project(rotations, activities, overrides) do
     protected = protected_dates(rotations, overrides)
@@ -75,7 +75,10 @@ defmodule ResidencySchedule.Rotations.FridayNightFloat do
           end_date: List.last(dates),
           rotation_type: type,
           source_assignment_date:
-            if(rotation.rotation_type == "ambulatory" and type == "night_float", do: first)
+            if(rotation.rotation_type == "ambulatory" and type == "strong_weekend_nights",
+              do: first,
+              else: rotation.source_assignment_date
+            )
       }
     end)
   end
@@ -88,7 +91,7 @@ defmodule ResidencySchedule.Rotations.FridayNightFloat do
         rotation.rotation_type
 
       rotation.rotation_type == "ambulatory" and contact_night?(rotation, date, by_day, protected) ->
-        "night_float"
+        "strong_weekend_nights"
 
       rotation.rotation_type == "night_float" and
         MapSet.member?(triggers, {rotation.schedule_resident.schedule_id, date}) and

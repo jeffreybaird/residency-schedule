@@ -7,6 +7,7 @@ defmodule ResidencySchedule.ScheduleCacheIntegrationTest do
   alias ResidencySchedule.Repo
   alias ResidencySchedule.Residents.{Resident, ScheduleResident}
   alias ResidencySchedule.Rotations.Rotation
+  alias ResidencySchedule.Rotations.StrongNightBoundaries
   alias ResidencySchedule.ScheduleCache
   alias ResidencySchedule.ScheduleCache.Revision
   alias ResidencySchedule.ScheduleEditor
@@ -52,6 +53,38 @@ defmodule ResidencySchedule.ScheduleCacheIntegrationTest do
     assert ScheduleCache.fetch(Date.add(today, 1), fn -> :next_date end) == :next_date
     Repo.update!(Ecto.Changeset.change(data.person, name: "Renamed synthetic resident"))
     assert ScheduleCache.fetch(today, builder) == "Renamed synthetic resident"
+  end
+
+  test "a warm grid from before the Strong night boundary correction is rebuilt without a database write" do
+    today = ~D[2095-10-17]
+    revision = Revision.current()
+    legacy_key = {2, Repo.get_dynamic_repo(), revision, today}
+    legacy = [{"night_float", ~D[2026-11-02], ~D[2026-11-06]}]
+    assert ScheduleCache.fetch_key(legacy_key, fn -> legacy end) == legacy
+
+    builder = fn ->
+      [
+        %Rotation{
+          id: -1,
+          schedule_resident_id: -1,
+          rotation_type: "night_float",
+          start_date: ~D[2026-11-02],
+          end_date: ~D[2026-11-06]
+        }
+      ]
+      |> StrongNightBoundaries.project([], [])
+      |> Enum.map(&{&1.rotation_type, &1.start_date, &1.end_date})
+    end
+
+    expected = [
+      {"night_float", ~D[2026-11-01], ~D[2026-11-05]},
+      {"post_call", ~D[2026-11-06], ~D[2026-11-06]}
+    ]
+
+    assert ScheduleCache.fetch(today, builder) == expected
+    assert Revision.current() == revision
+    assert ScheduleCache.fetch(today, fn -> flunk("corrected warm grid rebuilt") end) == expected
+    assert ScheduleCache.fetch_key(legacy_key, fn -> flunk("legacy key changed") end) == legacy
   end
 
   test "all seven table writes advance committed revision and rollback preserves it", %{
