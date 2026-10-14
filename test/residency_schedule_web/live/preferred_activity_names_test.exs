@@ -54,7 +54,7 @@ defmodule ResidencyScheduleWeb.PreferredActivityNamesTest do
     assert Enum.all?(activity.sources, &(&1.raw_staff == "Vale, Juniper"))
   end
 
-  test "calendar old-year activity and resident panel use the newer imported name", ctx do
+  test "calendar old-year activity and resident schedule use the newer imported name", ctx do
     {:ok, calendar, _} = live(ctx.conn, "/calendar?view=day&date=2026-12-30")
 
     assert has_element?(
@@ -65,8 +65,15 @@ defmodule ResidencyScheduleWeb.PreferredActivityNamesTest do
 
     {:ok, resident, _} = live(ctx.conn, "/residents/#{ctx.juniper.id}")
     assert has_element?(resident, "h1", "Juniper Vale-Smith")
-    resident |> form("#resident-activity-date-form", %{"date" => "2026-12-30"}) |> render_change()
-    assert has_element?(resident, "#resident-day-activities", "Juniper Vale-Smith")
+
+    assert has_element?(
+             resident,
+             "#rotation-table tr[data-rotation-type='qgenda_assignment'][phx-value-start-date='2026-12-30'][phx-value-end-date='2026-12-30']",
+             "Sick Backup"
+           )
+
+    refute has_element?(resident, "#resident-activity-date-form")
+    refute has_element?(resident, "#resident-day-activities")
   end
 
   test "case-only imported variants retain existing full-name capitalization without changing spelling",

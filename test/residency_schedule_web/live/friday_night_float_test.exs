@@ -180,12 +180,18 @@ defmodule ResidencyScheduleWeb.FridayNightFloatTest do
       "#rotation-table tr[data-rotation-type='night_float'][phx-value-start-date='2026-10-09'][phx-value-end-date='2026-10-09']"
 
     assert has_element?(resident, selector, "SMH Obstetrics Resident 1st Contact Night")
-    resident |> form("#resident-activity-date-form", %{"date" => "2026-10-09"}) |> render_change()
-    refute has_element?(resident, "#resident-day-activities", "Base rotation: Ambulatory")
+    refute has_element?(resident, "#resident-activity-date-form")
+    refute has_element?(resident, "#resident-day-activities")
 
     {:ok, usual, _} = live(ctx.conn, "/residents/#{ctx.cedar.id}")
-    usual |> form("#resident-activity-date-form", %{"date" => "2026-10-09"}) |> render_change()
-    assert has_element?(usual, "#resident-day-activities", "Post Call")
+
+    assert has_element?(
+             usual,
+             "#rotation-table tr[data-rotation-type='post_call'][phx-value-start-date='2026-10-09'][phx-value-end-date='2026-10-09']",
+             "Post Call"
+           )
+
+    refute has_element?(usual, "#resident-activity-date-form")
     render_click(usual, "toggle_night_shifts", %{})
     assert has_element?(usual, "div", ~r/Night Float – Strong\s+6 days/)
 

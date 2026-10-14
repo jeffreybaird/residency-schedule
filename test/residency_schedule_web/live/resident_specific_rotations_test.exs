@@ -188,14 +188,23 @@ defmodule ResidencyScheduleWeb.ResidentSpecificRotationsTest do
     refute has_element?(view, activity_row("2026-12-29"), "SMH GYN R2 Day")
   end
 
-  test "the selected-date commitments panel replaces only matching general rotations", ctx do
+  test "daily commitments and its date form are removed while schedule details remain", ctx do
     {:ok, view, _} = live(ctx.conn, "/residents/#{ctx.iris.id}")
-    view |> form("#resident-activity-date-form", %{"date" => "2026-12-29"}) |> render_change()
-    assert has_element?(view, "#resident-day-activities", "SMH GYN R2 Day")
-    assert has_element?(view, "#resident-day-activities", "Coverage discussion")
-    refute has_element?(view, "#resident-day-activities", "Base rotation:")
-    view |> form("#resident-activity-date-form", %{"date" => "2026-12-30"}) |> render_change()
-    assert has_element?(view, "#resident-day-activities", "Gynecology – Strong Memorial")
+    refute has_element?(view, "#resident-activity-date-form")
+    refute has_element?(view, "#resident-day-activities")
+    refute has_element?(view, "h2", "Daily commitments")
+
+    assert has_element?(
+             view,
+             rotation_row("strong_gynecology", "2026-12-28", "2026-12-29"),
+             "Coverage discussion"
+           )
+
+    assert has_element?(
+             view,
+             rotation_row("strong_gynecology", "2026-12-30", "2027-01-03"),
+             "Gynecology – Strong Memorial"
+           )
   end
 
   test "multiple specific tasks share one matching rotation row without duplicated activity rows",
