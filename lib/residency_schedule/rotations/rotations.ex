@@ -10,6 +10,7 @@ defmodule ResidencySchedule.Rotations do
   alias ResidencySchedule.Rotations.HighlandPostCall
   alias ResidencySchedule.Rotations.Rotation
   alias ResidencySchedule.Rotations.ScheduleGaps
+  alias ResidencySchedule.Rotations.StrongNightBoundaries
   alias ResidencySchedule.ShiftOverrides
 
   @rotation_labels %{
@@ -630,18 +631,21 @@ defmodule ResidencySchedule.Rotations do
   @doc """
   Lists derived display rotations overlapping dates across schedules.
 
-  Applies imported-assignment corrections within the requested date window.
-  Returned rotation spans can extend beyond that window; dates outside it are
-  not corrected by this query.
+  Loads one week of adjacent evidence so shifted evening duties and their paired
+  slots remain visible even for a single Friday or Sunday. Returned rotation
+  spans can extend beyond the requested window.
 
   Exempt from doctest — database query.
   """
   def projected_rotations_in_range_all_schedules(range_start, range_end) do
-    range_start
-    |> list_rotations_in_range_all_schedules(range_end)
+    context_start = Date.add(range_start, -7)
+    context_end = Date.add(range_end, 7)
+
+    context_start
+    |> list_rotations_in_range_all_schedules(context_end)
     |> project_assignments(
-      DetailedSchedules.list_in_range(range_start, range_end),
-      ShiftOverrides.list_overrides_in_range(range_start, range_end)
+      DetailedSchedules.list_in_range(context_start, context_end),
+      ShiftOverrides.list_overrides_in_range(context_start, context_end)
     )
     |> Enum.filter(fn rotation ->
       Date.compare(rotation.start_date, range_end) != :gt and
@@ -666,6 +670,7 @@ defmodule ResidencySchedule.Rotations do
 
     rotations
     |> HighlandPostCall.normalize()
+    |> StrongNightBoundaries.project(activities, overrides)
     |> FridayNightFloat.project(activities, overrides)
     |> ScheduleGaps.project(activities, overrides)
   end

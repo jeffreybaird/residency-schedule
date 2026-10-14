@@ -12,7 +12,7 @@ defmodule ResidencySchedule.ScheduleCache do
   alias ResidencySchedule.Repo
   alias ResidencySchedule.ScheduleCache.Revision
 
-  @calculation_version 2
+  @calculation_version 3
   @revision_retries 3
   @coordination_timeout 30_000
 

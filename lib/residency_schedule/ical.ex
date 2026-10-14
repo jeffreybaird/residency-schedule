@@ -218,8 +218,8 @@ defmodule ResidencySchedule.Ical do
       MapSet.member?(imported_nights, {night_site(segment.rotation_type), Date.add(date, -1)})
   end
 
-  defp segment_event_times(%{rotation_type: type, source_assignment_date: date}, date)
-       when type in @night_shift_types,
+  defp segment_event_times(%{rotation_type: type, source_assignment_date: source_date}, date)
+       when type in @night_shift_types and not is_nil(source_date),
        do: {format_datetime(date, 18), format_datetime(Date.add(date, 1), 6)}
 
   defp segment_event_times(segment, date), do: event_times(segment.rotation_type, date)
