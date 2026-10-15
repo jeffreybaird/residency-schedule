@@ -2,6 +2,8 @@
 
 Design reference: [Phase 0 recovery plan, PR #77](https://github.com/jeffreybaird/residency-schedule/pull/77). This delivery implements the bounded Step 3 deployment safeguards; it does not establish persistent staging, backup restoration, application/schema compatibility or production recovery readiness.
 
+**Current result:** the Ruby replacement is independently accepted, with 22 deployment tests and the full application suite passing. Bandit is upgraded to 1.13.0, the locked-package audit is clean and the former temporary exception is retired. Ruby-core/RubyGems advisory feeds were unavailable; this is not a comprehensive runtime-security assessment. Earlier implementation and no-patch evidence below are explicitly historical.
+
 ## Design review
 
 The proposed pipeline builds one release artifact after tests and promotes the same downloaded bytes to each destination. Host deployment verifies checksums before deployment mutation, holds a stable destination lock across the transaction, uses run-specific paths, migrates before swapping/restarting, retains immutable secret-free artifacts and verifies startup and rollback. No automatic archive pruning is proposed before a retention policy is approved.
@@ -10,17 +12,21 @@ Runtime configuration remains private. Build and legacy archives exclude environ
 
 Required regression evidence includes checksum and malformed-archive rejection before mutation; retained, retrievable prior artifacts after later successful deployment; no secrets in archives or diagnostics; cookie continuity; real local lock serialization; migration failure preserving the active release; rollback after restart/startup-check failure; and truthful nonzero reporting with preserved private recovery state when rollback itself fails. Workflow review must retain the test dependency and avoid rebuilding separately per destination.
 
-## Accepted test contract
+## Original Python implementation history — commit 64ba9bf
+
+The following contract and implementation evidence describes the original PR revision. The user subsequently requested removing Python; it is not evidence that the Ruby replacement has passed verification. Current port review appears below.
+
+### Accepted original test contract
 
 Reviewer independently inspected and accepted `test/deploy/release_artifacts_test.py`, SHA256 `3bc03d8e4adf1b9779af9122322e0b36246201f1963486c12fa666ccfda7d0ca`, before implementation. The fifteen standard-library unittest cases run scripts against synthetic release trees, real local filesystem locks/FIFOs and stub service/network commands. They cover retained secret-free archives and legacy snapshots; cookie-file and environment-only continuity; missing-both failure; checksum and otherwise-valid malformed-archive rejection before sourcing server configuration; migration/swap/restart/health failures; failed recovery privacy/reporting; and build-once/per-destination workflow structure. A deterministic health-phase gate proves the stable lock remains held through startup validation, rather than relying only on eventual event ordering.
 
-Runner authoritative red: `python3 -m unittest discover -s test/deploy -p '*_test.py'`, exit 1, fifteen tests, 23 expected subtest assertion failures, zero errors. Failures concern missing release scripts and the absent build-once workflow; fixture-driven execution will be verified after implementation. Evidence: `/tmp/phase0-red.log`. The source owner was authorized only after reviewer acceptance. Final implementation review remains pending.
+Runner authoritative red: `python3 -m unittest discover -s test/deploy -p '*_test.py'`, exit 1, fifteen tests, 23 expected subtest assertion failures, zero errors. Failures concerned missing release scripts and the absent build-once workflow; fixture-driven execution was verified later. Evidence: `/tmp/phase0-red.log`. The source owner was authorized only after reviewer acceptance. Independent implementation review had not yet occurred at that red checkpoint.
 
 Independent review of the first implementation identified a same-commit rebuild collision: distinct archive bytes were stored under only the commit SHA. Repackaging an unchanged synthetic release into two output directories independently reproduced different hashes; normal Mix rebuilds also need not be byte-identical. Parent review additionally identified the need to prevent release/epmd children from inheriting the destination-lock descriptor.
 
 The spec writer extended the contract to eighteen tests: retain exact artifacts under `<commit>-<sha256>`, keep the source `RELEASE_ID`, write a separate verified `ARTIFACT_ID` to the candidate, permit distinct builds of the same commit without overwriting either archive, reject corrupted retained content, and close lock descriptor 9 in migration/demo-seed children while the parent still owns its lock through health validation. Reviewer independently inspected and renewed acceptance of SHA256 `99eaf9d0ebc175a71c07e68bde52111025c69ea0fd569d39cfa48d26eef28815` before the source correction. Runner red confirms four failures and three expected missing-new-contract-path errors across eighteen tests, exit 1; evidence: `/tmp/phase0-content-red.log`. No unrelated fixture defect was established.
 
-## Implementation review
+### Original implementation review
 
 Independently reviewed both deployment scripts, the archive helper, build/deploy workflow, CI test registration and operational documentation. The final implementation uses content-addressed retained artifacts and checks both the manifest and filename digest. It validates archive paths/types/identity before sourcing server configuration, excludes runtime credentials from retained artifacts, keeps the existing cookie or environment override, and preserves protected recovery state on failed rollback. Configuration updates affect the private candidate rather than the active installation. The parent keeps its stable destination lock while the release-evaluation subshell closes descriptor 9. Workflow jobs build once after tests, download the same artifact for both destinations and retain the migration-before-restart and failure-recovery ordering.
 
@@ -32,7 +38,7 @@ The accepted test hash was independently rechecked unchanged after implementatio
 
 **Functional implementation accepted.** Commit eligibility remains conditional on the existing security exception. The parent must perform a new live patch/advisory check immediately before the actual commit; the review check below is not a substitute. Raw advisory failure remains disclosed. No live deployment, production migration, staging readiness or complete recovery capability is authorized or established by this review.
 
-## Current dependency advisory review
+## Historical dependency advisory review
 
 At **2026-10-15 16:49:20 UTC**, reviewer ran `source /workspace/.setup/activate.sh` followed by standalone `MIX_ENV=test mix hex.audit`: **exit 1**, only pre-existing **Bandit 1.12.5, EEF-CVE-2026-105659 / CVE-2026-105659 / GHSA-69m6-wcv4-rwcf**, HIGH. Raw output: `/tmp/phase0-release-artifacts-audit.log`.
 
@@ -41,3 +47,34 @@ Live Hex package and release requests with `Cache-Control: no-cache` confirm ins
 The issue permits HTTP/2 WINDOW_UPDATE traffic to extend blocked-send deadlines and retain stream processes. The existing application mitigation disables HTTP/2; actual deployed configuration and exposure remain unverified. The [explicit temporary exception](bandit-http2-audit-exception.md) permits only this named finding while all its conditions hold, including protocol tests and a separate fresh live patch/advisory check immediately before every commit. Raw audit failure is not suppressed or called clean. Unrelated findings, unavailable/stale data or a published fixed release invalidate the exception.
 
 The [prior security review](consecutive-rotation-merge-security-review.md) records separately observed host-runtime advisory identifiers, installed/affected/patched versions and exposure uncertainty. Current cloud OTP components meet those previously documented patches; production runtime remains unverified, and independent OTP/OSV feeds have been unavailable through the proxy. This package audit does not cover operating-system or vendored dependencies.
+
+## Ruby replacement review
+
+The user requested removing Python from this delivery. The replacement keeps Bash promotion/package entry points, uses Ruby standard-library/RubyGems archive handling, and ports the deployment contracts and command stubs to Ruby/Minitest. The locally provisioned test runtime is Ruby 3.3.8, RubyGems 3.5.22 and Minitest 5.25.4; host availability remains unverified. Tar metadata, raw header checksum, complete payload/trailer and gzip integrity are validated before extraction; a naive line-based archive listing or unvalidated `TarReader` iteration is insufficient.
+
+Reviewer independently inspected the complete Ruby port and renewed acceptance of `test/deploy/release_artifacts_test.rb`, SHA256 `2919f5a0a9251b7a94f73ace2191bd87f858f6808fef85a9f04d07973b72fcac`, before implementation. All eighteen original behavioral/security contracts remain; the additional four tests require removal of Python deployment tooling plus rejection of otherwise-valid gzip archives containing invalid tar header checksums, truncated members or PAX/GNU extension metadata. The [contract mapping](phase0-ruby-test-contract.md) records the preserved coverage. Real FIFO synchronization uses unbuffered writes; service/network commands remain synthetic local stubs.
+
+Runner authoritative red: **22 tests, 4,433 assertions, three expected failures, zero errors/skips**, exit 1 in 13.175 seconds, seed 34372. Failures demonstrate the missing Ruby helper/runtime guard, Python workflow invocation and old PAX/GNU acceptance. Existing behavior fixtures pass without unrelated fixture errors. Evidence: `/tmp/phase0-ruby-red.log`. The source owner received implementation authorization only after reviewer acceptance.
+
+Fresh reviewer advisory checks at **2026-10-15 21:42:06 UTC** changed the security baseline. Standalone `MIX_ENV=test mix hex.audit` exits **1** for installed Bandit 1.12.5 with **two** findings:
+
+- **EEF-CVE-2026-105659 / CVE-2026-105659 / GHSA-69m6-wcv4-rwcf**, HIGH; HTTP/2 blocked-send deadline extension, affected **>=1.4.0,<1.13.0**.
+- **EEF-CVE-2026-105660 / CVE-2026-105660 / GHSA-v53v-9hvg-37jf**, MEDIUM; unvalidated HTTP/1 request-target authority lets a client choose `conn.host` and `conn.port`, affected **>=0.6.0,<1.13.0**. Exposure depends on request/proxy handling and downstream use of these fields; actual production exposure has not been established.
+
+Fresh no-cache Hex metadata reports latest stable **Bandit 1.13.0**, fixing both findings; release metadata has no advisories or retirement. Existing `~>1.5` permits this version; its hpax requirement is `~>1.1`. The temporary exception has **expired** because a patched release is available and an additional advisory is present. Compatible upgrade, renewed tests/audit and removal of the active exception/directive were routed to the source owner and parent. The previous no-fix/conditional-eligibility statements above describe historical observations only.
+
+Raw evidence: `/tmp/phase0-ruby-port-audit.log`, `/tmp/phase0-ruby-port-bandit-package.json`, `/tmp/phase0-ruby-port-bandit-release.json`, and `/tmp/phase0-ruby-port-bandit-patched.json`. Hex auditing does not cover the Ruby interpreter, RubyGems or operating-system packages; no comprehensive runtime security claim is made.
+
+Current upgrade validation is isolated in [Bandit 1.13 upgrade verification](bandit-1.13-upgrade-verification.md), including the post-upgrade audit. Historical no-fix and exception-eligibility observations in this document do not describe the current dependency state.
+
+### Final Ruby implementation review
+
+Independently reviewed `deploy/release_artifact.rb`, the Bash entry-point changes, CI/deployment workflow changes and runtime documentation. The helper validates raw 512-byte USTAR headers and checksums, strict numeric metadata, member types, complete padded payload/trailer and gzip integrity before using TarReader. Paths come from raw prefix/name fields rather than normalized `full_name`; duplicates, invalid parents, links, special files, private paths and release-identity mismatches are rejected before exclusive extraction. Source links are materialized only after containment validation. Content-addressed retention, exact prior-artifact lookup, cookie/environment handling, lock-descriptor closure and rollback behavior remain intact. No actionable port defect was established.
+
+The old Python deployment helper/tests are removed; active Bash scripts and workflows invoke Ruby. Ruby 3.3-family setup is used where needed in CI/build; local behavior was tested with 3.3.8. No Gemfile dependency or application boot requirement was introduced. PAX/GNU extensions are explicitly unsupported and fail before mutation; the runbook documents this compatibility boundary, including possible earlier-draft archives.
+
+Authoritative Ruby green: **22 tests, 4,471 assertions, zero failures/errors/skips**. The accepted hash remains `2919f5a0a9251b7a94f73ace2191bd87f858f6808fef85a9f04d07973b72fcac`. Actual newly assembled Mix release packaging, supported USTAR paths, content-addressed staging and exact retained-snapshot lookup pass with the upgraded dependencies. No production application was started. Full application verification also passes: **216 doctests and 1,706 tests, zero failures**, exit 0 in 68.7 seconds, seed 199561; protocol regressions and static checks pass. The runner's [verification record](phase0-release-artifacts-verification.md) contains commands and tool limitations.
+
+Fresh read-only checks of the official Ruby security page (`https://www.ruby-lang.org/en/security/`) and official RubyGems advisory API (`https://api.github.com/repos/rubygems/rubygems/security-advisories?per_page=100`) both returned **HTTP 403**, curl exit 22. A current Ruby-core/RubyGems advisory assessment was therefore unavailable. No advisory tool or extra gem was installed. The successful Hex audit covers locked Elixir packages, not Ruby, RubyGems, operating-system packages or production runtime; no comprehensive runtime-clean claim is made.
+
+**Ruby replacement functionally accepted.** The Bandit upgrade removes both known locked-package findings and retires the temporary exception. Ordinary fresh project security checks remain required before commit. Historical Python results above are superseded and do not substitute for current Ruby evidence. Host runtime readiness, live deployment, staging and database recovery remain unverified and outside this acceptance.

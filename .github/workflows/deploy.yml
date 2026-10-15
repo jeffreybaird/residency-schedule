@@ -28,6 +28,9 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: ${{ env.ELIXIR_VERSION }}
@@ -42,7 +45,7 @@ jobs:
         with:
           path: _build
           key: ${{ runner.os }}-build-${{ hashFiles('**/mix.lock') }}
-      - run: python3 -m unittest discover -s test/deploy -p '*_test.py'
+      - run: ruby test/deploy/release_artifacts_test.rb
       - run: mix deps.get
       - run: mix compile --warnings-as-errors
       - run: mix test
@@ -56,6 +59,9 @@ jobs:
     needs: test
     steps:
       - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: ${{ env.ELIXIR_VERSION }}

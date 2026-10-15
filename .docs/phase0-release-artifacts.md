@@ -25,6 +25,14 @@ unsafe archive paths, links and special files before extraction. An archive
 checksum establishes byte integrity, not a signature or independent provenance;
 the existing trusted workflow and SSH transport remain the delivery boundary.
 
+Archives use the supported USTAR format. The Ruby validator rejects PAX/GNU
+metadata extensions rather than guessing their effect on entry paths or types.
+An archive produced by the earlier Python draft can contain such extensions;
+it is not automatically accepted or converted. Validation must fail before
+configuration, migrations or service changes if an existing archive is outside
+the supported format. Inspect and repackage trusted original code separately
+rather than bypassing validation. No live use of the earlier draft is established.
+
 The artifact uploaded by a build is immutable for that workflow run. Host
 retention stores verified archives and checksums in `<INSTALL_DIR>.artifacts`,
 identified by both commit and content digest. Installed `ARTIFACT_ID` records
@@ -54,9 +62,15 @@ the protected recovery state for an operator; do not delete the last recoverable
 copy or publish it as an artifact. Do not print environment contents, cookies,
 raw application logs, database output or resident data into CI diagnostics.
 
-The host needs Bash, Python 3.8 or newer, `flock`, checksum/tar utilities, `curl`, and the
-existing permitted systemd commands. Local tests verify behavior with synthetic
-files and stubbed services; they do not verify those facilities on the droplet.
+The requester accepted Ruby deployment tooling. The host needs Bash, Ruby 3.3
+(tested with Ruby 3.3.8 and its standard-library RubyGems archive support),
+`flock`, checksum/tar utilities, `curl`, and the existing permitted systemd
+commands. Deployment requires no Python interpreter or application boot to
+validate artifacts. The test suite uses Minitest 5.x (locally tested with 5.25.4);
+it is a development/CI requirement, not a host deployment dependency. CI selects
+the maintained Ruby 3.3 patch release. Local tests verify behavior with synthetic
+files and stubbed services; they do not verify Ruby or the other host facilities
+on the droplet.
 
 ## Serialization and retention
 
@@ -111,7 +125,7 @@ power loss or `SIGKILL` can bypass shell traps; an operator must inspect the
 protected work directory and retained artifacts under the same lock. Additive
 schema compatibility and disaster recovery remain later Phase 0 gates.
 
-Before every commit, retain the existing
-[fresh Bandit patch-check procedure](bandit-http2-audit-exception.md). The
-temporary advisory exception does not permit other security findings or an
-unverified check. No production deployment is authorized by this documentation.
+Run current security checks before every commit under the shared workflow. The
+former Bandit audit exception has expired following the published 1.13.0 fix;
+see [upgrade verification](bandit-1.13-upgrade-verification.md). No production
+deployment is authorized by this documentation.

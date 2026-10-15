@@ -43,8 +43,5 @@ npm-debug.log
 
 .playwright-mcp/
 
-# Local Python deployment checks.
-__pycache__/
-*.py[cod]
 # Real schedule data (PII) — never commit
 /data/

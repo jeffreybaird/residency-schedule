@@ -11,7 +11,7 @@ fail() { echo "$1" >&2; exit 1; }
 [[ ${APP_PORT:-} =~ ^[0-9]{1,5}$ ]] && ((10#$APP_PORT > 0 && 10#$APP_PORT < 65536)) || fail 'Invalid application port'
 [[ ${SEED_DEMO:-} == true || ${SEED_DEMO:-} == false ]] || fail 'Invalid deployment target'
 [[ -d ${ARTIFACT_DIR:-} ]] || fail 'Missing artifact directory'
-helper="$(cd "$(dirname "$0")" && pwd)/release_artifact.py"
+helper="$(cd "$(dirname "$0")" && pwd)/release_artifact.rb"
 
 exec 9>"${INSTALL_DIR}.deploy.lock"
 flock -x 9
@@ -67,7 +67,7 @@ trap finish EXIT
 trap 'exit 1' INT TERM
 
 # Validate checksum, identity and every tar member before reading any .env.
-python3 "$helper" stage "$ARTIFACT_DIR" "$RELEASE_ID" "$candidate" "${INSTALL_DIR}.artifacts" || fail 'Incoming release rejected'
+ruby "$helper" stage "$ARTIFACT_DIR" "$RELEASE_ID" "$candidate" "${INSTALL_DIR}.artifacts" || fail 'Incoming release rejected'
 
 prior_identity="legacy-${DEPLOY_RUN_ID}-${workspace##*.}"
 if [[ -f $INSTALL_DIR/RELEASE_ID && ! -L $INSTALL_DIR/RELEASE_ID ]]; then
@@ -76,7 +76,7 @@ if [[ -f $INSTALL_DIR/RELEASE_ID && ! -L $INSTALL_DIR/RELEASE_ID ]]; then
     prior_identity=$installed_identity
   fi
 fi
-python3 "$helper" snapshot "$INSTALL_DIR" "${INSTALL_DIR}.artifacts" "$prior_identity" || fail 'Previous release retention failed'
+ruby "$helper" snapshot "$INSTALL_DIR" "${INSTALL_DIR}.artifacts" "$prior_identity" || fail 'Previous release retention failed'
 
 cp -- "$INSTALL_DIR/.env" "$candidate/.env"
 chmod 600 "$candidate/.env"
