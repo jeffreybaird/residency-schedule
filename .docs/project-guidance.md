@@ -25,6 +25,13 @@ Before committing, follow the correction and security-review requirements in
 [the shared agent workflow](agent-workflow.md#precommit-corrections).
 Run `mix format --force` before the remaining repository verification checks.
 
+Temporary Bandit audit exception: the user explicitly authorized an HTTP/2
+mitigation and a temporary override on October 15, 2026. Before **every commit**,
+follow [the Bandit exception and fresh patch-check procedure](bandit-http2-audit-exception.md).
+Only the named advisory may qualify; unavailable/stale checks, other findings,
+or any application listener serving HTTP/2 block the exception. Remove it when
+a patched release becomes available. All other shared workflow rules apply.
+
 # Project rules
 
 ---

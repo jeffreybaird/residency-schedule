@@ -31,6 +31,8 @@ config :residency_schedule, :chat,
 config :residency_schedule, ResidencyScheduleWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
+  # Temporary mitigation for CVE-2026-105659 until a patched Bandit is available.
+  http: [http_2_options: [enabled: false]],
   render_errors: [
     formats: [html: ResidencyScheduleWeb.ErrorHTML, json: ResidencyScheduleWeb.ErrorJSON],
     layout: false
