@@ -32,29 +32,41 @@ Sources: [deployment](../.github/workflows/deploy.yml),
 [release operations](../lib/residency_schedule/release.ex),
 [migration files](../priv/repo/migrations).
 
-The managed environment reports no configured secrets, outbound identities or
-VPN access. Git fetch/push and the GitHub connector are available. A read-only
+The requester confirmed DigitalOcean as the hosting provider and said tokens
+exist locally and in GitHub Actions secrets. The current managed environment
+reports no configured secrets, outbound identities or VPN access. It has no
+`doctl` executable/default configuration, known DigitalOcean token variable
+binding, or SSH agent. The local token location/connection remains to be inspected;
+GitHub secrets cannot be read back through the API. An authorized Actions workflow
+can use existing secret bindings without exposing their values.
+
+The requester offered to continue on the local machine. The desktop project is
+available there; use the [local continuation record](schedule-adapter-phase-0-handoff.md)
+to resume with existing local access. A separate remote inventory workflow is
+deferred while that route is available.
+
+Git fetch/push and the GitHub connector are available. A read-only
 attempt to inspect push-triggered Actions runs using `gh api` returned Forbidden;
 the available commit-workflow connector is restricted to pull-request runs.
 Neither result proves production deployment state. No production connection or
 database access has been attempted using guessed credentials or destinations.
 
-## Owners and proposed objectives
+## Accepted owner and recovery objectives
 
-The requester has been asked to confirm owners, recovery objectives and an
-existing connection/profile or setup location. These values are proposals until
-confirmed; elapsed time is not acceptance.
+On October 15, 2026, the requester explicitly accepted ownership and the proposed
+recovery targets. These are required objectives, not measured capabilities.
+Infrastructure access and the operational rehearsal remain outstanding.
 
-| Decision | Proposed starting point | Acceptance state |
+| Decision | Target | Acceptance state |
 | --- | --- | --- |
-| Release/recovery/go-no-go owner | Requester, with delegation recorded if needed | Pending confirmation |
-| Application rollback RTO | At most 10 minutes, including health verification | Pending confirmation and rehearsal |
-| Database recovery RTO | At most 60 minutes, including reconciliation | Pending confirmation and rehearsal |
-| Database RPO | At most 15 minutes of lost writes | Pending confirmation and demonstrated backup/replay capability |
+| Release/recovery/go-no-go owner | Requester; record any delegated operator | Confirmed by requester |
+| Application rollback RTO | At most 10 minutes, including health verification | Accepted; rehearsal pending |
+| Database recovery RTO | At most 60 minutes, including reconciliation | Accepted; rehearsal pending |
+| Database RPO | At most 15 minutes of lost writes | Accepted; demonstrated backup/replay capability pending |
 | Rollout window | Low-activity window with recovery operator available | Time and operator pending |
 | Retention | Preserve designated rollback artifacts throughout the rollback window; never automatically prune them | Duration and backup retention pending |
 
-The RPO proposal is not a promise that current infrastructure can meet it.
+The accepted RPO is not a promise that current infrastructure can meet it.
 Backups and restored/replayed records must demonstrate the actual limit.
 
 ## Mutation inventory and recovery freeze boundary
@@ -113,12 +125,13 @@ Supply connection/profile names rather than pasting secrets into the chat.
 ## Step status and next PRs
 
 - Complete: current source baseline, repository deployment inventory, mutation
-  inventory and explicit access/evidence gaps.
-- Pending: live deployment/schema/runtime observations, named operational owners,
-  accepted recovery targets, backup evidence and a verified write-freeze procedure.
+  inventory, confirmed owner/recovery targets and explicit access/evidence gaps.
+- Pending: live deployment/schema/runtime observations, access location/binding,
+  rollout/retention windows, backup evidence and a verified write-freeze procedure.
 - Next Step 2 PR: persistent staging, once its destination and access are known.
-- Independent Step 3 PR: artifact retention and deployment serialization can be
-  prepared and tested locally while operational access remains unresolved.
+- Independent [Step 3 draft PR #78](https://github.com/jeffreybaird/residency-schedule/pull/78):
+  artifact retention and deployment serialization are implemented and locally
+  verified; host prerequisites and staging rehearsal remain outstanding.
 - Steps 4–8: prepare tooling separately as feasible; do not mark operational
   rehearsals complete from documentation or local mocked tests.
 
