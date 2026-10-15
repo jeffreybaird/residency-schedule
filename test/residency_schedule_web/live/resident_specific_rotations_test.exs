@@ -46,13 +46,37 @@ defmodule ResidencyScheduleWeb.ResidentSpecificRotationsTest do
           }
         ])
 
+      {specific_row, base_row} =
+        if unquote(type == :vacation) do
+          {:ok, _} =
+            Rotations.insert_rotations(ctx.iris.id, [
+              %{
+                slot_index: 2,
+                start_date: ~D[2027-01-05],
+                end_date: ~D[2027-01-11],
+                rotation_type: :vacation
+              }
+            ])
+
+          {rotation_row(type, "2026-12-28", "2027-01-03"),
+           rotation_row(type, "2027-01-05", "2027-01-11")}
+        else
+          {rotation_row(type, "2026-12-28", "2026-12-29"),
+           rotation_row(type, "2026-12-30", "2027-01-03")}
+        end
+
       {:ok, view, _} = live(ctx.conn, "/residents/#{ctx.iris.id}")
-      specific_row = rotation_row(type, "2026-12-28", "2026-12-29")
       specific_pill = specific_row <> " [data-role='specific-rotation-label']"
-      base_pill = rotation_row(type, "2026-12-30", "2027-01-03") <> " span[title='#{base_label}']"
+      base_pill = base_row <> " span[title='#{base_label}']"
       assert has_element?(view, specific_pill, task)
       assert has_element?(view, base_pill, base_label)
       assert pill_classes(view, specific_pill) == pill_classes(view, base_pill)
+
+      if unquote(type == :vacation) do
+        assert has_element?(view, specific_row <> " td:last-child", ~r/^\s*7\s*$/)
+        refute has_element?(view, rotation_row(type, "2026-12-28", "2026-12-29"))
+        refute has_element?(view, rotation_row(type, "2026-12-30", "2027-01-03"))
+      end
 
       for token <- [
             "w-full",

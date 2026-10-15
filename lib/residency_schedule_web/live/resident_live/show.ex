@@ -1059,8 +1059,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
   defp rotation_span_identity(entry) do
     {
       entry.rotation_type,
-      entry |> Map.get(:specific_tasks, []) |> Enum.uniq() |> Enum.sort(),
-      entry |> Map.get(:source_tasks, []) |> Enum.uniq() |> Enum.sort(),
+      schedule_entry_label(entry),
       Map.get(entry, :is_coverage, false),
       coverage_resident_id(Map.get(entry, :covered_by)),
       coverage_resident_id(Map.get(entry, :original_resident))
