@@ -118,7 +118,7 @@ Generate a `SECRET_KEY_BASE` on your local machine:
 mix phx.gen.secret
 ```
 
-> **Important:** `DATABASE_URL` and `ACCESS_PASSWORD` live **only** on the server. They are never sent through GitHub. `SECRET_KEY_BASE` and `PHX_HOST` are also in GitHub Secrets (needed at build time for asset digests).
+> **Important:** `DATABASE_URL`, `ACCESS_PASSWORD`, `SECRET_KEY_BASE`, and `PHX_HOST` are runtime server settings. The release build does not receive them. Keep the server `.env` private.
 
 > The optional chat assistant is switched on from GitHub: set the `CHAT_ENABLED` variable and `ANTHROPIC_API_KEY` secret (Part 2) and the next deploy writes both into this file. When `CHAT_ENABLED=true` the key is required at boot.
 
@@ -205,8 +205,6 @@ In your GitHub repository go to **Settings → Secrets and variables → Actions
 |---|---|---|
 | `DEPLOY_HOST` | Droplet IP or domain | e.g. `143.198.12.34` |
 | `DEPLOY_SSH_KEY` | Full private key PEM | Generate with `ssh-keygen -t ed25519 -C "deploy@github-actions" -f ~/.ssh/residency_deploy -N ""`, use the private key file |
-| `SECRET_KEY_BASE` | Output of `mix phx.gen.secret` | Must match the value in your server `.env` |
-| `PHX_HOST` | Your domain | e.g. `residency-schedule.example.com` |
 | `ANTHROPIC_API_KEY` | Key from console.anthropic.com | Optional. The deploy writes it into the production `.env`; only needed when the chat assistant is on |
 | `OTEL_HUB_TOKEN` | Source-scoped ingest token from OTel Hub | Required when telemetry is enabled; production only |
 
@@ -258,17 +256,20 @@ git push origin main
 
 Monitor the deployment in the GitHub Actions tab. The workflow:
 
-1. **Test job** — runs the full test suite against a Postgres service container
-2. **Deploy job** (only if tests pass):
-   - Builds a production release with `mix release`
-   - SCPs the release to `/home/deploy/residency_schedule_new/` on the server
-   - On the server:
-     - Copies `.env` from the current release into the new release
-     - Runs database migrations via `ResidencySchedule.Release.migrate()`
-     - Atomically swaps the old and new release directories
-     - Restarts the systemd service
-     - Waits 3 seconds and checks `systemctl is-active`
-     - If the health check fails, automatically rolls back to the old release
+1. **Test job** — runs the application and deployment-script tests.
+2. **Build job** — creates one release archive identified by commit and SHA256,
+   without server runtime credentials or a distribution cookie.
+3. **Deploy jobs** — download the same archive for production and demo. Each
+   destination has noncanceling workflow concurrency and a stable host lock.
+   The host verifies the artifact, retains the previous code archive, prepares
+   private runtime configuration, runs migrations before the swap/restart, and
+   checks HTTP readiness. Swap, restart or startup-check failure attempts to
+   restore the previous application and verifies recovery.
+
+See [release artifact and locking operations](.docs/phase0-release-artifacts.md)
+for retained paths, cookie handling, failure limits and pending recovery gates.
+This upgrade path requires an existing installation and private server `.env`;
+initial provisioning is a separate operation.
 
 After a successful deploy, verify:
 ```bash
@@ -531,35 +532,41 @@ journalctl -u residency_schedule -n 200     # last 200 lines
 
 ```bash
 ssh deploy@your-droplet
+flock -x --close /home/deploy/residency_schedule.deploy.lock bash
 sudo systemctl restart residency_schedule
 ```
 
 ### Manual rollback
 
-If a bad release makes it past the automated health check:
-
-```bash
-ssh deploy@your-droplet
-mv /home/deploy/residency_schedule /home/deploy/residency_schedule_bad
-mv /home/deploy/residency_schedule_old /home/deploy/residency_schedule
-sudo systemctl restart residency_schedule
-```
+The deployment now retains checksummed code archives rather than a disposable
+`_old` directory. Do not use an unguarded directory swap: every recovery operation
+must hold `/home/deploy/residency_schedule.deploy.lock`. See the
+[artifact runbook](.docs/phase0-release-artifacts.md). A checksum-verified,
+schema-compatible manual rollback command and rehearsal remain Phase 0 Step 6
+work; automatic startup recovery does not establish that capability.
 
 ### Updating the .env file
 
 Edit directly on the server, then restart:
 ```bash
 ssh root@your-droplet
+test -f /home/deploy/residency_schedule.deploy.lock || exit 1
+flock -x --close /home/deploy/residency_schedule.deploy.lock bash
 nano /home/deploy/residency_schedule/.env
 sudo systemctl restart residency_schedule
 ```
 
-> **Note:** The `.env` file is automatically copied into each new release during deployment (`cp .env residency_schedule_new/.env`), so you only ever need to maintain one copy. Edits take effect on the next service restart.
+> **Note:** Deployment prepares a private candidate copy of the current `.env`;
+> retained code archives exclude it. Hold the same host deployment lock while
+> editing configuration and restarting, and keep mode 600. Edits take effect on
+> the next service restart.
 
 ### Resetting the database (destructive)
 
 ```bash
 ssh root@your-droplet
+test -f /home/deploy/residency_schedule.deploy.lock || exit 1
+flock -x --close /home/deploy/residency_schedule.deploy.lock bash
 sudo -u postgres dropdb residency_schedule_prod
 sudo -u postgres createdb residency_schedule_prod
 # Then trigger a deploy to re-run migrations, or run them manually:
@@ -589,12 +596,10 @@ The `set -a; source .env; set +a` in the deploy script exports variables to chil
 
 ### Deploy fails with "mv: cannot overwrite"
 
-A stale `residency_schedule_old` directory from a previous failed deploy is blocking the swap. Remove it:
-```bash
-ssh deploy@your-droplet
-rm -rf /home/deploy/residency_schedule_old
-```
-Then re-run the deploy.
+Do not delete a previous release or recovery directory to clear this error.
+The new deployment uses run-specific private work paths and a stable host lock.
+Inspect a failed run under that lock, identify the current and recoverable code
+artifacts, and follow the [artifact runbook](.docs/phase0-release-artifacts.md).
 
 ### SSL certificate issues
 

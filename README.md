@@ -248,8 +248,8 @@ Runtime configuration is read from the environment in `config/runtime.exs` using
 |---|---|---|
 | `DATABASE_URL` | server `.env` **only** | e.g. `ecto://postgres:pw@localhost:5432/residency_schedule_prod` |
 | `ACCESS_PASSWORD` | server `.env` **only** | App login password |
-| `SECRET_KEY_BASE` | server `.env` **and** GitHub Secret | Generate with `mix phx.gen.secret`; needed at build time for asset digests |
-| `PHX_HOST` | server `.env` **and** GitHub Secret | Your public domain |
+| `SECRET_KEY_BASE` | server `.env` **only** | Generate with `mix phx.gen.secret`; release builds do not receive it |
+| `PHX_HOST` | server `.env` **only** | Your public domain |
 | `POOL_SIZE` | server `.env` | DB connection pool size (e.g. `10`) |
 | `DB_SSL` | server `.env` | Set `true` for managed Postgres over SSL |
 | `CHAT_ENABLED` | GitHub **Variable** → server `.env` | Set `true` to turn on the chat assistant; the deploy writes it to the server |
@@ -259,7 +259,9 @@ Runtime configuration is read from the environment in `config/runtime.exs` using
 > `ACCESS_PASSWORD` never leave the server — they are **not** GitHub Secrets.
 
 In **GitHub → Settings → Secrets and variables → Actions**, add:
-`DEPLOY_HOST`, `DEPLOY_SSH_KEY` (the private deploy key), `SECRET_KEY_BASE`, and `PHX_HOST`.
+`DEPLOY_HOST` and `DEPLOY_SSH_KEY` (the private deploy key).
+`SECRET_KEY_BASE` and `PHX_HOST` belong in the private server runtime `.env`;
+they are not required by the release build.
 
 ### 3. First deploy
 
@@ -269,13 +271,17 @@ git push origin main
 
 The [`deploy.yml`](.github/workflows/deploy.yml) workflow:
 
-1. **test** — runs the full suite against a Postgres service container.
-2. **deploy** (`needs: test`, so it never runs on a red build):
-   - builds the release with `mix release` (assets compiled via `mix assets.deploy`),
-   - copies it to the server and pulls the existing `.env` into the new release,
-   - runs migrations via `ResidencySchedule.Release.migrate/0` (no Mix on the server),
-   - swaps old/new release directories and restarts systemd,
-   - health-checks `systemctl is-active` and **rolls back to the previous release on failure**.
+1. **test** — runs the application and deployment-script suites.
+2. **build** — packages one release with its commit identity and SHA256.
+3. **deploy** (`needs: [test, build]`) — promotes the same archive to production
+   and demo under per-destination workflow concurrency and a host lock. It keeps
+   private runtime configuration outside the retained code archives, runs
+   migrations before restart, checks HTTP readiness, and verifies application
+   recovery after swap, restart or startup-check failure.
+
+Prior code archives remain available after successful deployment. See the
+[artifact runbook](.docs/phase0-release-artifacts.md) for retention, recovery
+limits and the shared lock required by manual operations.
 
 Then load data by uploading a CSV at `https://yourdomain.com/admin/upload`.
 

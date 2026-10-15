@@ -374,8 +374,8 @@ server and in GitHub Actions Secrets. They must never appear in source code,
 The variables required at runtime are:
 - `DATABASE_URL` — server-only, never in GitHub Secrets
 - `ACCESS_PASSWORD` — server-only, never in GitHub Secrets
-- `SECRET_KEY_BASE` — GitHub Secret (used at build time for asset digests)
-- `PHX_HOST` — GitHub Secret
+- `SECRET_KEY_BASE` — server-only; release builds do not receive runtime credentials
+- `PHX_HOST` — server-only
 - `CHAT_ENABLED` — optional; GitHub Variable, written to the server `.env` by the deploy
 - `ANTHROPIC_API_KEY` — optional; GitHub Secret, written to the server `.env` by the deploy; required at boot when `CHAT_ENABLED=true`
 - `OTEL_ENABLED` — optional; production GitHub Variable; telemetry defaults off

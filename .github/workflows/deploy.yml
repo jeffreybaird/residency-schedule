@@ -13,7 +13,6 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-
     services:
       postgres:
         image: postgres:16
@@ -27,27 +26,23 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: ${{ env.ELIXIR_VERSION }}
           otp-version: ${{ env.OTP_VERSION }}
-
       - name: Cache deps
         uses: actions/cache@v4
         with:
           path: deps
           key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
-
       - name: Cache build
         uses: actions/cache@v4
         with:
           path: _build
           key: ${{ runner.os }}-build-${{ hashFiles('**/mix.lock') }}
-
+      - run: python3 -m unittest discover -s test/deploy -p '*_test.py'
       - run: mix deps.get
       - run: mix compile --warnings-as-errors
       - run: mix test
@@ -55,13 +50,41 @@ jobs:
           DATABASE_URL: ecto://postgres:postgres@localhost/residency_schedule_test
           MIX_ENV: test
 
+  build:
+    name: Build immutable release
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+      - name: Cache deps
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+      - run: mix deps.get --only prod
+      - name: Package deployment commit
+        run: printf '%s\n' "$GITHUB_SHA" > priv/deploy_sha
+      - run: mix assets.deploy
+      # Runtime credentials are read from each host's private .env at boot.
+      - run: mix release
+      - run: bash deploy/package_release.sh _build/prod/rel/residency_schedule artifact "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.sha }}
+          path: artifact/
+          if-no-files-found: error
+
   deploy:
     name: Deploy (${{ matrix.target }})
     runs-on: ubuntu-latest
-    needs: test
-
-    # Both targets build the same release; only the destination, systemd unit,
-    # and post-migrate seeding differ. A demo failure must not abort prod.
+    needs: [test, build]
+    concurrency:
+      group: deploy-${{ matrix.target }}
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:
@@ -78,59 +101,30 @@ jobs:
             service: residency_schedule_demo
             port: 4002
             seed_demo: true
-
     steps:
       - uses: actions/checkout@v4
-
-      - uses: erlef/setup-beam@v1
+      - uses: actions/download-artifact@v4
         with:
-          elixir-version: ${{ env.ELIXIR_VERSION }}
-          otp-version: ${{ env.OTP_VERSION }}
-
-      - name: Cache deps
-        uses: actions/cache@v4
-        with:
-          path: deps
-          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
-
-      - run: mix deps.get --only prod
-
-      - name: Package deployment commit
-        run: printf '%s\n' "$GITHUB_SHA" > priv/deploy_sha
-
-      - run: mix assets.deploy
-        env:
-          MIX_ENV: prod
-
-      - run: mix release
-        env:
-          MIX_ENV: prod
-          SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
-          PHX_HOST: ${{ secrets.PHX_HOST }}
-          # ACCESS_PASSWORD is NOT needed here — runtime.exs runs at boot, not
-          # at compile time. It lives only in the target's .env
-
-      - name: Upload release to droplet
+          name: release-${{ github.sha }}
+          path: artifact/
+      - name: Upload immutable artifact and promotion tools
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets[matrix.host_secret] }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "_build/prod/rel/residency_schedule"
-          target: "${{ matrix.install_dir }}_new"
-          strip_components: 4
-
-      - name: Swap release and restart
+          source: "artifact,deploy"
+          target: "${{ matrix.install_dir }}.incoming/${{ github.run_id }}-${{ github.run_attempt }}"
+      - name: Promote retained release
         uses: appleboy/ssh-action@v1.0.3
         env:
           INSTALL_DIR: ${{ matrix.install_dir }}
           SERVICE: ${{ matrix.service }}
           SEED_DEMO: ${{ matrix.seed_demo }}
           APP_PORT: ${{ matrix.port }}
-          # Chat assistant settings are managed from GitHub and written into
-          # the server .env on each deploy. Prod only: the demo site never
-          # runs the assistant, so its key never lands on that box. Leaving
-          # the variable or secret unset leaves the .env line untouched.
+          RELEASE_ID: ${{ github.sha }}
+          DEPLOY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          ARTIFACT_DIR: ${{ matrix.install_dir }}.incoming/${{ github.run_id }}-${{ github.run_attempt }}/artifact
           CHAT_ENABLED: ${{ matrix.target == 'prod' && vars.CHAT_ENABLED || '' }}
           ANTHROPIC_API_KEY: ${{ matrix.target == 'prod' && secrets.ANTHROPIC_API_KEY || '' }}
           OTEL_ENABLED: ${{ matrix.target == 'prod' && vars.OTEL_ENABLED || '' }}
@@ -140,74 +134,5 @@ jobs:
           host: ${{ secrets[matrix.host_secret] }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: INSTALL_DIR,SERVICE,SEED_DEMO,APP_PORT,CHAT_ENABLED,ANTHROPIC_API_KEY,OTEL_ENABLED,OTEL_EXPORTER_OTLP_ENDPOINT,OTEL_HUB_TOKEN
-          script: |
-            set -e
-            umask 077
-
-            # Write a KEY=value line into the server .env, replacing any
-            # existing line for that key. Skipped when the value is empty so
-            # an unset GitHub variable never erases a server-side setting.
-            # Rewrites in place through cat so the file keeps its 600 mode.
-            upsert_env() {
-              [ -n "$2" ] || return 0
-              { grep -v "^$1=" "$INSTALL_DIR/.env" || true; echo "$1=$2"; } > "$INSTALL_DIR/.env.tmp"
-              cat "$INSTALL_DIR/.env.tmp" > "$INSTALL_DIR/.env"
-              rm -f "$INSTALL_DIR/.env.tmp"
-            }
-            upsert_env CHAT_ENABLED "$CHAT_ENABLED"
-            upsert_env ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
-            if [ "$SEED_DEMO" != "true" ]; then
-              upsert_env OTEL_ENABLED "$OTEL_ENABLED"
-              upsert_env OTEL_EXPORTER_OTLP_ENDPOINT "$OTEL_EXPORTER_OTLP_ENDPOINT"
-              upsert_env OTEL_HUB_TOKEN "$OTEL_HUB_TOKEN"
-            fi
-
-            # Run migrations before swapping (uses server .env for real DB creds)
-            # set -a exports all sourced variables to child processes
-            set -a; source "$INSTALL_DIR/.env"; set +a
-            "${INSTALL_DIR}_new/bin/residency_schedule" eval \
-              "ResidencySchedule.Release.migrate()"
-
-            # Demo deployments reload their synthetic fixture every deploy, so
-            # anything a visitor changed is discarded.
-            if [ "$SEED_DEMO" = "true" ]; then
-              "${INSTALL_DIR}_new/bin/residency_schedule" eval \
-                "ResidencySchedule.Release.seed_demo()"
-            fi
-
-            # Carry the .env into the new release before swapping — it lives
-            # inside the deployment dir and must not be lost during rotation.
-            cp "$INSTALL_DIR/.env" "${INSTALL_DIR}_new/.env"
-
-            # Atomic swap — remove any stale _old dir first so mv doesn't
-            # move into a subdirectory instead of renaming.
-            rm -rf "${INSTALL_DIR}_old"
-            mv "$INSTALL_DIR" "${INSTALL_DIR}_old"
-            mv "${INSTALL_DIR}_new" "$INSTALL_DIR"
-
-            # Restart service
-            sudo systemctl restart "$SERVICE"
-
-            # Health check — if it fails, roll back automatically.
-            # systemctl state alone is not enough: a release that crash-loops
-            # reports "activating" while restarting, and a release that starts
-            # but cannot serve still counts as running. Poll the port instead.
-            healthy=false
-            for _ in $(seq 1 15); do
-              if curl -fsS -o /dev/null --max-time 3 "http://127.0.0.1:${APP_PORT}/"; then
-                healthy=true
-                break
-              fi
-              sleep 2
-            done
-
-            if [ "$healthy" != "true" ]; then
-              journalctl -u "$SERVICE" -n 30 --no-pager || true
-              mv "$INSTALL_DIR" "${INSTALL_DIR}_failed"
-              mv "${INSTALL_DIR}_old" "$INSTALL_DIR"
-              sudo systemctl restart "$SERVICE"
-              echo "Deploy failed — rolled back" && exit 1
-            fi
-
-            rm -rf "${INSTALL_DIR}_old"
+          envs: INSTALL_DIR,SERVICE,SEED_DEMO,APP_PORT,RELEASE_ID,DEPLOY_RUN_ID,ARTIFACT_DIR,CHAT_ENABLED,ANTHROPIC_API_KEY,OTEL_ENABLED,OTEL_EXPORTER_OTLP_ENDPOINT,OTEL_HUB_TOKEN
+          script: bash "${ARTIFACT_DIR%/artifact}/deploy/promote_release.sh"
