@@ -1044,6 +1044,48 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     |> Enum.uniq()
   end
 
+  defp merge_adjacent_rotations(entries) do
+    entries
+    |> Enum.group_by(&rotation_span_identity/1)
+    |> Enum.flat_map(fn {_identity, spans} ->
+      spans
+      |> Enum.sort_by(& &1.start_date, Date)
+      |> Enum.reduce([], &append_rotation_span/2)
+      |> Enum.reverse()
+    end)
+    |> Enum.sort_by(& &1.start_date, Date)
+  end
+
+  defp rotation_span_identity(entry) do
+    {
+      entry.rotation_type,
+      entry |> Map.get(:specific_tasks, []) |> Enum.uniq() |> Enum.sort(),
+      entry |> Map.get(:source_tasks, []) |> Enum.uniq() |> Enum.sort(),
+      Map.get(entry, :is_coverage, false),
+      coverage_resident_id(Map.get(entry, :covered_by)),
+      coverage_resident_id(Map.get(entry, :original_resident))
+    }
+  end
+
+  defp coverage_resident_id(nil), do: nil
+  defp coverage_resident_id(resident), do: resident.id
+
+  defp append_rotation_span(entry, []), do: [entry]
+
+  defp append_rotation_span(entry, [previous | rest] = spans) do
+    if Date.add(previous.end_date, 1) == entry.start_date do
+      [merge_rotation_span(previous, entry) | rest]
+    else
+      [entry | spans]
+    end
+  end
+
+  defp merge_rotation_span(previous, entry) do
+    previous
+    |> Map.put(:end_date, entry.end_date)
+    |> Map.put(:specific_notes, Enum.uniq(previous.specific_notes ++ entry.specific_notes))
+  end
+
   defp unmatched_activities(activities, entries) do
     Enum.reject(activities, fn activity ->
       Enum.any?(entries, fn entry ->
@@ -1101,6 +1143,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
     entries =
       effective_entries
       |> specific_rotation_entries(activities)
+      |> merge_adjacent_rotations()
       |> merge_effective_entries(off_slots)
       |> Kernel.++(activities |> unmatched_activities(effective_entries) |> activity_entries())
       |> Enum.map(&tag_entry_with_schedule(&1, schedule_resident))
