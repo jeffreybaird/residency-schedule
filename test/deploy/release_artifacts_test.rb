@@ -1327,6 +1327,32 @@ class ReleaseArtifactsTest < Minitest::Test
     refute_match(/source\s+["']?\$.*\.env/, File.read(PROMOTE))
   end
 
+  def test_private_transfer_hands_ownership_to_container_user_without_widening_permissions
+    jobs = YAML.load_file(File.join(ROOT, '.github/workflows/deploy.yml')).fetch('jobs')
+    %w[staging deploy].each do |target|
+      steps = jobs.fetch(target).fetch('steps')
+      render = steps.index { |step| step['run'].to_s.include?('runtime_config.rb render') }
+      upload = steps.index { |step| step.dig('with', 'source') == 'runtime-config/runtime.json' }
+      refute_nil render
+      refute_nil upload
+      assert_operator render, :<, upload
+      commands = steps[render...upload].map { |step| step['run'].to_s }.join("\n")
+      handoff = commands.lines.find { |line| line.include?('chown') }
+      refute_nil handoff, "#{target} must hand private config to the pinned action's UID 1000"
+      assert_equal 'sudo chown --no-dereference 1000:1000 runtime-config runtime-config/runtime.json', handoff.strip
+      assert_operator commands.index('runtime_config.rb render'), :<, commands.index(handoff)
+      refute_match(/\bchmod\b/, commands, 'handoff must preserve the renderer\'s private modes')
+      transfer = steps.fetch(upload).fetch('with')
+      assert_equal 1, transfer.fetch('strip_components')
+      assert_equal '${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}/',
+                   transfer.fetch('tar_tmp_path')
+      cleanup = steps.find { |step| step['name'] == 'Remove private local configuration' }
+      refute_nil cleanup
+      assert_equal 'always()', cleanup.fetch('if')
+      assert_equal 'sudo rm -f -- runtime-config/runtime.json', cleanup.fetch('run').strip
+    end
+  end
+
   def test_workflow_builds_once_promotes_same_artifact_and_serializes_each_destination
     deploy = File.read(File.join(ROOT, '.github/workflows/deploy.yml'))
     jobs = deploy.scan(/^  ([a-zA-Z_][\w-]*):\n(.*?)(?=^  [a-zA-Z_][\w-]*:\n|\z)/m).to_h

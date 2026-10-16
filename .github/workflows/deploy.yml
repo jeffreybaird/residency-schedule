@@ -143,6 +143,11 @@ jobs:
           OTEL_HUB_TOKEN: ''
           OTEL_RESOURCE_ATTRIBUTES: ''
         run: ruby deploy/runtime_config.rb render runtime-config/runtime.json
+      - name: Hand private configuration to transfer container
+        run: |
+          test -d runtime-config && test ! -L runtime-config
+          test -f runtime-config/runtime.json && test ! -L runtime-config/runtime.json
+          sudo chown --no-dereference 1000:1000 runtime-config runtime-config/runtime.json
       - name: Prepare private configuration inbox
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -168,7 +173,7 @@ jobs:
           source: "runtime-config/runtime.json"
           strip_components: 1
           target: "${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}"
-          tar_tmp_path: "${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}"
+          tar_tmp_path: "${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}/"
       - name: Promote retained release
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -189,7 +194,7 @@ jobs:
           script: bash "${ARTIFACT_DIR%/artifact}/deploy/promote_release.sh"
       - name: Remove private local configuration
         if: always()
-        run: rm -f runtime-config/runtime.json
+        run: sudo rm -f -- runtime-config/runtime.json
       - name: Remove private remote configuration inbox
         if: always()
         uses: appleboy/ssh-action@v1.0.3
@@ -268,6 +273,11 @@ jobs:
           OTEL_HUB_TOKEN: ${{ matrix.target == 'prod' && secrets.OTEL_HUB_TOKEN || '' }}
           OTEL_RESOURCE_ATTRIBUTES: ${{ matrix.target == 'prod' && vars.OTEL_RESOURCE_ATTRIBUTES || '' }}
         run: ruby deploy/runtime_config.rb render runtime-config/runtime.json
+      - name: Hand private configuration to transfer container
+        run: |
+          test -d runtime-config && test ! -L runtime-config
+          test -f runtime-config/runtime.json && test ! -L runtime-config/runtime.json
+          sudo chown --no-dereference 1000:1000 runtime-config runtime-config/runtime.json
       - name: Prepare private configuration inbox
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -293,7 +303,7 @@ jobs:
           source: "runtime-config/runtime.json"
           strip_components: 1
           target: "${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}"
-          tar_tmp_path: "${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}"
+          tar_tmp_path: "${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}/"
       - name: Promote retained release
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -314,7 +324,7 @@ jobs:
           script: bash "${ARTIFACT_DIR%/artifact}/deploy/promote_release.sh"
       - name: Remove private local configuration
         if: always()
-        run: rm -f runtime-config/runtime.json
+        run: sudo rm -f -- runtime-config/runtime.json
       - name: Remove private remote configuration inbox
         if: always()
         uses: appleboy/ssh-action@v1.0.3
