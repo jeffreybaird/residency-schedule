@@ -10,7 +10,7 @@ fail() { echo "$1" >&2; exit 1; }
 [[ ${SERVICE:-} =~ ^[a-zA-Z0-9_@.-]+$ ]] || fail 'Invalid service'
 [[ ${APP_PORT:-} =~ ^[0-9]{1,5}$ ]] && ((10#$APP_PORT > 0 && 10#$APP_PORT < 65536)) || fail 'Invalid application port'
 [[ ${SEED_DEMO:-} == true || ${SEED_DEMO:-} == false ]] || fail 'Invalid deployment target'
-[[ ${DEPLOY_TARGET:-} == prod || ${DEPLOY_TARGET:-} == demo ]] || fail 'Invalid configuration target'
+[[ ${DEPLOY_TARGET:-} == prod || ${DEPLOY_TARGET:-} == demo || ${DEPLOY_TARGET:-} == staging ]] || fail 'Invalid configuration target'
 [[ -d ${ARTIFACT_DIR:-} ]] || fail 'Missing artifact directory'
 helper="$(cd "$(dirname "$0")" && pwd)/release_artifact.rb"
 config_helper="$(dirname "$helper")/runtime_config.rb"

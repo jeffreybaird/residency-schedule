@@ -2,7 +2,8 @@ name: Deploy to Digital Ocean
 
 on:
   push:
-    branches: [main]
+    branches: [main, codex/phase0-release-artifacts]
+  workflow_dispatch:
 
 env:
   MIX_ENV: prod
@@ -84,10 +85,129 @@ jobs:
           path: artifact/
           if-no-files-found: error
 
+  staging:
+    name: Rehearse (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    environment: ${{ matrix.target }}
+    concurrency:
+      group: deploy-${{ matrix.target }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: staging
+            host_secret: STAGING_DEPLOY_HOST
+            install_dir: /home/deploy/residency_schedule_staging
+            service: residency_schedule_staging
+            port: 4004
+            seed_demo: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-${{ github.sha }}
+          path: artifact/
+      - name: Upload immutable artifact and promotion tools
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets[matrix.host_secret] }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "artifact,deploy"
+          target: "${{ matrix.install_dir }}.incoming/${{ github.run_id }}-${{ github.run_attempt }}"
+      - name: Render private environment configuration
+        env:
+          DEPLOY_TARGET: ${{ matrix.target }}
+          CONFIG_ENVIRONMENT: ${{ vars.CONFIG_ENVIRONMENT }}
+          EXPECTED_DATABASE_NAME: ${{ vars.EXPECTED_DATABASE_NAME }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
+          PHX_HOST: ${{ vars.PHX_HOST }}
+          ACCESS_PASSWORD: ${{ secrets.ACCESS_PASSWORD }}
+          RESEND_API_KEY: ''
+          RELEASE_COOKIE: ${{ secrets.RELEASE_COOKIE }}
+          PORT: ${{ matrix.port }}
+          HTTP_IP: ${{ vars.HTTP_IP }}
+          POOL_SIZE: ${{ vars.POOL_SIZE }}
+          DB_SSL: ${{ vars.DB_SSL }}
+          ROSTER_PATH: ${{ vars.ROSTER_PATH }}
+          CHAT_ENABLED: 'false'
+          ANTHROPIC_API_KEY: ''
+          OTEL_ENABLED: 'false'
+          OTEL_EXPORTER_OTLP_ENDPOINT: ''
+          OTEL_HUB_TOKEN: ''
+          OTEL_RESOURCE_ATTRIBUTES: ''
+        run: ruby deploy/runtime_config.rb render runtime-config/runtime.json
+      - name: Prepare private configuration inbox
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          INSTALL_DIR: ${{ matrix.install_dir }}
+          DEPLOY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        with:
+          host: ${{ secrets[matrix.host_secret] }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: INSTALL_DIR,DEPLOY_RUN_ID
+          script: |
+            set -eu
+            umask 077
+            test ! -L "${INSTALL_DIR}.config-incoming"
+            test ! -L "${INSTALL_DIR}.config-incoming/${DEPLOY_RUN_ID}"
+            install -d -m 700 "${INSTALL_DIR}.config-incoming" "${INSTALL_DIR}.config-incoming/${DEPLOY_RUN_ID}"
+      - name: Transfer private configuration separately
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets[matrix.host_secret] }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "runtime-config/runtime.json"
+          strip_components: 1
+          target: "${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}"
+          tar_tmp_path: "${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}"
+      - name: Promote retained release
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          INSTALL_DIR: ${{ matrix.install_dir }}
+          SERVICE: ${{ matrix.service }}
+          SEED_DEMO: ${{ matrix.seed_demo }}
+          APP_PORT: ${{ matrix.port }}
+          RELEASE_ID: ${{ github.sha }}
+          DEPLOY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          ARTIFACT_DIR: ${{ matrix.install_dir }}.incoming/${{ github.run_id }}-${{ github.run_attempt }}/artifact
+          CONFIG_FILE: ${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}/runtime.json
+          DEPLOY_TARGET: ${{ matrix.target }}
+        with:
+          host: ${{ secrets[matrix.host_secret] }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: INSTALL_DIR,SERVICE,SEED_DEMO,APP_PORT,RELEASE_ID,DEPLOY_RUN_ID,ARTIFACT_DIR,CONFIG_FILE,DEPLOY_TARGET
+          script: bash "${ARTIFACT_DIR%/artifact}/deploy/promote_release.sh"
+      - name: Remove private local configuration
+        if: always()
+        run: rm -f runtime-config/runtime.json
+      - name: Remove private remote configuration inbox
+        if: always()
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          INSTALL_DIR: ${{ matrix.install_dir }}
+          DEPLOY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        with:
+          host: ${{ secrets[matrix.host_secret] }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: INSTALL_DIR,DEPLOY_RUN_ID
+          script: rm -rf -- "${INSTALL_DIR}.config-incoming/${DEPLOY_RUN_ID}"
+
   deploy:
     name: Deploy (${{ matrix.target }})
     runs-on: ubuntu-latest
-    needs: [test, build]
+    needs: [test, build, staging]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: ${{ matrix.target }}
     concurrency:
       group: deploy-${{ matrix.target }}

@@ -248,19 +248,19 @@ staging readiness must be verified separately.
 Runtime configuration is read from the environment in `config/runtime.exs` using
 `System.fetch_env!/1`, so a missing variable fails loudly at boot.
 
-Create **Settings → Environments → `prod` and `demo`**. Each environment manages
+Create **Settings → Environments → `prod`, `demo` and `staging`**. Each environment manages
 its own runtime settings. GitHub is the source of truth; deployments generate
 the server files automatically, without passing runtime credentials to the build.
 
 | Setting | Managed in | Notes |
 |---|---|---|
 | `DATABASE_URL` | GitHub environment secret | Distinct database and restricted role for each target |
-| `ACCESS_PASSWORD` | GitHub `prod` environment secret | Production app login password |
+| `ACCESS_PASSWORD` | GitHub `prod`/`staging` environment secret | Separate app login passwords |
 | `SECRET_KEY_BASE` | GitHub environment secret | Preserve the existing value during transition; generate new installation values with `mix phx.gen.secret` |
 | `RELEASE_COOKIE` | GitHub environment secret | Must match the installation's effective distribution cookie; deployment does not rotate it |
 | `RESEND_API_KEY` | GitHub `prod` environment secret | Production transactional email credential |
 | `PHX_HOST` | GitHub environment variable | Public domain for that target |
-| `CONFIG_ENVIRONMENT` | GitHub environment variable | `prod` or `demo`, matching the deployment target |
+| `CONFIG_ENVIRONMENT` | GitHub environment variable | `prod`, `demo` or `staging`, matching the deployment target |
 | `EXPECTED_DATABASE_NAME` | GitHub environment variable | Must match the database selected by `DATABASE_URL` |
 | `POOL_SIZE`, `DB_SSL`, `HTTP_IP`, `ROSTER_PATH` | GitHub environment variables | Optional runtime overrides; see the deployment guide |
 | `CHAT_ENABLED` | GitHub `prod` environment variable | Enable the chat assistant explicitly |
@@ -269,7 +269,7 @@ the server files automatically, without passing runtime credentials to the build
 | `OTEL_RESOURCE_ATTRIBUTES` | GitHub `prod` environment variable | Optional non-sensitive telemetry labels |
 | `OTEL_HUB_TOKEN` | GitHub `prod` environment secret | Required when telemetry is enabled |
 
-Configure the transport secrets `DEPLOY_HOST`, `DEMO_DEPLOY_HOST` and
+Configure the transport secrets `DEPLOY_HOST`, `DEMO_DEPLOY_HOST`, `STAGING_DEPLOY_HOST` and
 `DEPLOY_SSH_KEY` under **Secrets and variables → Actions**. Runtime secrets belong
 in their target environments: repository-level production defaults must not
 silently become demo settings. Verify database-role isolation separately; a
@@ -293,11 +293,18 @@ The [`deploy.yml`](.github/workflows/deploy.yml) workflow:
 
 1. **test** — runs the application and deployment-script suites.
 2. **build** — packages one release with its commit identity and SHA256.
-3. **deploy** (`needs: [test, build]`) — promotes the same archive to production
+3. **staging** (`needs: [test, build]`) — promotes the archive to persistent,
+   isolated staging with outbound integrations disabled and no automatic reseed.
+4. **deploy** (`needs: [test, build, staging]`) — promotes the same archive to production
    and demo under per-destination workflow concurrency and a host lock. It keeps
    private runtime configuration outside the retained code archives, runs
    migrations before restart, checks HTTP readiness, and verifies application
    recovery after swap, restart or startup-check failure.
+
+Production/demo run only on pushes to `main`. Manual dispatch and pushes to
+`codex/phase0-release-artifacts` build/test and deploy staging alone, allowing
+rehearsal before merge. Staging has its own service, database, credentials and
+node on loopback port 4004; access it through the authorized SSH connection.
 
 Prior code archives remain available after successful deployment. See the
 [artifact runbook](.docs/phase0-release-artifacts.md) for retention, recovery

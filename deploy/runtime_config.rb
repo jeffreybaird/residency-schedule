@@ -66,7 +66,7 @@ module RuntimeConfig
     default!(values, 'PORT', port)
     default!(values, 'PHX_SERVER', 'true')
     default!(values, 'RELEASE_DISTRIBUTION', 'name')
-    node = target == 'demo' ? 'residency_schedule_demo' : 'residency_schedule'
+    node = target == 'prod' ? 'residency_schedule' : "residency_schedule_#{target}"
     default!(values, 'RELEASE_NODE', "#{node}@127.0.0.1")
     values['HTTP_IP'] ||= '127.0.0.1'
     octets = values['HTTP_IP'].split('.', -1)
@@ -85,10 +85,13 @@ module RuntimeConfig
       values[key] ||= 'false'
       raise 'invalid boolean configuration' unless %w[true false].include?(values[key])
     end
-    if target == 'demo'
-      raise 'production integration in demo' if values['CHAT_ENABLED'] != 'false' || values['OTEL_ENABLED'] != 'false'
-      forbidden = %w[ACCESS_PASSWORD RESEND_API_KEY ANTHROPIC_API_KEY OTEL_HUB_TOKEN OTEL_EXPORTER_OTLP_ENDPOINT]
-      raise 'production credential in demo' if forbidden.any? { |key| values.key?(key) }
+    if %w[demo staging].include?(target)
+      raise 'production integration in isolated target' if values['CHAT_ENABLED'] != 'false' || values['OTEL_ENABLED'] != 'false'
+      forbidden = %w[RESEND_API_KEY ANTHROPIC_API_KEY OTEL_HUB_TOKEN OTEL_EXPORTER_OTLP_ENDPOINT]
+      forbidden << 'OTEL_RESOURCE_ATTRIBUTES' if target == 'staging'
+      forbidden << 'ACCESS_PASSWORD' if target == 'demo'
+      raise 'production credential in isolated target' if forbidden.any? { |key| values.key?(key) }
+      required!(values, ['ACCESS_PASSWORD']) if target == 'staging'
     else
       required!(values, %w[ACCESS_PASSWORD RESEND_API_KEY])
     end
@@ -120,7 +123,7 @@ module RuntimeConfig
   end
 
   def normalize(values, target, port, seed_demo)
-    raise 'unrecognized deployment target' unless %w[prod demo].include?(target)
+    raise 'unrecognized deployment target' unless %w[prod demo staging].include?(target)
     raise 'target and seeding disagree' unless seed_demo == (target == 'demo').to_s
     raise 'invalid target port' unless /\A[0-9]{1,5}\z/.match?(port) && port.to_i.between?(1, 65_535)
 
@@ -138,7 +141,9 @@ module RuntimeConfig
   end
 
   def environment_file(values)
-    APPLICATION_KEYS.sort.filter_map do |key|
+    # Preserve existing prod/demo pairs byte-for-byte during their first upgrade.
+    keys = APPLICATION_KEYS + (values['CONFIG_ENVIRONMENT'] == 'staging' ? ['CONFIG_ENVIRONMENT'] : [])
+    keys.sort.filter_map do |key|
       next unless values.key?(key)
 
       escaped = values.fetch(key).gsub(/[\\"]/) { |character| '\\' + character }
@@ -192,7 +197,7 @@ module RuntimeConfig
     end.to_h
     required!(values, MARKER_KEYS + ['DATABASE_URL'])
     target = ENV['DEPLOY_TARGET']
-    raise 'environment marker mismatch' unless %w[prod demo].include?(target) &&
+    raise 'environment marker mismatch' unless %w[prod demo staging].include?(target) &&
                                                values['CONFIG_ENVIRONMENT'] == target
 
     validate_database(values)
@@ -336,8 +341,9 @@ module RuntimeConfig
     target = ENV.fetch('DEPLOY_TARGET')
     values, = managed_values(ENV.fetch('INSTALL_DIR'), File.join(candidate, '.env'),
                              target, ENV.fetch('APP_PORT'), seed_demo)
-    child_environment = (APPLICATION_KEYS + RELEASE_OVERRIDE_KEYS).to_h { |key| [key, nil] }
+    child_environment = (ALLOWED_KEYS + RELEASE_OVERRIDE_KEYS).to_h { |key| [key, nil] }
     APPLICATION_KEYS.each { |key| child_environment[key] = values[key] if values.key?(key) }
+    child_environment['CONFIG_ENVIRONMENT'] = 'staging' if target == 'staging'
     evaluate(candidate, child_environment, 'ResidencySchedule.Release.migrate()')
     evaluate(candidate, child_environment, 'ResidencySchedule.Release.seed_demo()') if seed_demo == 'true'
   end

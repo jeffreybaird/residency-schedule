@@ -214,7 +214,7 @@ Under **Settings → Secrets and variables → Actions**, configure transport ac
 | `DEMO_DEPLOY_HOST` | Demo droplet IP or domain | May share a host with production, but uses a separate installation and database |
 | `DEPLOY_SSH_KEY` | Full private key PEM | Generate with `ssh-keygen -t ed25519 -C "deploy@github-actions" -f ~/.ssh/residency_deploy -N ""`, use the private key file |
 
-Create **Settings → Environments → `prod` and `demo`**, with the desired branch
+Create **Settings → Environments → `prod`, `demo` and `staging`**, with the desired branch
 restrictions and deployment approvals. Each deployment job selects its target
 environment. Configure runtime values there:
 
@@ -223,7 +223,7 @@ environment. Configure runtime values there:
 | `DATABASE_URL` | Both targets | Distinct database and restricted role for each target |
 | `SECRET_KEY_BASE` | Both targets | Preserve the installation's signing secret; demo and production must differ |
 | `RELEASE_COOKIE` | Both targets | Preserve the effective existing Erlang distribution cookie |
-| `ACCESS_PASSWORD` | Production | App login password |
+| `ACCESS_PASSWORD` | Production and staging | Separate app login passwords |
 | `RESEND_API_KEY` | Production | Transactional email credential |
 | `ANTHROPIC_API_KEY` | Production with chat enabled | Provider credential |
 | `OTEL_HUB_TOKEN` | Production with telemetry enabled | Source-scoped ingest token |
@@ -232,7 +232,7 @@ Environment variables hold public configuration:
 
 | Variable | Value | Notes |
 |---|---|---|
-| `CONFIG_ENVIRONMENT` | `prod` or `demo` | Required; must match the job's target |
+| `CONFIG_ENVIRONMENT` | `prod`, `demo` or `staging` | Required; must match the job's target |
 | `EXPECTED_DATABASE_NAME` | e.g. `residency_schedule_prod` | Required; must match the database in `DATABASE_URL` |
 | `PHX_HOST` | Target public hostname | Required |
 | `POOL_SIZE` | Positive integer | Optional connection-pool override |
@@ -246,6 +246,13 @@ Environment variables hold public configuration:
 
 The workflow sets target-specific port and demo mode and keeps Erlang node
 identities distinct. See the runbook for supported overrides and defaults.
+Staging uses `STAGING_DEPLOY_HOST`, its own database/credentials, installation
+and service `residency_schedule_staging`, and loopback port 4004. It retains
+authentication while using the in-memory email sink; provider and telemetry
+credentials are forbidden. It never runs the automatic demo seed. Production
+and demo require the staging job to succeed using the same downloaded archive.
+Candidate branch pushes and manual dispatch are staging-only; production/demo
+require a push to `main`. Restrict their GitHub environments to `main` too.
 Removing an optional setting restores its declared default; disabled integrations
 do not retain their old provider credentials in the newly generated configuration.
 

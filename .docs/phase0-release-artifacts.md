@@ -11,8 +11,12 @@ PR; operational validation remains a separate Phase 0 prerequisite.
 
 The deployment workflow requires its test job, builds one Mix release, and
 packages `release-<commit>.tar.gz` with `release-<commit>.sha256`. The package
-contains a `RELEASE_ID` identifying the source commit. Production and demo
-download the same uploaded artifact; neither deployment job rebuilds it.
+contains a `RELEASE_ID` identifying the source commit. Staging, production and
+demo download the same uploaded artifact; no deployment job rebuilds it.
+Staging must succeed before production/demo can run. Only a push to `main` runs
+production/demo. Candidate branch pushes and manual dispatch rehearse staging
+alone; the exact candidate branch is enabled explicitly so rehearsal works
+before the dispatcher reaches the default branch.
 Existing demo-only seeding remains separate from production.
 
 Build jobs receive no server `.env`, `SECRET_KEY_BASE`, provider token or other
@@ -45,7 +49,7 @@ not evidence of reproducibility or of the originally deployed build checksum.
 
 ## Runtime configuration and private temporary state
 
-GitHub Environments `prod` and `demo` are the source of truth. The deployment
+GitHub Environments `prod`, `demo` and `staging` are the source of truth. The deployment
 job binds its environment from the fixed target matrix. Only the render step
 receives runtime secrets through step environment bindings; build/test jobs
 and SSH command bodies do not receive them. The public `PHX_HOST` and required
@@ -121,28 +125,28 @@ run identity is supplied separately from the fixed deployment matrix.
 
 | Key | Source and requirement | Default or constraint |
 | --- | --- | --- |
-| `CONFIG_ENVIRONMENT` | Environment variable, required | Exactly `prod` or `demo`, matching independent `DEPLOY_TARGET`. |
+| `CONFIG_ENVIRONMENT` | Environment variable, required | Exactly `prod`, `demo` or `staging`, matching independent `DEPLOY_TARGET`; propagated to release processes and systemd. |
 | `EXPECTED_DATABASE_NAME` | Environment variable, required | Must match the decoded database path in `DATABASE_URL`. |
 | `DATABASE_URL` | Environment secret, required | Plain `postgres`, `postgresql` or `ecto` URL; query options and fragments are rejected. |
 | `SECRET_KEY_BASE` | Environment secret, required | At least 64 bytes; keep prod/demo signing secrets distinct. |
 | `PHX_HOST` | Environment variable, required | Hostname only, without URL scheme, path or credentials. |
-| `ACCESS_PASSWORD` | Production secret | Required for production; omit it for demo. |
-| `RESEND_API_KEY` | Production secret | Required for production; a production mail key is rejected for demo. |
+| `ACCESS_PASSWORD` | Production/staging secret | Required for authenticated production and staging; omit it for demo. |
+| `RESEND_API_KEY` | Production secret | Required for production; rejected for demo/staging. Staging uses the in-memory Swoosh test adapter. |
 | `RELEASE_COOKIE` | Environment secret, required | Must preserve the previous effective cookie; never generated or silently rotated. |
 | `PORT` | Target-derived setting | The workflow supplies the matrix port; direct JSON values must match `APP_PORT`, and omission uses that port. |
 | `HTTP_IP` | Environment variable, optional | IPv4 bind address; defaults to `127.0.0.1`. |
 | `POOL_SIZE` | Environment variable, optional | Positive integer; defaults to `10`. |
 | `DB_SSL` | Environment variable, optional | `true` or `false`; defaults to `false`. |
 | `ROSTER_PATH` | Environment variable, optional | Explicit roster path when required; omission removes the previous override. |
-| `CHAT_ENABLED` | Environment variable, optional | Defaults to `false`; demo cannot enable the provider integration. |
+| `CHAT_ENABLED` | Environment variable, optional | Defaults to `false`; demo/staging cannot enable the provider integration. |
 | `ANTHROPIC_API_KEY` | Conditional environment secret | Required when production chat is enabled; omitted from active config when disabled. |
-| `OTEL_ENABLED` | Environment variable, optional | Defaults to `false`; demo cannot enable telemetry export. |
+| `OTEL_ENABLED` | Environment variable, optional | Defaults to `false`; demo/staging cannot enable telemetry export. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Conditional environment variable | Required HTTPS collector URL when telemetry is enabled; no credentials/query/fragment. |
 | `OTEL_HUB_TOKEN` | Conditional environment secret | Required when telemetry is enabled; omitted when disabled. |
 | `OTEL_RESOURCE_ATTRIBUTES` | Environment variable, optional | Administrative attributes only when telemetry is enabled; never include resident data or secrets. |
-| `DEMO_MODE` | Target-derived setting | `false` for prod, `true` for demo; conflicting supplied values are rejected. |
+| `DEMO_MODE` | Target-derived setting | `false` for prod/staging, `true` for demo; conflicting supplied values are rejected. |
 | `PHX_SERVER` | Target-derived setting | Always `true`. |
-| `RELEASE_NODE` | Target-derived setting | `residency_schedule@127.0.0.1` for prod; `residency_schedule_demo@127.0.0.1` for demo. |
+| `RELEASE_NODE` | Target-derived setting | `residency_schedule@127.0.0.1` for prod; `residency_schedule_demo@127.0.0.1` for demo; `residency_schedule_staging@127.0.0.1` for staging. |
 | `RELEASE_DISTRIBUTION` | Target-derived setting | Always `name`; arbitrary release path/runtime overrides are not accepted. |
 
 Do not silently remove database URL query settings to make validation pass.
@@ -150,6 +154,13 @@ Use the explicit supported `DB_SSL` setting where appropriate; advanced SSL or
 other connection options require review rather than an implicit translation.
 Database guards still require an operational check of roles and distinct target
 credentials before rollout.
+
+Staging uses `STAGING_DEPLOY_HOST`, installation/service
+`residency_schedule_staging`, and loopback port 4004. It has its own database,
+credentials, signing key and cookie. It never runs the demo reset-on-deploy seed.
+Provision an initial isolated installation before promotion; promotion does not
+bootstrap an empty host. Live observations and unresolved rollout gates are in
+[the local rollout record](phase0-local-rollout-record.md).
 
 Temporary candidate and rollback trees live under a mode-700 deployment work
 directory. They can contain runtime configuration and cookies during promotion;

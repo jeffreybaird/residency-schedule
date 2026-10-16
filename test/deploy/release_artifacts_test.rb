@@ -13,6 +13,7 @@ require 'tempfile'
 require 'timeout'
 require 'tmpdir'
 require 'zlib'
+require 'yaml'
 
 class ReleaseArtifactsTest < Minitest::Test
   ROOT = File.expand_path('../..', __dir__)
@@ -36,6 +37,12 @@ class ReleaseArtifactsTest < Minitest::Test
     root = File.expand_path('..', __dir__)
     label = File.read(File.join(root, 'lib/app/LABEL')).strip
     phase = ARGV.join(' ').include?('seed_demo') ? 'seed' : 'migrate'
+    if ENV['SYNTHETIC_DATABASE_FILE']
+      database = JSON.parse(File.read(ENV.fetch('SYNTHETIC_DATABASE_FILE')))
+      database['records'] = [] if phase == 'seed'
+      database.fetch('migrations') << label if phase == 'migrate'
+      File.write(ENV.fetch('SYNTHETIC_DATABASE_FILE'), JSON.generate(database))
+    end
     cookie = File.join(root, 'releases/COOKIE')
     begin
       IO.for_fd(9, autoclose: false).stat
@@ -49,7 +56,7 @@ class ReleaseArtifactsTest < Minitest::Test
       cookie_ok: File.exist?(cookie) && File.read(cookie) == ENV.fetch('EXPECTED_COOKIE'),
       cookie_override_ok: ENV['RELEASE_COOKIE'] == ENV.fetch('EXPECTED_RUNTIME_COOKIE'),
       cookie_mode: File.exist?(cookie) ? File.stat(cookie).mode & 0o777 : nil,
-      runtime: ENV.select { |key, _| %w[DATABASE_URL SECRET_KEY_BASE PHX_HOST ACCESS_PASSWORD
+      runtime: ENV.select { |key, _| %w[CONFIG_ENVIRONMENT DATABASE_URL SECRET_KEY_BASE PHX_HOST ACCESS_PASSWORD
         RESEND_API_KEY DEMO_MODE CHAT_ENABLED ANTHROPIC_API_KEY OTEL_ENABLED
         OTEL_EXPORTER_OTLP_ENDPOINT OTEL_HUB_TOKEN PORT HTTP_IP POOL_SIZE DB_SSL
         ROSTER_PATH OTEL_RESOURCE_ATTRIBUTES RELEASE_NODE RELEASE_DISTRIBUTION
@@ -226,6 +233,8 @@ class ReleaseArtifactsTest < Minitest::Test
     }
     if target == 'prod'
       values.merge!('ACCESS_PASSWORD' => 'synthetic-access-password', 'RESEND_API_KEY' => 'synthetic-mail-key')
+    elsif target == 'staging'
+      values['ACCESS_PASSWORD'] = 'synthetic-staging-password'
     else
       values['DEMO_MODE'] = 'true'
     end
@@ -244,7 +253,7 @@ class ReleaseArtifactsTest < Minitest::Test
   end
 
   def promotion_env(artifact, sha = SHA_A, install: @current, config: {}, omit: [], **overrides)
-    target = overrides.fetch(:SEED_DEMO, 'false') == 'true' ? 'demo' : 'prod'
+    target = overrides.fetch(:DEPLOY_TARGET) { overrides.fetch(:SEED_DEMO, 'false') == 'true' ? 'demo' : 'prod' }
     values = runtime_values(target).merge(config.transform_keys(&:to_s))
     omit.each { |key| values.delete(key.to_s) }
     file = write_runtime_input(values)
@@ -941,6 +950,76 @@ class ReleaseArtifactsTest < Minitest::Test
     refute_includes values.fetch('DATABASE_URL'), '?'
   end
 
+  def test_staging_preserves_synthetic_data_across_two_regular_migration_promotions
+    artifact_a = package
+    artifact_b = package(SHA_B, 'B')
+    staging = File.join(@work, 'staging')
+    make_installed(staging)
+    database = File.join(@work, 'synthetic-staging-database.json')
+    records = [{ 'year' => 2026, 'activity' => 'overnight duty' },
+               { 'year' => 2027, 'vacation' => '2027-04-05/2027-04-18' }]
+    File.write(database, JSON.generate('records' => records, 'migrations' => []))
+    [[artifact_a, SHA_A], [artifact_b, SHA_B]].each do |artifact, sha|
+      result = promote(artifact, sha, install: staging, DEPLOY_TARGET: 'staging',
+                       APP_PORT: '4004', SYNTHETIC_DATABASE_FILE: database)
+      assert result.success?, result.stderr
+      canonical, values = assert_managed_configuration(staging)
+      assert_equal 'staging', canonical.fetch('CONFIG_ENVIRONMENT')
+      assert_equal 'staging', values.fetch('CONFIG_ENVIRONMENT')
+      assert_equal 'false', values.fetch('DEMO_MODE')
+      assert_equal '4004', values.fetch('PORT')
+      assert_equal 'residency_schedule_staging@127.0.0.1', values.fetch('RELEASE_NODE')
+      assert_equal 'synthetic-staging-password', values.fetch('ACCESS_PASSWORD')
+      assert_equal 'false', values.fetch('CHAT_ENABLED')
+      assert_equal 'false', values.fetch('OTEL_ENABLED')
+      %w[RESEND_API_KEY ANTHROPIC_API_KEY OTEL_HUB_TOKEN OTEL_EXPORTER_OTLP_ENDPOINT].each do |key|
+        refute values.key?(key), key
+      end
+      assert_equal artifact_identity(artifact, sha), File.read(File.join(staging, 'ARTIFACT_ID')).strip
+      assert_equal records, JSON.parse(File.read(database)).fetch('records')
+    end
+    assert_equal %w[A B], JSON.parse(File.read(database)).fetch('migrations')
+    assert_equal %w[migrate restart health migrate restart health], logged.map { |event| event.fetch('phase') }
+    logged.select { |event| event['phase'] == 'migrate' }.each do |event|
+      assert_equal Digest::SHA256.hexdigest('staging'), event.fetch('runtime').fetch('CONFIG_ENVIRONMENT')
+    end
+  end
+
+  def test_staging_requires_authentication_and_refuses_demo_seeding_and_outbound_configuration
+    artifact = package
+    options = { DEPLOY_TARGET: 'staging', APP_PORT: '4004' }
+    assert_configuration_rejected(artifact, omit: ['ACCESS_PASSWORD'], **options)
+    assert_configuration_rejected(artifact, SEED_DEMO: 'true', **options)
+    [
+      { CONFIG_ENVIRONMENT: 'prod' }, { EXPECTED_DATABASE_NAME: 'synthetic_prod' },
+      { DEMO_MODE: 'true' }, { RELEASE_NODE: 'residency_schedule@127.0.0.1' },
+      { RELEASE_NODE: 'residency_schedule_demo@127.0.0.1' },
+      { RESEND_API_KEY: 'synthetic-mail-key' }, { ANTHROPIC_API_KEY: 'synthetic-chat-key' },
+      { CHAT_ENABLED: 'true', ANTHROPIC_API_KEY: 'synthetic-chat-key' },
+      { OTEL_ENABLED: 'true', OTEL_EXPORTER_OTLP_ENDPOINT: 'https://collector.synthetic.example', OTEL_HUB_TOKEN: 'synthetic-token' },
+      { OTEL_HUB_TOKEN: 'synthetic-token' },
+      { OTEL_EXPORTER_OTLP_ENDPOINT: 'https://collector.synthetic.example' }
+    ].each { |config| assert_configuration_rejected(artifact, config: config, **options) }
+  end
+
+  def test_production_and_demo_release_children_clear_an_inherited_staging_marker
+    artifact = package
+    demo = File.join(@work, 'demo')
+    make_installed(demo)
+    [[@current, 'false'], [demo, 'true']].each do |install, seed|
+      result = promote(artifact, install: install, SEED_DEMO: seed, CONFIG_ENVIRONMENT: 'staging')
+      assert result.success?, result.stderr
+      canonical, environment = assert_managed_configuration(install)
+      assert_equal seed == 'true' ? 'demo' : 'prod', canonical.fetch('CONFIG_ENVIRONMENT')
+      refute environment.key?('CONFIG_ENVIRONMENT'), 'existing production/demo environment files retain their format'
+    end
+    evaluations = logged.select { |event| %w[migrate seed].include?(event['phase']) }
+    assert_equal %w[migrate migrate seed], evaluations.map { |event| event.fetch('phase') }
+    evaluations.each do |event|
+      refute event.fetch('runtime').key?('CONFIG_ENVIRONMENT'), 'inherited staging must not switch production to the email sink'
+    end
+  end
+
   def test_configuration_values_are_literal_for_migration_and_systemd_without_shell_evaluation
     artifact = package
     sentinel = File.join(@work, 'secret-was-executed')
@@ -1145,6 +1224,63 @@ class ReleaseArtifactsTest < Minitest::Test
       refute_includes result.stdout + result.stderr, ENV_SECRET
       refute_includes result.stdout + result.stderr, 'synthetic-env-cookie'
     end
+  end
+
+  def test_ci_renderer_accepts_isolated_authenticated_staging_without_real_email_credentials
+    helper = File.join(ROOT, 'deploy/runtime_config.rb')
+    values = runtime_values('staging')
+    output = File.join(@work, 'staging-render/runtime.json')
+    process = launch(@env.merge(values).merge('DEPLOY_TARGET' => 'staging'),
+                     command_path('ruby'), helper, 'render', output)
+    result = collect(process)
+    assert result.success?, result.stderr
+    assert_equal values, JSON.parse(File.read(output))
+    assert_equal 0o700, File.stat(File.dirname(output)).mode & 0o777
+    assert_equal 0o600, File.stat(output).mode & 0o777
+    refute_includes result.stdout + result.stderr, values.fetch('ACCESS_PASSWORD')
+  end
+
+  def test_candidate_dispatch_stages_the_same_artifact_and_production_requires_main_push_and_staging_success
+    workflow = YAML.load_file(File.join(ROOT, '.github/workflows/deploy.yml'))
+    triggers = workflow['on'] || workflow[true]
+    assert triggers.key?('workflow_dispatch'), 'candidate branches require an explicit dispatch rehearsal path'
+    assert_equal ['codex/phase0-release-artifacts', 'main'], triggers.fetch('push').fetch('branches').sort,
+                 'the candidate requires a premerge push rehearsal path before dispatch exists on the default branch'
+    jobs = workflow.fetch('jobs')
+    test_job, build, staging, deploy = jobs.values_at('test', 'build', 'staging', 'deploy')
+    refute_nil staging, 'persistent staging must gate production promotion'
+    assert_includes Array(build.fetch('needs')), 'test'
+    assert_equal %w[build test], Array(staging.fetch('needs')).sort
+    assert_equal %w[build staging test], Array(deploy.fetch('needs')).sort
+    # An exact conjunction retains GitHub's implicit success() gate. Reject OR,
+    # always(), arbitrary inputs and branch-only dispatches from this boundary.
+    guard = deploy.fetch('if').delete_prefix('${{').delete_suffix('}}').strip
+    assert_equal "github.event_name == 'push' && github.ref == 'refs/heads/main'", guard
+    [test_job, build].each do |job|
+      refute job.key?('environment'), 'test/build must not receive runtime environments'
+      job.fetch('steps').select { |step| step['uses'].to_s.start_with?('actions/checkout@') }.each do |step|
+        ref = step.fetch('with', {}).fetch('ref', '${{ github.sha }}')
+        assert_equal '${{ github.sha }}', ref, 'test/build must use the event candidate SHA'
+      end
+    end
+    upload = build.fetch('steps').find { |step| step['uses'].to_s.start_with?('actions/upload-artifact@') }
+    assert_equal 'release-${{ github.sha }}', upload.fetch('with').fetch('name')
+    [staging, deploy].each do |job|
+      downloads = job.fetch('steps').select { |step| step['uses'].to_s.start_with?('actions/download-artifact@') }
+      assert_equal 1, downloads.length
+      assert_equal upload.fetch('with').fetch('name'), downloads.first.fetch('with').fetch('name')
+      refute_match(/\bmix (?:release|assets\.deploy|compile|deps\.get)\b/, job.to_s)
+      assert_includes job.to_s, 'deploy/promote_release.sh'
+      assert_equal false, job.fetch('concurrency').fetch('cancel-in-progress')
+    end
+    assert_equal '${{ matrix.target }}', staging.fetch('environment')
+    assert_equal [{ 'target' => 'staging', 'host_secret' => 'STAGING_DEPLOY_HOST',
+                    'install_dir' => '/home/deploy/residency_schedule_staging',
+                    'service' => 'residency_schedule_staging', 'port' => 4004,
+                    'seed_demo' => false }], staging.fetch('strategy').fetch('matrix').fetch('include')
+    assert_equal %w[demo prod], deploy.fetch('strategy').fetch('matrix').fetch('include').map { |row| row.fetch('target') }.sort
+    assert_includes staging.to_s, 'matrix.seed_demo'
+    refute_match(/seed_demo\(\)|ecto\.reset|DROP DATABASE/i, staging.to_s)
   end
 
   def test_workflow_scopes_and_transfers_private_configuration_separately_with_cleanup
