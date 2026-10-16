@@ -1,7 +1,9 @@
 defmodule ResidencySchedule.Release do
   @moduledoc "Provides database tasks for application releases."
 
+  alias Ecto.Adapters.SQL
   alias ResidencySchedule.Importer.ScheduleImporter
+  alias ResidencySchedule.StagingFixtures
   @app :residency_schedule
 
   @doc """
@@ -72,6 +74,33 @@ defmodule ResidencySchedule.Release do
     [repo] = repos()
 
     {:ok, result, _apps} = Ecto.Migrator.with_repo(repo, fn _repo -> import_demo_csv() end)
+
+    result
+  end
+
+  @doc """
+  Manually seeds persistent synthetic staging fixtures after checking the actual
+  connected database and both staging declarations. Never called by deployment.
+
+  Requires a database; guarded behavior is covered by integration tests.
+  """
+  def seed_staging do
+    load_app()
+    [repo] = repos()
+
+    {:ok, result, _apps} =
+      Ecto.Migrator.with_repo(repo, fn repo ->
+        %{rows: [[database]]} = SQL.query!(repo, "SELECT current_database()", [])
+
+        with :ok <-
+               StagingFixtures.validate_target(
+                 System.get_env("CONFIG_ENVIRONMENT"),
+                 System.get_env("EXPECTED_DATABASE_NAME"),
+                 database
+               ) do
+          StagingFixtures.seed()
+        end
+      end)
 
     result
   end
