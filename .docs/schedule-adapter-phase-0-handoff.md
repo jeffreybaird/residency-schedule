@@ -1,5 +1,13 @@
 # Local handoff: finish and merge PR #78
 
+Local continuation on October 16 completed the repository staging gate,
+representative persistent fixtures, the profiler race fix, and the real SCP
+ownership fix. Live access, configuration import, separate-host staging and
+measured recovery/persistence evidence are in
+[the local rollout record](phase0-local-rollout-record.md). The final production
+owner decision and merge/deployment outcome remain pending; the earlier checklist
+below is preserved as the scope and acceptance contract.
+
 Updated October 16, 2026. Continue this work in the local **Residency Scheduler**
 project at `/Users/jeffreybaird/src/residency-schedule`, after verifying that path.
 The immediate goal is to make
