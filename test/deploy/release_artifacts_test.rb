@@ -22,10 +22,17 @@ class ReleaseArtifactsTest < Minitest::Test
   SHA_B = 'b' * 40
   COOKIE = 'synthetic-private-cookie'
   ENV_SECRET = 'synthetic-server-only-password'
+  CONFIG_KEYS = %w[
+    DATABASE_URL SECRET_KEY_BASE PHX_HOST ACCESS_PASSWORD RESEND_API_KEY DEMO_MODE
+    CHAT_ENABLED ANTHROPIC_API_KEY OTEL_ENABLED OTEL_EXPORTER_OTLP_ENDPOINT OTEL_HUB_TOKEN
+    PORT HTTP_IP POOL_SIZE DB_SSL ROSTER_PATH OTEL_RESOURCE_ATTRIBUTES
+    RELEASE_NODE RELEASE_DISTRIBUTION RELEASE_COOKIE PHX_SERVER
+  ].freeze
 
   RELEASE_BIN = <<~'RUBY'
     #!/usr/bin/env ruby
     require 'json'
+    require 'digest'
     root = File.expand_path('..', __dir__)
     label = File.read(File.join(root, 'lib/app/LABEL')).strip
     phase = ARGV.join(' ').include?('seed_demo') ? 'seed' : 'migrate'
@@ -40,9 +47,14 @@ class ReleaseArtifactsTest < Minitest::Test
       phase: phase, label: label, path: root, lock_fd_open: lock_fd_open,
       cookie_present: File.exist?(cookie),
       cookie_ok: File.exist?(cookie) && File.read(cookie) == ENV.fetch('EXPECTED_COOKIE'),
-      cookie_override_ok: ENV['RELEASE_COOKIE'] == 'synthetic-env-cookie',
-      cookie_mode: File.exist?(cookie) ? File.stat(cookie).mode & 0777 : nil,
-      parent_mode: File.stat(File.dirname(root)).mode & 0777
+      cookie_override_ok: ENV['RELEASE_COOKIE'] == ENV.fetch('EXPECTED_RUNTIME_COOKIE'),
+      cookie_mode: File.exist?(cookie) ? File.stat(cookie).mode & 0o777 : nil,
+      runtime: ENV.select { |key, _| %w[DATABASE_URL SECRET_KEY_BASE PHX_HOST ACCESS_PASSWORD
+        RESEND_API_KEY DEMO_MODE CHAT_ENABLED ANTHROPIC_API_KEY OTEL_ENABLED
+        OTEL_EXPORTER_OTLP_ENDPOINT OTEL_HUB_TOKEN PORT HTTP_IP POOL_SIZE DB_SSL
+        ROSTER_PATH OTEL_RESOURCE_ATTRIBUTES RELEASE_NODE RELEASE_DISTRIBUTION
+        RELEASE_COOKIE PHX_SERVER].include?(key) }.transform_values { |value| Digest::SHA256.hexdigest(value) },
+      parent_mode: File.stat(File.dirname(root)).mode & 0o777
     }
     File.open(ENV.fetch('EVENT_LOG'), 'a') { |log| log.puts(JSON.generate(event)) }
     if phase == 'migrate' && ENV['GATE_LABEL'] == label
@@ -76,6 +88,15 @@ class ReleaseArtifactsTest < Minitest::Test
       end
       exec(ENV.fetch('REAL_MV'), *ARGV, close_others: false)
     end
+    if name == 'rm'
+      marker = ENV.fetch('REMOVE_FAILURE_MARKER')
+      if ARGV.include?(ENV['FAIL_REMOVE_FILE']) && !File.exist?(marker)
+        File.write(marker, '')
+        warn 'synthetic-private-cleanup-diagnostic'
+        exit 1
+      end
+      exec(ENV.fetch('REAL_RM'), *ARGV, close_others: false)
+    end
     label_file = File.join(root, 'lib/app/LABEL')
     label = File.exist?(label_file) ? File.read(label_file).strip : 'missing'
     phase = name == 'curl' ? 'health' : ARGV.include?('restart') ? 'restart' : name
@@ -100,7 +121,7 @@ class ReleaseArtifactsTest < Minitest::Test
     @work = Dir.mktmpdir('release-artifacts-test-')
     @stubs = File.join(@work, 'stubs')
     FileUtils.mkdir_p(@stubs)
-    %w[sudo systemctl curl journalctl flock mv].each do |command|
+    %w[sudo systemctl curl journalctl flock mv rm].each do |command|
       executable(File.join(@stubs, command), COMMAND_STUB)
     end
     executable(File.join(@stubs, 'sleep'), "#!/bin/sh\nexit 0\n")
@@ -110,12 +131,16 @@ class ReleaseArtifactsTest < Minitest::Test
       'EVENT_LOG' => @events,
       'REAL_FLOCK' => command_path('flock'),
       'REAL_MV' => command_path('mv'),
+      'REAL_RM' => command_path('rm'),
       'MOVE_FAILURE_MARKER' => File.join(@work, 'move-failed-once'),
-      'EXPECTED_COOKIE' => COOKIE
+      'REMOVE_FAILURE_MARKER' => File.join(@work, 'remove-failed-once'),
+      'EXPECTED_COOKIE' => COOKIE,
+      'EXPECTED_RUNTIME_COOKIE' => 'synthetic-env-cookie'
     }
     @current = File.join(@work, 'production')
     @processes = []
     @fifos = []
+    @config_sequence = 0
     make_installed(@current)
   end
 
@@ -141,7 +166,7 @@ class ReleaseArtifactsTest < Minitest::Test
   def executable(path, text)
     FileUtils.mkdir_p(File.dirname(path))
     File.write(path, text)
-    File.chmod(0755, path)
+    File.chmod(0o755, path)
   end
 
   def make_release(path, label)
@@ -152,14 +177,14 @@ class ReleaseArtifactsTest < Minitest::Test
     File.write(File.join(path, 'releases/start_erl.data'), "synthetic runtime version\n")
     File.write(File.join(path, 'releases/0.1.0/sys.config'), "[].\n")
     File.write(File.join(path, 'releases/COOKIE'), COOKIE)
-    File.chmod(0600, File.join(path, 'releases/COOKIE'))
+    File.chmod(0o600, File.join(path, 'releases/COOKIE'))
     path
   end
 
   def make_installed(path, label = 'legacy')
     make_release(path, label)
     File.write(File.join(path, '.env'), "DATABASE_URL=#{ENV_SECRET}\nRELEASE_COOKIE=synthetic-env-cookie\n")
-    File.chmod(0600, File.join(path, '.env'))
+    File.chmod(0o600, File.join(path, '.env'))
     %w[.env.backup erl_crash.dump config.backup tmp/private tmp/runtime.sys.config].each do |name|
       FileUtils.mkdir_p(File.dirname(File.join(path, name)))
       File.write(File.join(path, name), 'synthetic-runtime-private-data')
@@ -191,11 +216,43 @@ class ReleaseArtifactsTest < Minitest::Test
     "#{sha}-#{Digest::SHA256.file(File.join(artifact, "release-#{sha}.tar.gz")).hexdigest}"
   end
 
-  def promotion_env(artifact, sha = SHA_A, install: @current, **overrides)
+  def runtime_values(target = 'prod')
+    database = "synthetic_#{target}"
+    values = {
+      'CONFIG_ENVIRONMENT' => target, 'EXPECTED_DATABASE_NAME' => database,
+      'DATABASE_URL' => "postgres://synthetic:#{ENV_SECRET}@localhost/#{database}",
+      'SECRET_KEY_BASE' => 'synthetic-signing-key-' * 4,
+      'PHX_HOST' => "#{target}.synthetic.example", 'RELEASE_COOKIE' => 'synthetic-env-cookie'
+    }
+    if target == 'prod'
+      values.merge!('ACCESS_PASSWORD' => 'synthetic-access-password', 'RESEND_API_KEY' => 'synthetic-mail-key')
+    else
+      values['DEMO_MODE'] = 'true'
+    end
+    values
+  end
+
+  def write_runtime_input(values)
+    @config_sequence += 1
+    directory = File.join(@work, 'private-input')
+    FileUtils.mkdir_p(directory, mode: 0o700)
+    File.chmod(0o700, directory)
+    file = File.join(directory, "runtime-#{@config_sequence}.json")
+    File.write(file, JSON.generate(values))
+    File.chmod(0o600, file)
+    file
+  end
+
+  def promotion_env(artifact, sha = SHA_A, install: @current, config: {}, omit: [], **overrides)
+    target = overrides.fetch(:SEED_DEMO, 'false') == 'true' ? 'demo' : 'prod'
+    values = runtime_values(target).merge(config.transform_keys(&:to_s))
+    omit.each { |key| values.delete(key.to_s) }
+    file = write_runtime_input(values)
     @env.merge(
       'INSTALL_DIR' => install, 'SERVICE' => 'synthetic-residency-service',
       'APP_PORT' => '4999', 'SEED_DEMO' => 'false', 'RELEASE_ID' => sha,
-      'DEPLOY_RUN_ID' => "run-#{sha[0, 8]}", 'ARTIFACT_DIR' => artifact
+      'DEPLOY_RUN_ID' => "run-#{sha[0, 8]}", 'ARTIFACT_DIR' => artifact,
+      'CONFIG_FILE' => file, 'DEPLOY_TARGET' => target
     ).merge(overrides.transform_keys(&:to_s))
   end
 
@@ -241,7 +298,7 @@ class ReleaseArtifactsTest < Minitest::Test
       refute_includes %w[1 2], member[:type], name
       next unless member[:data]
 
-      [COOKIE, ENV_SECRET, 'synthetic-runtime-private-data'].each do |secret|
+      [COOKIE, ENV_SECRET, 'synthetic-env-cookie', 'synthetic-runtime-private-data'].each do |secret|
         refute_includes member[:data], secret
       end
     end
@@ -249,10 +306,42 @@ class ReleaseArtifactsTest < Minitest::Test
 
   def assert_private_current(install = @current)
     assert_includes File.read(File.join(install, '.env')), ENV_SECRET
-    assert_includes File.read(File.join(install, '.env')), 'RELEASE_COOKIE=synthetic-env-cookie'
-    assert_equal 0600, File.stat(File.join(install, '.env')).mode & 0777
+    assert_equal 'synthetic-env-cookie', decode_environment_file(File.join(install, '.env'))['RELEASE_COOKIE']
+    assert_equal 0o600, File.stat(File.join(install, '.env')).mode & 0o777
     assert_equal COOKIE, File.read(File.join(install, 'releases/COOKIE'))
-    assert_equal 0600, File.stat(File.join(install, 'releases/COOKIE')).mode & 0777
+    assert_equal 0o600, File.stat(File.join(install, 'releases/COOKIE')).mode & 0o777
+  end
+
+  # Independent decoder for the documented single-line systemd EnvironmentFile
+  # double-quoted subset. Values are data; no shell is involved in this check.
+  def decode_environment_file(path)
+    File.readlines(path, chomp: true).reject { |line| line.empty? || line.start_with?('#') }.to_h do |line|
+      key, encoded = line.split('=', 2)
+      assert_match(/\A[A-Z][A-Z0-9_]*\z/, key)
+      refute_nil encoded
+      value = if encoded.start_with?('"')
+                assert encoded.end_with?('"'), "unterminated value for #{key}"
+                encoded[1...-1].gsub(/\\([\\"`$])/, '\\1')
+              elsif encoded.start_with?("'")
+                assert encoded.end_with?("'"), "unterminated value for #{key}"
+                encoded[1...-1]
+              else
+                encoded
+              end
+      [key, value]
+    end
+  end
+
+  def assert_managed_configuration(install = @current)
+    link = File.join(install, '.env')
+    assert File.symlink?(link), 'release .env must point to its versioned external environment file'
+    resolved = File.realpath(link)
+    assert_match(%r{\A#{Regexp.escape(install)}\.config/[^/]+/runtime\.env\z}, resolved)
+    version = File.dirname(resolved)
+    assert_equal 0o700, File.stat("#{install}.config").mode & 0o777
+    assert_equal 0o700, File.stat(version).mode & 0o777
+    %w[runtime.env runtime.json].each { |file| assert_equal 0o600, File.stat(File.join(version, file)).mode & 0o777 }
+    [JSON.parse(File.read(File.join(version, 'runtime.json'))), decode_environment_file(resolved)]
   end
 
   def assert_no_private_retention(install = @current)
@@ -280,14 +369,15 @@ class ReleaseArtifactsTest < Minitest::Test
       assert_equal identity, File.read(File.join(install, 'ARTIFACT_ID')).strip
       assert_equal bytes, File.binread(File.join("#{install}.artifacts", "#{identity}.tar.gz"))
       assert_private_current(install)
+      assert_managed_configuration(install)
       assert_no_private_retention(install)
     end
     assert_equal %w[migrate restart health migrate seed restart health], logged.map { |event| event['phase'] }
     logged.select { |event| %w[migrate seed].include?(event['phase']) }.each do |event|
       assert event['cookie_ok']
       assert event['cookie_override_ok']
-      assert_equal 0600, event['cookie_mode']
-      assert_equal 0700, event['parent_mode']
+      assert_equal 0o600, event['cookie_mode']
+      assert_equal 0o700, event['parent_mode']
     end
     [production, demonstration].each do |result|
       refute_includes result.stdout + result.stderr, COOKIE
@@ -389,7 +479,7 @@ class ReleaseArtifactsTest < Minitest::Test
     artifact = package
     File.open(File.join(artifact, "release-#{SHA_A}.tar.gz"), 'ab') { |archive| archive.write('corruption') }
     before = File.binread(File.join(@current, '.env'))
-    result = promote(artifact, CHAT_ENABLED: 'true', ANTHROPIC_API_KEY: 'synthetic-new-key')
+    result = promote(artifact, config: { CHAT_ENABLED: 'true', ANTHROPIC_API_KEY: 'synthetic-new-key' })
     refute result.success?
     assert_equal 'legacy', installed_label
     assert_equal before, File.binread(File.join(@current, '.env'))
@@ -401,12 +491,12 @@ class ReleaseArtifactsTest < Minitest::Test
     archive = File.join(directory, "release-#{SHA_A}.tar.gz")
     Zlib::GzipWriter.open(archive) do |gzip|
       [
-        ['RELEASE_ID', "#{SHA_A}\n", 0644],
-        ['bin/residency_schedule', RELEASE_BIN, 0755],
-        ['lib/app/LABEL', 'bad', 0644],
-        ['releases/start_erl.data', "synthetic runtime version\n", 0644]
+        ['RELEASE_ID', "#{SHA_A}\n", 0o644],
+        ['bin/residency_schedule', RELEASE_BIN, 0o755],
+        ['lib/app/LABEL', 'bad', 0o644],
+        ['releases/start_erl.data', "synthetic runtime version\n", 0o644]
       ].each { |valid_name, payload, mode| write_tar_member(gzip, valid_name, '0', payload, mode) }
-      write_tar_member(gzip, name, type, type == '0' ? 'x' : '', 0644)
+      write_tar_member(gzip, name, type, type == '0' ? 'x' : '', 0o644)
       gzip.write("\0" * 1024)
     end
     digest = Digest::SHA256.file(archive).hexdigest
@@ -425,11 +515,11 @@ class ReleaseArtifactsTest < Minitest::Test
   def valid_tar_payload
     tar = StringIO.new(''.b)
     [
-      ['RELEASE_ID', "#{SHA_A}\n", 0644],
-      ['bin/residency_schedule', RELEASE_BIN, 0755],
-      ['lib/app/LABEL', 'bad', 0644],
-      ['releases/start_erl.data', "synthetic runtime version\n", 0644],
-      ['releases/0.1.0/sys.config', "[].\n", 0644]
+      ['RELEASE_ID', "#{SHA_A}\n", 0o644],
+      ['bin/residency_schedule', RELEASE_BIN, 0o755],
+      ['lib/app/LABEL', 'bad', 0o644],
+      ['releases/start_erl.data', "synthetic runtime version\n", 0o644],
+      ['releases/0.1.0/sys.config', "[].\n", 0o644]
     ].each { |name, payload, mode| write_tar_member(tar, name, '0', payload, mode) }
     tar.string + "\0" * 1024
   end
@@ -450,7 +540,7 @@ class ReleaseArtifactsTest < Minitest::Test
     poisoned = original + "touch '#{sentinel}'\n"
     File.write(File.join(@current, '.env'), poisoned)
     begin
-      result = promote(artifact, CHAT_ENABLED: 'true')
+      result = promote(artifact)
       refute result.success?
       refute File.exist?(sentinel)
       assert_empty logged
@@ -471,7 +561,7 @@ class ReleaseArtifactsTest < Minitest::Test
 
   def test_truncated_tar_member_is_rejected_with_valid_gzip_and_external_digest
     header = Gem::Package::TarHeader.new(name: 'lib/app/truncated', prefix: '', typeflag: '0',
-                                        mode: 0644, size: 4096, linkname: '', mtime: 0)
+                                        mode: 0o644, size: 4096, linkname: '', mtime: 0)
     payload = valid_tar_payload.delete_suffix("\0" * 1024) + header.to_s + 'short payload'
     artifact = raw_artifact('truncated-member', payload)
     verify_checksum(File.join(artifact, "release-#{SHA_A}.tar.gz"), File.join(artifact, "release-#{SHA_A}.sha256"))
@@ -481,7 +571,7 @@ class ReleaseArtifactsTest < Minitest::Test
   def test_pax_and_gnu_metadata_headers_are_rejected_with_otherwise_valid_payload
     { 'x' => "11 a=value\n", 'L' => "RELEASE_ID\0" }.each do |type, payload|
       metadata = StringIO.new(''.b)
-      write_tar_member(metadata, 'lib/app/metadata', type, payload, 0644)
+      write_tar_member(metadata, 'lib/app/metadata', type, payload, 0o644)
       artifact = raw_artifact("metadata-#{type}", metadata.string + valid_tar_payload)
       verify_checksum(File.join(artifact, "release-#{SHA_A}.tar.gz"), File.join(artifact, "release-#{SHA_A}.sha256"))
       assert_rejected_before_configuration(artifact)
@@ -500,7 +590,7 @@ class ReleaseArtifactsTest < Minitest::Test
       poisoned = original + "touch '#{sentinel}'\n"
       File.write(File.join(@current, '.env'), poisoned)
       begin
-        result = promote(artifact, CHAT_ENABLED: 'true')
+        result = promote(artifact)
         refute result.success?, name
         refute File.exist?(sentinel), name
         assert_empty logged, name
@@ -529,7 +619,7 @@ class ReleaseArtifactsTest < Minitest::Test
     File.unlink(File.join(@current, 'releases/COOKIE'))
     File.write(File.join(@current, '.env'), "DATABASE_URL=#{ENV_SECRET}\n")
     before = File.binread(File.join(@current, '.env'))
-    result = promote(artifact, CHAT_ENABLED: 'true')
+    result = promote(artifact)
     refute result.success?
     assert_equal 'legacy', installed_label
     assert_equal before, File.binread(File.join(@current, '.env'))
@@ -540,11 +630,11 @@ class ReleaseArtifactsTest < Minitest::Test
   def test_existing_env_cookie_override_works_without_generating_cookie_file
     artifact = package
     File.unlink(File.join(@current, 'releases/COOKIE'))
-    before = File.binread(File.join(@current, '.env'))
     result = promote(artifact)
     assert result.success?, result.stderr
     assert_equal 'A', installed_label
-    assert_equal before, File.binread(File.join(@current, '.env'))
+    assert_managed_configuration
+    assert_equal 'synthetic-env-cookie', decode_environment_file(File.join(@current, '.env'))['RELEASE_COOKIE']
     refute File.exist?(File.join(@current, 'releases/COOKIE'))
     migration = logged.find { |event| event['phase'] == 'migrate' }
     refute migration['cookie_present']
@@ -600,18 +690,18 @@ class ReleaseArtifactsTest < Minitest::Test
     workspaces = Dir.glob("#{@current}.deploy/*")
     refute_empty workspaces, 'failed recovery retains private operator recovery evidence'
     workspaces.each do |workspace|
-      assert_equal 0700, File.stat(workspace).mode & 0777
+      assert_equal 0o700, File.stat(workspace).mode & 0o777
       Dir.glob("#{workspace}/**/*", File::FNM_DOTMATCH).each do |private_file|
         next unless %w[.env COOKIE].include?(File.basename(private_file))
 
-        assert_equal 0600, File.stat(private_file).mode & 0777
+        assert_equal 0o600, File.stat(private_file).mode & 0o777
       end
     end
   end
 
   def fifo(name)
     path = File.join(@work, name)
-    File.mkfifo(path, 0600)
+    File.mkfifo(path, 0o600)
     descriptor = File.open(path, File::RDWR | File::NONBLOCK)
     descriptor.sync = true
     @fifos << descriptor
@@ -694,6 +784,411 @@ class ReleaseArtifactsTest < Minitest::Test
       first_result = collect(first)
     end
     assert first_result.success?, first_result.stderr
+  end
+
+  def test_complete_configuration_creates_private_external_version_and_preserves_legacy_copy
+    artifact = package
+    legacy = File.binread(File.join(@current, '.env'))
+    env = promotion_env(artifact)
+    result = run_script(PROMOTE, env: env)
+    assert result.success?, result.stderr
+    refute File.exist?(env.fetch('CONFIG_FILE')), 'incoming secret file must be removed'
+    json, values = assert_managed_configuration
+    assert_equal 'prod', json.fetch('CONFIG_ENVIRONMENT')
+    assert_equal 'synthetic_prod', json.fetch('EXPECTED_DATABASE_NAME')
+    { 'PHX_SERVER' => 'true', 'PORT' => '4999', 'HTTP_IP' => '127.0.0.1',
+      'POOL_SIZE' => '10', 'DB_SSL' => 'false', 'CHAT_ENABLED' => 'false',
+      'OTEL_ENABLED' => 'false', 'DEMO_MODE' => 'false',
+      'RELEASE_NODE' => 'residency_schedule@127.0.0.1', 'RELEASE_DISTRIBUTION' => 'name' }.each do |key, value|
+      assert_equal value, values[key], key
+    end
+    copies = Dir.glob("#{@current}.config/**/*", File::FNM_DOTMATCH).select do |path|
+      File.file?(path) && !File.symlink?(path) && File.binread(path) == legacy
+    end
+    refute_empty copies, 'first transition must retain the original private legacy configuration'
+    copies.each { |path| assert_equal 0o600, File.stat(path).mode & 0o777 }
+    legacy_metadata = Dir.glob("#{@current}.config/legacy-*/deployment.json")
+    refute_empty legacy_metadata
+    legacy_metadata.each do |path|
+      metadata = JSON.parse(File.read(path))
+      assert_equal 'legacy', metadata.fetch('kind')
+      identity = metadata.fetch('artifact_id')
+      assert File.file?(File.join("#{@current}.artifacts", "#{identity}.tar.gz"))
+      assert_equal legacy, File.binread(File.join(File.dirname(path), 'legacy.env'))
+      assert_equal COOKIE, File.binread(File.join(File.dirname(path), 'COOKIE'))
+      assert_equal 0o600, File.stat(path).mode & 0o777
+    end
+    current_metadata = JSON.parse(File.read(File.join(File.dirname(File.realpath(File.join(@current, '.env'))), 'deployment.json')))
+    assert_equal artifact_identity(artifact), current_metadata.fetch('artifact_id')
+    assert_equal JSON.parse(File.read(legacy_metadata.first)).fetch('artifact_id'), current_metadata.fetch('prior_artifact_id')
+    assert_equal File.basename(File.dirname(legacy_metadata.first)), current_metadata.fetch('prior_config_version')
+    assert_no_private_retention
+  end
+
+  def test_replacement_configuration_clears_removed_optional_and_ambient_credentials
+    artifact_a = package
+    artifact_b = package(SHA_B, 'B')
+    enabled = {
+      CHAT_ENABLED: 'true', ANTHROPIC_API_KEY: 'synthetic-old-chat-token',
+      OTEL_ENABLED: 'true', OTEL_EXPORTER_OTLP_ENDPOINT: 'https://collector.synthetic.example',
+      OTEL_HUB_TOKEN: 'synthetic-old-otel-token', ROSTER_PATH: '/synthetic/old-roster.csv'
+    }
+    first = promote(artifact_a, config: enabled)
+    assert first.success?, first.stderr
+    old_version = File.dirname(File.realpath(File.join(@current, '.env')))
+    old_json = File.binread(File.join(old_version, 'runtime.json'))
+    @env['ANTHROPIC_API_KEY'] = 'synthetic-ambient-chat-token'
+    @env['OTEL_HUB_TOKEN'] = 'synthetic-ambient-otel-token'
+    @env['ROSTER_PATH'] = '/synthetic/ambient-roster.csv'
+    @env['OTEL_ENABLED'] = 'true'
+    second = promote(artifact_b, SHA_B)
+    assert second.success?, second.stderr
+    _, values = assert_managed_configuration
+    assert_equal 'false', values['CHAT_ENABLED']
+    assert_equal 'false', values['OTEL_ENABLED']
+    %w[ANTHROPIC_API_KEY OTEL_HUB_TOKEN OTEL_EXPORTER_OTLP_ENDPOINT ROSTER_PATH].each do |key|
+      refute values.key?(key), key
+      refute logged.last(3).first.fetch('runtime').key?(key), key
+    end
+    assert_equal old_json, File.binread(File.join(old_version, 'runtime.json'))
+    assert_equal 0o700, File.stat(old_version).mode & 0o777
+    assert_equal 0o600, File.stat(File.join(old_version, 'runtime.json')).mode & 0o777
+  end
+
+  def test_failed_managed_deployment_restores_the_matching_configuration_version
+    artifact_a = package
+    artifact_b = package(SHA_B, 'B')
+    assert promote(artifact_a).success?
+    prior = File.realpath(File.join(@current, '.env'))
+    prior_bytes = File.binread(prior)
+    result = promote(artifact_b, SHA_B, config: { ACCESS_PASSWORD: 'synthetic-new-access' }, FAIL_HEALTH_LABEL: 'B')
+    refute result.success?
+    assert_equal 'A', installed_label
+    assert_equal prior, File.realpath(File.join(@current, '.env'))
+    assert_equal prior_bytes, File.binread(prior)
+    assert_managed_configuration
+    versions = Dir.glob("#{@current}.config/*/runtime.json")
+    assert_operator versions.length, :>=, 2
+    versions.each do |path|
+      assert_equal 0o600, File.stat(path).mode & 0o777
+      assert_equal 0o700, File.stat(File.dirname(path)).mode & 0o777
+    end
+    assert_no_private_retention
+  end
+
+  def assert_configuration_rejected(artifact, config: {}, omit: [], **options)
+    before = File.binread(File.join(@current, '.env'))
+    env = promotion_env(artifact, config: config, omit: omit, **options)
+    result = run_script(PROMOTE, env: env)
+    refute result.success?
+    assert_equal 'legacy', installed_label
+    assert_equal before, File.binread(File.join(@current, '.env'))
+    assert_empty logged
+    refute File.exist?(env.fetch('CONFIG_FILE')), 'rejected incoming secret file must be removed'
+    refute_includes result.stdout + result.stderr, ENV_SECRET
+    refute_includes result.stdout + result.stderr, 'synthetic-env-cookie'
+    result
+  end
+
+  def test_missing_required_configuration_fails_before_current_or_service_mutation
+    artifact = package
+    %w[CONFIG_ENVIRONMENT EXPECTED_DATABASE_NAME DATABASE_URL SECRET_KEY_BASE PHX_HOST
+       RELEASE_COOKIE ACCESS_PASSWORD RESEND_API_KEY].each do |key|
+      assert_configuration_rejected(artifact, omit: [key])
+    end
+  end
+
+  def test_invalid_conditional_configuration_and_control_characters_fail_closed
+    artifact = package
+    [
+      { CHAT_ENABLED: 'true' },
+      { OTEL_ENABLED: 'true', OTEL_EXPORTER_OTLP_ENDPOINT: 'https://collector.synthetic.example' },
+      { OTEL_ENABLED: 'true', OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector.synthetic.example', OTEL_HUB_TOKEN: 'synthetic-token' },
+      { OTEL_ENABLED: 'true', OTEL_EXPORTER_OTLP_ENDPOINT: 'https://user:pass@collector.synthetic.example', OTEL_HUB_TOKEN: 'synthetic-token' },
+      { SECRET_KEY_BASE: 'short' }, { RELEASE_COOKIE: 'synthetic-rotated-cookie' },
+      { PORT: '4000' }, { POOL_SIZE: 'zero' }, { DB_SSL: 'maybe' },
+      { RELEASE_NODE: 'unreviewed@external.example' }, { RELEASE_DISTRIBUTION: 'none' },
+      { HTTP_IP: '999.0.0.1' }, { UNREVIEWED_SECRET: 'synthetic-unknown-key' }
+    ].each { |config| assert_configuration_rejected(artifact, config: config) }
+    ["\0", "\r", "\n", "\e", "\t"].each do |control|
+      assert_configuration_rejected(artifact, config: { RESEND_API_KEY: "synthetic#{control}token" })
+    end
+  end
+
+  def test_environment_and_database_guards_prevent_demo_using_production_configuration
+    artifact = package
+    [
+      { CONFIG_ENVIRONMENT: 'prod' },
+      { DATABASE_URL: runtime_values.fetch('DATABASE_URL') },
+      { DATABASE_URL: runtime_values('demo').fetch('DATABASE_URL') + '?database=synthetic_prod' },
+      { DATABASE_URL: runtime_values('demo').fetch('DATABASE_URL') + '?sslmode=require' },
+      { DATABASE_URL: runtime_values('demo').fetch('DATABASE_URL') + '#synthetic_prod' },
+      { DEMO_MODE: 'false' }, { CHAT_ENABLED: 'true', ANTHROPIC_API_KEY: 'synthetic-chat-key' },
+      { OTEL_ENABLED: 'true', OTEL_EXPORTER_OTLP_ENDPOINT: 'https://collector.synthetic.example', OTEL_HUB_TOKEN: 'synthetic-token' },
+      { RESEND_API_KEY: 'synthetic-production-mail-key' }
+    ].each do |config|
+      assert_configuration_rejected(artifact, config: config, SEED_DEMO: 'true')
+    end
+  end
+
+  def test_database_ssl_uses_the_supported_setting_without_url_query_options
+    artifact = package
+    result = promote(artifact, config: { DB_SSL: 'true' })
+    assert result.success?, result.stderr
+    _, values = assert_managed_configuration
+    assert_equal 'true', values.fetch('DB_SSL')
+    assert_equal Digest::SHA256.hexdigest('true'), logged.find { |event| event['phase'] == 'migrate' }.fetch('runtime')['DB_SSL']
+    refute_includes values.fetch('DATABASE_URL'), '?'
+  end
+
+  def test_configuration_values_are_literal_for_migration_and_systemd_without_shell_evaluation
+    artifact = package
+    sentinel = File.join(@work, 'secret-was-executed')
+    literal = "synthetic 'quotes' \"double\" \\ slash $HOME $(touch '#{sentinel}') `touch '#{sentinel}'`"
+    result = promote(artifact, config: { ACCESS_PASSWORD: literal, RESEND_API_KEY: literal })
+    assert result.success?, result.stderr
+    _, values = assert_managed_configuration
+    %w[ACCESS_PASSWORD RESEND_API_KEY].each do |key|
+      assert_equal literal, values[key]
+      assert_equal Digest::SHA256.hexdigest(literal), logged.find { |event| event['phase'] == 'migrate' }.fetch('runtime')[key]
+    end
+    refute File.exist?(sentinel)
+    refute_includes result.stdout + result.stderr, literal
+    assert_no_private_retention
+  end
+
+  def test_legacy_environment_commands_are_rejected_without_execution
+    artifact = package
+    sentinel = File.join(@work, 'legacy-was-executed')
+    File.open(File.join(@current, '.env'), 'a') { |file| file.puts("touch '#{sentinel}'") }
+    assert_configuration_rejected(artifact)
+    refute File.exist?(sentinel)
+  end
+
+  def test_legacy_export_cookie_is_rejected_as_unsupported_systemd_configuration
+    artifact = package
+    # systemd ignores this export line, so the existing file cookie remains
+    # effective. Treating export as an assignment would silently rotate it.
+    File.write(File.join(@current, '.env'), "DATABASE_URL=#{ENV_SECRET}\nexport RELEASE_COOKIE=synthetic-env-cookie\n")
+    refute_equal 'synthetic-env-cookie', File.read(File.join(@current, 'releases/COOKIE'))
+    assert_configuration_rejected(artifact)
+  end
+
+  def test_environment_symlinks_outside_managed_layout_are_rejected_without_mutating_target
+    artifact = package
+    outside = File.join(@work, 'outside.env')
+    bytes = File.binread(File.join(@current, '.env'))
+    File.binwrite(outside, bytes)
+    File.unlink(File.join(@current, '.env'))
+    File.symlink(outside, File.join(@current, '.env'))
+    assert_configuration_rejected(artifact)
+    assert_equal bytes, File.binread(outside)
+    assert_equal outside, File.readlink(File.join(@current, '.env'))
+  end
+
+  def test_managed_environment_must_match_its_canonical_json_before_next_deployment
+    artifact_a = package
+    artifact_b = package(SHA_B, 'B')
+    assert promote(artifact_a).success?
+    link = File.join(@current, '.env')
+    prior = File.realpath(link)
+    File.open(prior, 'a') { |file| file.puts('ACCESS_PASSWORD="synthetic-tampered"') }
+    tampered = File.binread(prior)
+    FileUtils.rm_f(@events)
+    result = promote(artifact_b, SHA_B)
+    refute result.success?
+    assert_equal 'A', installed_label
+    assert_equal prior, File.realpath(link)
+    assert_equal tampered, File.binread(prior)
+    assert_empty logged
+  end
+
+  def test_managed_canonical_json_cannot_link_outside_its_private_version
+    artifact_a = package
+    artifact_b = package(SHA_B, 'B')
+    assert promote(artifact_a).success?
+    environment = File.realpath(File.join(@current, '.env'))
+    canonical = File.join(File.dirname(environment), 'runtime.json')
+    outside = File.join(@work, 'outside-runtime.json')
+    FileUtils.cp(canonical, outside)
+    File.unlink(canonical)
+    File.symlink(outside, canonical)
+    before = File.binread(outside)
+    FileUtils.rm_f(@events)
+    result = promote(artifact_b, SHA_B)
+    refute result.success?
+    assert_equal 'A', installed_label
+    assert_equal environment, File.realpath(File.join(@current, '.env'))
+    assert_equal before, File.binread(outside)
+    assert_empty logged
+  end
+
+  def test_configuration_store_cannot_redirect_writes_outside_installation_namespace
+    artifact = package
+    outside = File.join(@work, 'outside-config-store')
+    FileUtils.mkdir_p(outside, mode: 0o700)
+    File.symlink(outside, "#{@current}.config")
+    assert_configuration_rejected(artifact)
+    assert_empty Dir.children(outside)
+  end
+
+  def assert_aliased_input_preserves_retained_state(artifact, input, protected, sha: SHA_A, label: 'legacy')
+    before = File.binread(protected)
+    env = promotion_env(artifact, sha, CONFIG_FILE: input)
+    result = run_script(PROMOTE, env: env)
+    assert File.file?(protected), 'invalid incoming aliases must never delete active or retained configuration'
+    assert_equal before, File.binread(protected)
+    refute result.success?
+    assert_equal label, installed_label
+    assert_empty logged
+    refute_includes result.stdout + result.stderr, ENV_SECRET
+  end
+
+  def test_incoming_dotdot_and_parent_symlink_aliases_cannot_delete_active_legacy_environment
+    artifact = package
+    base = File.join(@work, 'alias-base')
+    FileUtils.mkdir_p(base)
+    alias_parent = File.join(@work, 'aliased-current')
+    File.symlink(@current, alias_parent)
+    protected = File.join(@current, '.env')
+    [File.join(base, '../production/.env'), File.join(alias_parent, '.env')].each do |input|
+      assert_aliased_input_preserves_retained_state(artifact, input, protected)
+    end
+    lock = "#{@current}.deploy.lock"
+    lock_bytes = 'synthetic stable lock marker'
+    File.write(lock, lock_bytes)
+    File.chmod(0o600, lock)
+    inode = File.stat(lock).ino
+    before = File.binread(protected)
+    result = run_script(PROMOTE, env: promotion_env(artifact, CONFIG_FILE: lock))
+    refute result.success?
+    assert File.file?(lock), 'incoming configuration cleanup must never unlink the stable destination lock'
+    assert_equal inode, File.stat(lock).ino, 'the lock inode must remain stable across rejected input aliases'
+    assert_equal lock_bytes, File.binread(lock)
+    assert_equal 'legacy', installed_label
+    assert_equal before, File.binread(protected)
+    assert_empty logged
+  end
+
+  def test_incoming_dotdot_and_parent_symlink_aliases_cannot_delete_retained_canonical_json
+    artifact_a = package
+    artifact_b = package(SHA_B, 'B')
+    assert promote(artifact_a).success?
+    protected = File.join(File.dirname(File.realpath(File.join(@current, '.env'))), 'runtime.json')
+    before_environment = File.binread(File.join(@current, '.env'))
+    base = File.join(@work, 'alias-base')
+    FileUtils.mkdir_p(base)
+    alias_parent = File.join(@work, 'aliased-config')
+    File.symlink("#{@current}.config", alias_parent)
+    version = File.basename(File.dirname(protected))
+    FileUtils.rm_f(@events)
+    [File.join(base, "../production.config/#{version}/runtime.json"),
+     File.join(alias_parent, version, 'runtime.json')].each do |input|
+      assert_aliased_input_preserves_retained_state(artifact_b, input, protected, sha: SHA_B, label: 'A')
+      assert_equal before_environment, File.binread(File.join(@current, '.env'))
+    end
+  end
+
+  def test_incoming_configuration_cleanup_failure_cannot_prevent_verified_rollback
+    artifact_a = package
+    artifact_b = package(SHA_B, 'B')
+    assert promote(artifact_a).success?
+    prior_environment = File.realpath(File.join(@current, '.env'))
+    prior_bytes = File.binread(prior_environment)
+    FileUtils.rm_f(@events)
+    env = promotion_env(artifact_b, SHA_B, FAIL_HEALTH_LABEL: 'B')
+    env['FAIL_REMOVE_FILE'] = env.fetch('CONFIG_FILE')
+    result = run_script(PROMOTE, env: env)
+    assert File.file?(@env.fetch('REMOVE_FAILURE_MARKER')), 'test must exercise the injected cleanup failure'
+    refute result.success?
+    assert_equal 'A', installed_label
+    assert_equal prior_environment, File.realpath(File.join(@current, '.env'))
+    assert_equal prior_bytes, File.binread(prior_environment)
+    assert_equal [{ 'phase' => 'restart', 'label' => 'A' }, { 'phase' => 'health', 'label' => 'A' }], logged.last(2)
+    assert_match(/cleanup.*failed|failed.*cleanup/i, result.stderr)
+    refute_includes result.stdout + result.stderr, 'synthetic-private-cleanup-diagnostic'
+    refute_includes result.stdout + result.stderr, ENV_SECRET
+    assert_managed_configuration
+  end
+
+  def test_ci_renderer_uses_only_allowlisted_step_environment_and_private_json_output
+    helper = File.join(ROOT, 'deploy/runtime_config.rb')
+    assert File.file?(helper), 'runtime configuration requires its Ruby helper'
+    output = File.join(@work, 'private-render/runtime.json')
+    values = runtime_values.merge('ACCESS_PASSWORD' => 'synthetic literal $() `quotes` " \\')
+    env = @env.merge(values).merge('DEPLOY_TARGET' => 'prod', 'UNRELATED_CI_SECRET' => 'must-never-be-rendered')
+    process = launch(env, command_path('ruby'), helper, 'render', output)
+    result = collect(process)
+    assert result.success?, result.stderr
+    assert_equal values, JSON.parse(File.read(output))
+    assert_equal 0o700, File.stat(File.dirname(output)).mode & 0o777
+    assert_equal 0o600, File.stat(output).mode & 0o777
+    refute_includes result.stdout + result.stderr, values.fetch('ACCESS_PASSWORD')
+    refute_includes File.read(output), 'must-never-be-rendered'
+  end
+
+  def test_ci_renderer_rejects_environment_and_database_guard_failures_before_writing_payload
+    helper = File.join(ROOT, 'deploy/runtime_config.rb')
+    values = runtime_values('demo').merge('DEPLOY_TARGET' => 'demo')
+    [
+      { 'CONFIG_ENVIRONMENT' => nil }, { 'DEPLOY_TARGET' => nil },
+      { 'CONFIG_ENVIRONMENT' => 'prod' }, { 'DEPLOY_TARGET' => 'prod' },
+      { 'EXPECTED_DATABASE_NAME' => nil }, { 'DATABASE_URL' => nil },
+      { 'EXPECTED_DATABASE_NAME' => 'synthetic_prod' },
+      { 'DATABASE_URL' => runtime_values('prod').fetch('DATABASE_URL') }
+    ].each_with_index do |override, index|
+      output = File.join(@work, "rejected-render-#{index}/runtime.json")
+      process = launch(@env.merge(values).merge(override), command_path('ruby'), helper, 'render', output)
+      result = collect(process)
+      refute result.success?, "renderer must reject guard case #{index}"
+      refute File.exist?(output), 'invalid environment/database bindings must not create a secret payload'
+      refute_includes result.stdout + result.stderr, ENV_SECRET
+      refute_includes result.stdout + result.stderr, 'synthetic-env-cookie'
+    end
+  end
+
+  def test_workflow_scopes_and_transfers_private_configuration_separately_with_cleanup
+    workflow = File.read(File.join(ROOT, '.github/workflows/deploy.yml'))
+    deploy = workflow.split(/^  deploy:\s*$/).last
+    assert_match(/environment:\s*\$\{\{\s*matrix\.target\s*\}\}/, deploy)
+    assert_match(/runtime_config\.rb\s+render\s+/, deploy)
+    %w[DATABASE_URL SECRET_KEY_BASE RELEASE_COOKIE].each do |key|
+      assert_match(/#{key}:\s*\$\{\{\s*secrets\.#{key}\s*\}\}/, deploy)
+    end
+    {
+      'ACCESS_PASSWORD' => 'secrets', 'RESEND_API_KEY' => 'secrets',
+      'ANTHROPIC_API_KEY' => 'secrets', 'OTEL_HUB_TOKEN' => 'secrets',
+      'CHAT_ENABLED' => 'vars', 'OTEL_ENABLED' => 'vars',
+      'OTEL_EXPORTER_OTLP_ENDPOINT' => 'vars', 'OTEL_RESOURCE_ATTRIBUTES' => 'vars'
+    }.each do |key, provider|
+      binding = deploy.match(/\b#{key}:\s*([^\n]+)/)
+      refute_nil binding, "missing target-gated binding for #{key}"
+      assert_match(/matrix\.target\s*==\s*['"]prod['"]\s*&&\s*#{provider}\.#{key}\s*\|\|\s*['"](?:false)?['"]/, binding[1], key)
+    end
+    refute_match(/(?:PHX_SERVER|DEMO_MODE):[^\n]*vars\./, deploy)
+    assert_match(/PHX_HOST:\s*\$\{\{\s*vars\.PHX_HOST\s*\}\}/, deploy)
+    assert_match(/CONFIG_ENVIRONMENT:\s*\$\{\{\s*vars\.CONFIG_ENVIRONMENT\s*\}\}/, deploy)
+    assert_match(/DEPLOY_TARGET:\s*\$\{\{\s*matrix\.target\s*\}\}/, deploy)
+    assert_includes deploy, 'EXPECTED_DATABASE_NAME'
+    uploads = deploy.scan(/source:\s*([^\n]+)/).flatten
+    assert_operator uploads.length, :>=, 2
+    assert uploads.any? { |source| source.delete('"\'').strip == 'runtime-config/runtime.json' }
+    upload_steps = deploy.split(/^      - /).select { |step| step.match?(/uses:\s*appleboy\/scp-action@/) }
+    secret_upload = upload_steps.find { |step| step.match?(/source:.*runtime-config\/runtime\.json/) }
+    refute_nil secret_upload
+    assert_match(/tar_tmp_path:.*\.config-incoming\//, secret_upload)
+    assert_match(/target:.*\.config-incoming\//, secret_upload)
+    assert_match(/strip_components:\s*1/, secret_upload)
+    refute_match(/source:.*(?:artifact|deploy)/, secret_upload)
+    assert_match(/(?:chmod\s+700|install\s+-d\s+-m\s*700)/, deploy)
+    assert_operator deploy.scan(/if:\s*always\(\)/).length, :>=, 2
+    assert_match(/rm\s+-[a-z]*f[^\n]*(?:runtime\.json|CONFIG_FILE)/, deploy)
+    envs = deploy.scan(/envs:\s*([^\n]+)/).flatten.join(',')
+    %w[DATABASE_URL SECRET_KEY_BASE ACCESS_PASSWORD RESEND_API_KEY ANTHROPIC_API_KEY OTEL_HUB_TOKEN RELEASE_COOKIE].each do |key|
+      refute_includes envs.split(','), key, 'application secrets must not be SSH action environment inputs'
+    end
+    refute_match(/(?:run:|script:)[^\n]*\$\{\{\s*secrets\./, deploy)
+    refute_match(/source\s+["']?\$.*\.env/, File.read(PROMOTE))
   end
 
   def test_workflow_builds_once_promotes_same_artifact_and_serializes_each_destination

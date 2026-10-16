@@ -75,7 +75,7 @@ jobs:
       - name: Package deployment commit
         run: printf '%s\n' "$GITHUB_SHA" > priv/deploy_sha
       - run: mix assets.deploy
-      # Runtime credentials are read from each host's private .env at boot.
+      # Runtime credentials are provided only by the selected GitHub environment.
       - run: mix release
       - run: bash deploy/package_release.sh _build/prod/rel/residency_schedule artifact "$GITHUB_SHA"
       - uses: actions/upload-artifact@v4
@@ -88,6 +88,7 @@ jobs:
     name: Deploy (${{ matrix.target }})
     runs-on: ubuntu-latest
     needs: [test, build]
+    environment: ${{ matrix.target }}
     concurrency:
       group: deploy-${{ matrix.target }}
       cancel-in-progress: false
@@ -109,6 +110,9 @@ jobs:
             seed_demo: true
     steps:
       - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
       - uses: actions/download-artifact@v4
         with:
           name: release-${{ github.sha }}
@@ -121,6 +125,55 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           source: "artifact,deploy"
           target: "${{ matrix.install_dir }}.incoming/${{ github.run_id }}-${{ github.run_attempt }}"
+      - name: Render private environment configuration
+        env:
+          DEPLOY_TARGET: ${{ matrix.target }}
+          CONFIG_ENVIRONMENT: ${{ vars.CONFIG_ENVIRONMENT }}
+          EXPECTED_DATABASE_NAME: ${{ vars.EXPECTED_DATABASE_NAME }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
+          PHX_HOST: ${{ vars.PHX_HOST }}
+          ACCESS_PASSWORD: ${{ matrix.target == 'prod' && secrets.ACCESS_PASSWORD || '' }}
+          RESEND_API_KEY: ${{ matrix.target == 'prod' && secrets.RESEND_API_KEY || '' }}
+          RELEASE_COOKIE: ${{ secrets.RELEASE_COOKIE }}
+          PORT: ${{ matrix.port }}
+          HTTP_IP: ${{ vars.HTTP_IP }}
+          POOL_SIZE: ${{ vars.POOL_SIZE }}
+          DB_SSL: ${{ vars.DB_SSL }}
+          ROSTER_PATH: ${{ vars.ROSTER_PATH }}
+          CHAT_ENABLED: ${{ matrix.target == 'prod' && vars.CHAT_ENABLED || '' }}
+          ANTHROPIC_API_KEY: ${{ matrix.target == 'prod' && secrets.ANTHROPIC_API_KEY || '' }}
+          OTEL_ENABLED: ${{ matrix.target == 'prod' && vars.OTEL_ENABLED || '' }}
+          OTEL_EXPORTER_OTLP_ENDPOINT: ${{ matrix.target == 'prod' && vars.OTEL_EXPORTER_OTLP_ENDPOINT || '' }}
+          OTEL_HUB_TOKEN: ${{ matrix.target == 'prod' && secrets.OTEL_HUB_TOKEN || '' }}
+          OTEL_RESOURCE_ATTRIBUTES: ${{ matrix.target == 'prod' && vars.OTEL_RESOURCE_ATTRIBUTES || '' }}
+        run: ruby deploy/runtime_config.rb render runtime-config/runtime.json
+      - name: Prepare private configuration inbox
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          INSTALL_DIR: ${{ matrix.install_dir }}
+          DEPLOY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        with:
+          host: ${{ secrets[matrix.host_secret] }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: INSTALL_DIR,DEPLOY_RUN_ID
+          script: |
+            set -eu
+            umask 077
+            test ! -L "${INSTALL_DIR}.config-incoming"
+            test ! -L "${INSTALL_DIR}.config-incoming/${DEPLOY_RUN_ID}"
+            install -d -m 700 "${INSTALL_DIR}.config-incoming" "${INSTALL_DIR}.config-incoming/${DEPLOY_RUN_ID}"
+      - name: Transfer private configuration separately
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets[matrix.host_secret] }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "runtime-config/runtime.json"
+          strip_components: 1
+          target: "${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}"
+          tar_tmp_path: "${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}"
       - name: Promote retained release
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -131,14 +184,26 @@ jobs:
           RELEASE_ID: ${{ github.sha }}
           DEPLOY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           ARTIFACT_DIR: ${{ matrix.install_dir }}.incoming/${{ github.run_id }}-${{ github.run_attempt }}/artifact
-          CHAT_ENABLED: ${{ matrix.target == 'prod' && vars.CHAT_ENABLED || '' }}
-          ANTHROPIC_API_KEY: ${{ matrix.target == 'prod' && secrets.ANTHROPIC_API_KEY || '' }}
-          OTEL_ENABLED: ${{ matrix.target == 'prod' && vars.OTEL_ENABLED || '' }}
-          OTEL_EXPORTER_OTLP_ENDPOINT: ${{ matrix.target == 'prod' && vars.OTEL_EXPORTER_OTLP_ENDPOINT || '' }}
-          OTEL_HUB_TOKEN: ${{ matrix.target == 'prod' && secrets.OTEL_HUB_TOKEN || '' }}
+          CONFIG_FILE: ${{ matrix.install_dir }}.config-incoming/${{ github.run_id }}-${{ github.run_attempt }}/runtime.json
+          DEPLOY_TARGET: ${{ matrix.target }}
         with:
           host: ${{ secrets[matrix.host_secret] }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: INSTALL_DIR,SERVICE,SEED_DEMO,APP_PORT,RELEASE_ID,DEPLOY_RUN_ID,ARTIFACT_DIR,CHAT_ENABLED,ANTHROPIC_API_KEY,OTEL_ENABLED,OTEL_EXPORTER_OTLP_ENDPOINT,OTEL_HUB_TOKEN
+          envs: INSTALL_DIR,SERVICE,SEED_DEMO,APP_PORT,RELEASE_ID,DEPLOY_RUN_ID,ARTIFACT_DIR,CONFIG_FILE,DEPLOY_TARGET
           script: bash "${ARTIFACT_DIR%/artifact}/deploy/promote_release.sh"
+      - name: Remove private local configuration
+        if: always()
+        run: rm -f runtime-config/runtime.json
+      - name: Remove private remote configuration inbox
+        if: always()
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          INSTALL_DIR: ${{ matrix.install_dir }}
+          DEPLOY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        with:
+          host: ${{ secrets[matrix.host_secret] }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: INSTALL_DIR,DEPLOY_RUN_ID
+          script: rm -rf -- "${INSTALL_DIR}.config-incoming/${DEPLOY_RUN_ID}"

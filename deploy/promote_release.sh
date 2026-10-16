@@ -10,13 +10,18 @@ fail() { echo "$1" >&2; exit 1; }
 [[ ${SERVICE:-} =~ ^[a-zA-Z0-9_@.-]+$ ]] || fail 'Invalid service'
 [[ ${APP_PORT:-} =~ ^[0-9]{1,5}$ ]] && ((10#$APP_PORT > 0 && 10#$APP_PORT < 65536)) || fail 'Invalid application port'
 [[ ${SEED_DEMO:-} == true || ${SEED_DEMO:-} == false ]] || fail 'Invalid deployment target'
+[[ ${DEPLOY_TARGET:-} == prod || ${DEPLOY_TARGET:-} == demo ]] || fail 'Invalid configuration target'
 [[ -d ${ARTIFACT_DIR:-} ]] || fail 'Missing artifact directory'
 helper="$(cd "$(dirname "$0")" && pwd)/release_artifact.rb"
+config_helper="$(dirname "$helper")/runtime_config.rb"
+[[ -f ${CONFIG_FILE:-} && ! -L $CONFIG_FILE ]] || fail 'Private incoming configuration required'
+# Register cleanup only for a canonical, private input outside retained state.
+# This reads metadata only; payload validation follows artifact verification.
+CONFIG_FILE=$(ruby "$config_helper" check-input "$CONFIG_FILE" "$INSTALL_DIR") || fail 'Invalid incoming configuration path'
 
 exec 9>"${INSTALL_DIR}.deploy.lock"
 flock -x 9
 [[ -d $INSTALL_DIR && ! -L $INSTALL_DIR ]] || fail 'Existing installation required'
-[[ -f $INSTALL_DIR/.env && ! -L $INSTALL_DIR/.env ]] || fail 'Existing runtime configuration required'
 mkdir -p "${INSTALL_DIR}.deploy" "${INSTALL_DIR}.artifacts"
 chmod 700 "${INSTALL_DIR}.deploy" "${INSTALL_DIR}.artifacts"
 workspace=$(mktemp -d "${INSTALL_DIR}.deploy/${DEPLOY_RUN_ID}.XXXXXX")
@@ -59,7 +64,14 @@ finish() {
     fi
   fi
   if [[ $keep_workspace == false ]]; then
-    rm -rf -- "$workspace"
+    if ! rm -rf -- "$workspace" >/dev/null 2>&1; then
+      echo 'Private workspace cleanup failed' >&2
+      result=1
+    fi
+  fi
+  if ! rm -f -- "$CONFIG_FILE" >/dev/null 2>&1; then
+    echo 'Incoming configuration cleanup failed' >&2
+    result=1
   fi
   exit "$result"
 }
@@ -76,51 +88,14 @@ if [[ -f $INSTALL_DIR/RELEASE_ID && ! -L $INSTALL_DIR/RELEASE_ID ]]; then
     prior_identity=$installed_identity
   fi
 fi
-ruby "$helper" snapshot "$INSTALL_DIR" "${INSTALL_DIR}.artifacts" "$prior_identity" || fail 'Previous release retention failed'
+prior_artifact=$(ruby "$helper" snapshot "$INSTALL_DIR" "${INSTALL_DIR}.artifacts" "$prior_identity") || fail 'Previous release retention failed'
 
-cp -- "$INSTALL_DIR/.env" "$candidate/.env"
-chmod 600 "$candidate/.env"
-if [[ -e $INSTALL_DIR/releases/COOKIE || -L $INSTALL_DIR/releases/COOKIE ]]; then
-  [[ -f $INSTALL_DIR/releases/COOKIE && ! -L $INSTALL_DIR/releases/COOKIE ]] || fail 'Invalid runtime cookie file'
-  cp -- "$INSTALL_DIR/releases/COOKIE" "$candidate/releases/COOKIE"
-  chmod 600 "$candidate/releases/COOKIE"
-fi
+ruby "$config_helper" prepare "$CONFIG_FILE" "$INSTALL_DIR" "$candidate" "${workspace##*/}" \
+  "$DEPLOY_TARGET" "$APP_PORT" "$SEED_DEMO" "$prior_artifact" || fail 'Runtime configuration validation failed'
 
-upsert_env() {
-  local key=$1 value=$2
-  [[ -n $value ]] || return 0
-  [[ $value != *$'\n'* && $value != *$'\r'* ]] || return 1
-  # Double-quoted values work for both Bash sourcing and systemd EnvironmentFile.
-  value=${value//\\/\\\\}
-  value=${value//\"/\\\"}
-  value=${value//\$/\\\$}
-  value=${value//\`/\\\`}
-  { sed "/^${key}=/d" "$candidate/.env"; printf '%s="%s"\n' "$key" "$value"; } > "$workspace/env.updated"
-  cat "$workspace/env.updated" > "$candidate/.env"
-  rm -f "$workspace/env.updated"
-}
-
-if [[ $SEED_DEMO == false ]]; then
-  upsert_env CHAT_ENABLED "${CHAT_ENABLED:-}"
-  upsert_env ANTHROPIC_API_KEY "${ANTHROPIC_API_KEY:-}"
-  upsert_env OTEL_ENABLED "${OTEL_ENABLED:-}"
-  upsert_env OTEL_EXPORTER_OTLP_ENDPOINT "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
-  upsert_env OTEL_HUB_TOKEN "${OTEL_HUB_TOKEN:-}"
-fi
-
-# Source the trusted, server-owned configuration only inside the eval process.
-# Raw eval/source failures can contain credentials and are never printed.
-if ! (
-  set -a
-  source "$candidate/.env" || exit 1
-  set +a
-  [[ -f $candidate/releases/COOKIE || -n ${RELEASE_COOKIE:-} ]] || exit 1
-  cd "$candidate"
-  "$candidate/bin/residency_schedule" eval 'ResidencySchedule.Release.migrate()' || exit 1
-  if [[ $SEED_DEMO == true ]]; then
-    "$candidate/bin/residency_schedule" eval 'ResidencySchedule.Release.seed_demo()' || exit 1
-  fi
-) 9>&- >/dev/null 2>&1; then
+# Ruby passes the validated JSON environment directly to the release process.
+# No server environment file is evaluated as shell code.
+if ! ruby "$config_helper" run "$candidate" "$SEED_DEMO" 9>&- >/dev/null 2>&1; then
   fail 'Release migration or demo seeding failed; current release unchanged'
 fi
 

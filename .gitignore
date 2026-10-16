@@ -45,3 +45,6 @@ npm-debug.log
 
 # Real schedule data (PII) — never commit
 /data/
+
+# Private, short-lived deployment configuration rendered by CI.
+/runtime-config/

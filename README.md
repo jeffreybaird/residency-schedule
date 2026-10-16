@@ -234,36 +234,56 @@ On a fresh Ubuntu 24.04 droplet, as root:
 3. Grant `deploy` passwordless `systemctl` start/stop/restart on the `residency_schedule` service (`/etc/sudoers.d/deploy`).
 4. Create the PostgreSQL database `residency_schedule_prod`.
 5. Create the deploy directory `/home/deploy/residency_schedule`.
-6. Create the secrets file `/home/deploy/residency_schedule/.env` (see below), `chmod 600`.
-7. Install the systemd unit that runs `bin/residency_schedule start` with `EnvironmentFile=.../.env`.
+6. Configure the GitHub environments and import existing runtime values as described below.
+7. Install the systemd unit that runs `bin/residency_schedule start` with `EnvironmentFile=.../.env`. After transition, that path is a deployment-managed link to protected configuration outside the release directory.
 8. Configure the Nginx reverse proxy to `localhost:4000` (the `Connection: upgrade` header is required for LiveView WebSockets).
 9. Issue the TLS cert: `certbot --nginx -d yourdomain.com`.
 
-### 2. Configure secrets
+The managed promotion script upgrades an existing installed release. Host setup
+alone does not bootstrap an empty installation; first-install provisioning and
+staging readiness must be verified separately.
+
+### 2. Configure GitHub environments
 
 Runtime configuration is read from the environment in `config/runtime.exs` using
 `System.fetch_env!/1`, so a missing variable fails loudly at boot.
 
-| Variable | Lives in | Notes |
+Create **Settings → Environments → `prod` and `demo`**. Each environment manages
+its own runtime settings. GitHub is the source of truth; deployments generate
+the server files automatically, without passing runtime credentials to the build.
+
+| Setting | Managed in | Notes |
 |---|---|---|
-| `DATABASE_URL` | server `.env` **only** | e.g. `ecto://postgres:pw@localhost:5432/residency_schedule_prod` |
-| `ACCESS_PASSWORD` | server `.env` **only** | App login password |
-| `SECRET_KEY_BASE` | server `.env` **only** | Generate with `mix phx.gen.secret`; release builds do not receive it |
-| `PHX_HOST` | server `.env` **only** | Your public domain |
-| `POOL_SIZE` | server `.env` | DB connection pool size (e.g. `10`) |
-| `DB_SSL` | server `.env` | Set `true` for managed Postgres over SSL |
-| `CHAT_ENABLED` | GitHub **Variable** → server `.env` | Set `true` to turn on the chat assistant; the deploy writes it to the server |
-| `ANTHROPIC_API_KEY` | GitHub Secret → server `.env` | Required when `CHAT_ENABLED=true`; the deploy writes it to the server |
+| `DATABASE_URL` | GitHub environment secret | Distinct database and restricted role for each target |
+| `ACCESS_PASSWORD` | GitHub `prod` environment secret | Production app login password |
+| `SECRET_KEY_BASE` | GitHub environment secret | Preserve the existing value during transition; generate new installation values with `mix phx.gen.secret` |
+| `RELEASE_COOKIE` | GitHub environment secret | Must match the installation's effective distribution cookie; deployment does not rotate it |
+| `RESEND_API_KEY` | GitHub `prod` environment secret | Production transactional email credential |
+| `PHX_HOST` | GitHub environment variable | Public domain for that target |
+| `CONFIG_ENVIRONMENT` | GitHub environment variable | `prod` or `demo`, matching the deployment target |
+| `EXPECTED_DATABASE_NAME` | GitHub environment variable | Must match the database selected by `DATABASE_URL` |
+| `POOL_SIZE`, `DB_SSL`, `HTTP_IP`, `ROSTER_PATH` | GitHub environment variables | Optional runtime overrides; see the deployment guide |
+| `CHAT_ENABLED` | GitHub `prod` environment variable | Enable the chat assistant explicitly |
+| `ANTHROPIC_API_KEY` | GitHub `prod` environment secret | Required when chat is enabled |
+| `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT` | GitHub `prod` environment variables | Optional telemetry switch and endpoint |
+| `OTEL_RESOURCE_ATTRIBUTES` | GitHub `prod` environment variable | Optional non-sensitive telemetry labels |
+| `OTEL_HUB_TOKEN` | GitHub `prod` environment secret | Required when telemetry is enabled |
 
-> Secrets never appear in source, `config/`, or logs. `DATABASE_URL` and
-> `ACCESS_PASSWORD` never leave the server — they are **not** GitHub Secrets.
+Configure the transport secrets `DEPLOY_HOST`, `DEMO_DEPLOY_HOST` and
+`DEPLOY_SSH_KEY` under **Secrets and variables → Actions**. Runtime secrets belong
+in their target environments: repository-level production defaults must not
+silently become demo settings. Verify database-role isolation separately; a
+matching database name does not establish access isolation.
 
-In **GitHub → Settings → Secrets and variables → Actions**, add:
-`DEPLOY_HOST` and `DEPLOY_SSH_KEY` (the private deploy key).
-`SECRET_KEY_BASE` and `PHX_HOST` belong in the private server runtime `.env`;
-they are not required by the release build.
+Before the first managed deployment, transfer the existing runtime values into
+the appropriate GitHub environment through a private administrative channel.
+Preserve signing secrets and cookies. Subsequent changes happen in GitHub and
+take effect through deployment, rather than by editing server files. Each release
+selects its own protected configuration version, so automatic recovery restores
+the previous code and configuration together. Secret files remain outside code
+archives and require private retention and access controls.
 
-### 3. First deploy
+### 3. Deploy an existing installation
 
 ```bash
 git push origin main
@@ -288,7 +308,7 @@ Then load data by uploading a CSV at `https://yourdomain.com/admin/upload`.
 ### Day-to-day
 
 Every push to `main` deploys automatically. For maintenance — logs, manual
-rollback, editing `.env`, resetting the database — see the **Maintenance** and
+rollback, updating GitHub configuration, resetting the database — see the **Maintenance** and
 **Troubleshooting** sections of [`DEPLOY.md`](DEPLOY.md).
 
 ---

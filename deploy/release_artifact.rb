@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Retain only the credential-free, executable portion of a standard Mix release.
 require 'digest'
 require 'fileutils'
 require 'find'
@@ -10,6 +9,7 @@ require 'stringio'
 require 'tempfile'
 require 'zlib'
 
+# Retains only the credential-free, executable portion of a standard Mix release.
 module ReleaseArtifact
   CHUNK = 1024 * 1024
   ZERO_BLOCK = ("\0" * 512).b.freeze
@@ -54,32 +54,40 @@ module ReleaseArtifact
       raise 'truncated tar header' unless block&.bytesize == 512
 
       if block == ZERO_BLOCK
-        raise 'missing tar trailer' unless io.read(512) == ZERO_BLOCK
-
-        while (tail = io.read(CHUNK))
-          raise 'unexpected trailing tar data' unless tail.delete("\0").empty?
-        end
+        validate_trailer(io)
         return
       end
 
-      checksum_field = block.byteslice(148, 8)
-      raise 'invalid tar checksum field' unless /\A[0-7 \x00]+\z/n.match?(checksum_field)
-
-      checksum = checksum_field.delete("\0 ").to_i(8)
-      checked = block.dup
-      checked[148, 8] = ' ' * 8
-      raise 'tar checksum mismatch' unless checked.bytes.sum == checksum
-      raise 'unsupported tar format' unless block.byteslice(257, 6) == "ustar\0"
-
-      header = Gem::Package::TarHeader.from(StringIO.new(block))
-      raise 'unsupported tar member' unless %w[0 5].include?(header.typeflag)
-      raise 'ambiguous tar name' unless raw_field(block, 0, 100) == header.name
-      raise 'ambiguous tar prefix' unless raw_field(block, 345, 155) == header.prefix
-      raise 'unexpected tar link' unless header.linkname.empty?
-      raise 'invalid directory payload' if header.typeflag == '5' && header.size != 0
-
+      header = validate_header(block)
       drain_exact(io, ((header.size + 511) / 512) * 512)
     end
+  end
+
+  def validate_trailer(io)
+    raise 'missing tar trailer' unless io.read(512) == ZERO_BLOCK
+
+    while (tail = io.read(CHUNK))
+      raise 'unexpected trailing tar data' unless tail.delete("\0").empty?
+    end
+  end
+
+  def validate_header(block)
+    checksum_field = block.byteslice(148, 8)
+    raise 'invalid tar checksum field' unless /\A[0-7 \x00]+\z/n.match?(checksum_field)
+
+    checked = block.dup
+    checked[148, 8] = ' ' * 8
+    raise 'tar checksum mismatch' unless checked.bytes.sum == checksum_field.delete("\0 ").to_i(8)
+    raise 'unsupported tar format' unless block.byteslice(257, 6) == "ustar\0"
+
+    header = Gem::Package::TarHeader.from(StringIO.new(block))
+    raise 'unsupported tar member' unless %w[0 5].include?(header.typeflag)
+    raise 'ambiguous tar name' unless raw_field(block, 0, 100) == header.name
+    raise 'ambiguous tar prefix' unless raw_field(block, 345, 155) == header.prefix
+    raise 'unexpected tar link' unless header.linkname.empty?
+    raise 'invalid directory payload' if header.typeflag == '5' && header.size != 0
+
+    header
   end
 
   def member_name(entry)
@@ -109,9 +117,16 @@ module ReleaseArtifact
         marker_valid = entry.file? && entry.header.size == identity.bytesize + 1 &&
                        entry.read == "#{identity}\n"
       elsif name == 'bin/residency_schedule'
-        executable = entry.file? && (entry.header.mode & 0111).positive?
+        executable = entry.file? && (entry.header.mode & 0o111).positive?
       end
     end
+    validate_parents(seen)
+    raise 'wrong release identity or missing executable' unless marker_valid && executable
+
+    reader.rewind
+  end
+
+  def validate_parents(seen)
     seen.each_key do |name|
       parent = File.dirname(name)
       until parent == '.'
@@ -120,18 +135,19 @@ module ReleaseArtifact
         parent = File.dirname(parent)
       end
     end
-    raise 'wrong release identity or missing executable' unless marker_valid && executable
+  end
 
-    reader.rewind
+  def copy_contents(incoming, outgoing)
+    while (chunk = incoming.read(CHUNK)) && !chunk.empty?
+      outgoing.write(chunk)
+    end
   end
 
   def open_archive(path, identity)
     Tempfile.create('release-validation-') do |raw|
       raw.binmode
       Zlib::GzipReader.open(path) do |gzip|
-        while (chunk = gzip.read(CHUNK)) && !chunk.empty?
-          raw.write(chunk)
-        end
+        copy_contents(gzip, raw)
         raise 'unexpected gzip suffix' if gzip.unused && !gzip.unused.empty?
       end
       raw.rewind
@@ -161,9 +177,9 @@ module ReleaseArtifact
     return if private?(relative)
 
     target = File.realpath(path)
-    raise 'external link' unless target.start_with?(root + '/')
+    raise 'external link' unless target.start_with?("#{root}/")
 
-    resolved_name = target.delete_prefix(root + '/')
+    resolved_name = target.delete_prefix("#{root}/")
     raise 'external or private link' unless allowed?(resolved_name) && !private?(resolved_name)
 
     if File.directory?(target)
@@ -180,25 +196,25 @@ module ReleaseArtifact
     end
   end
 
-  def write_package(root, output, identity, snapshot: false)
-    root = File.realpath(root)
-    FileUtils.mkdir_p(output, mode: 0700)
+  def retained_snapshot(root, output, identity)
     marker = File.join(root, 'ARTIFACT_ID')
-    if snapshot && present?(marker)
-      artifact_id = File.read(marker).strip
-      raise 'invalid previous artifact identity' if File.symlink?(marker) ||
-                                                  !/\A#{Regexp.escape(identity)}-[0-9a-f]{64}\z/.match?(artifact_id)
+    return unless present?(marker)
 
-      verified_tar(File.join(output, artifact_id + '.tar.gz'), File.join(output, artifact_id + '.sha256'), identity)
-      return
-    end
-    name = snapshot ? identity : 'release-' + identity
-    final = File.join(output, name + '.tar.gz')
-    manifest = File.join(output, name + '.sha256')
-    if present?(final) || present?(manifest)
-      verified_tar(final, manifest, identity)
-      return
-    end
+    raise 'invalid previous artifact identity' if File.symlink?(marker)
+
+    artifact_id = File.read(marker).strip
+    pattern = /\A#{Regexp.escape(identity)}-[0-9a-f]{64}\z/
+    raise 'invalid previous artifact identity' unless pattern.match?(artifact_id)
+
+    verified_tar(*archive_paths(output, artifact_id), identity)
+    artifact_id
+  end
+
+  def archive_paths(output, name)
+    [File.join(output, "#{name}.tar.gz"), File.join(output, "#{name}.sha256")]
+  end
+
+  def package_entries(root, snapshot)
     unless snapshot
       Find.find(root) { |path| raise 'configuration in build' if File.basename(path).start_with?('.env') }
     end
@@ -206,70 +222,86 @@ module ReleaseArtifact
     Dir.children(root).sort.each do |child|
       collect(root, File.join(root, child), child, [], entries) if allowed?(child)
     end
-    raise 'missing release' unless entries.any? { |relative, _, directory| relative == 'bin/residency_schedule' && !directory }
+    executable = entries.any? do |relative, _, directory|
+      relative == 'bin/residency_schedule' && !directory
+    end
+    raise 'missing release' unless executable
 
-    Tempfile.create(['.pack-', '.tar.gz'], output) do |temporary|
-      temporary.binmode
-      gzip = Zlib::GzipWriter.new(temporary)
-      gzip.mtime = 0
-      Gem::Package::TarWriter.new(gzip) do |archive|
-        entries.each do |relative, target, directory|
-          mode = File.stat(target).mode & 0777
-          if directory
-            archive.mkdir(relative, mode)
-          else
-            archive.add_file_simple(relative, mode, File.size(target)) do |stream|
-              File.open(target, 'rb') do |incoming|
-                while (chunk = incoming.read(CHUNK))
-                  stream.write(chunk)
-                end
-              end
-            end
-          end
-        end
-        archive.add_file_simple('RELEASE_ID', 0644, identity.bytesize + 1) { |stream| stream.write("#{identity}\n") }
-      end
-      gzip.finish
-      temporary.flush
-      open_archive(temporary.path, identity)
-      if snapshot
-        artifact_id = identity + '-' + digest(temporary.path)
-        final = File.join(output, artifact_id + '.tar.gz')
-        manifest = File.join(output, artifact_id + '.sha256')
-        if present?(final) || present?(manifest)
-          verified_tar(final, manifest, identity)
-          return
-        end
-      end
-      File.rename(temporary.path, final)
-      File.write(manifest, "#{digest(final)}  #{File.basename(final)}\n")
+    entries
+  end
+
+  def add_tar_entry(archive, relative, target, directory)
+    mode = File.stat(target).mode & 0o777
+    return archive.mkdir(relative, mode) if directory
+
+    archive.add_file_simple(relative, mode, File.size(target)) do |stream|
+      File.open(target, 'rb') { |incoming| copy_contents(incoming, stream) }
     end
   end
 
-  def stage(source, identity, destination, retained)
-    path = File.join(source, "release-#{identity}.tar.gz")
-    manifest = File.join(source, "release-#{identity}.sha256")
-    verified_tar(path, manifest, identity) do |reader|
-      Dir.mkdir(destination, 0700)
-      reader.each do |entry|
-        target = File.join(destination, member_name(entry))
-        if entry.directory?
-          FileUtils.mkdir_p(target)
-        else
-          FileUtils.mkdir_p(File.dirname(target))
-          File.open(target, File::WRONLY | File::CREAT | File::EXCL, 0600) do |outgoing|
-            while (chunk = entry.read(CHUNK)) && !chunk.empty?
-              outgoing.write(chunk)
-            end
-          end
-          File.chmod(entry.header.mode & 0777, target)
-        end
+  def build_tarfile(temporary, entries, identity)
+    temporary.binmode
+    gzip = Zlib::GzipWriter.new(temporary)
+    gzip.mtime = 0
+    Gem::Package::TarWriter.new(gzip) do |archive|
+      entries.each { |entry| add_tar_entry(archive, *entry) }
+      archive.add_file_simple('RELEASE_ID', 0o644, identity.bytesize + 1) do |stream|
+        stream.write("#{identity}\n")
       end
     end
-    FileUtils.mkdir_p(retained, mode: 0700)
-    artifact_id = identity + '-' + digest(path)
-    saved = File.join(retained, artifact_id + '.tar.gz')
-    saved_manifest = File.join(retained, artifact_id + '.sha256')
+    gzip.finish
+    temporary.flush
+  end
+
+  def persist_package(temporary, output, name, identity)
+    final, manifest = archive_paths(output, name)
+    if present?(final) || present?(manifest)
+      verified_tar(final, manifest, identity)
+      return name
+    end
+
+    File.rename(temporary.path, final)
+    File.write(manifest, "#{digest(final)}  #{File.basename(final)}\n")
+    name
+  end
+
+  def write_package(root, output, identity, snapshot: false)
+    root = File.realpath(root)
+    FileUtils.mkdir_p(output, mode: 0o700)
+    retained = retained_snapshot(root, output, identity) if snapshot
+    return retained if retained
+
+    name = snapshot ? identity : "release-#{identity}"
+    final, manifest = archive_paths(output, name)
+    if present?(final) || present?(manifest)
+      verified_tar(final, manifest, identity)
+      return name
+    end
+
+    entries = package_entries(root, snapshot)
+    Tempfile.create(['.pack-', '.tar.gz'], output) do |temporary|
+      build_tarfile(temporary, entries, identity)
+      open_archive(temporary.path, identity)
+      name = "#{identity}-#{digest(temporary.path)}" if snapshot
+      persist_package(temporary, output, name, identity)
+    end
+  end
+
+  def extract_member(entry, destination)
+    target = File.join(destination, member_name(entry))
+    return FileUtils.mkdir_p(target) if entry.directory?
+
+    FileUtils.mkdir_p(File.dirname(target))
+    File.open(target, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |outgoing|
+      copy_contents(entry, outgoing)
+    end
+    File.chmod(entry.header.mode & 0o777, target)
+  end
+
+  def retain_archive(path, retained, identity)
+    FileUtils.mkdir_p(retained, mode: 0o700)
+    artifact_id = "#{identity}-#{digest(path)}"
+    saved, saved_manifest = archive_paths(retained, artifact_id)
     if present?(saved) || present?(saved_manifest)
       verified_tar(saved, saved_manifest, identity)
       raise 'artifact identity collision' unless digest(saved) == digest(path)
@@ -277,7 +309,17 @@ module ReleaseArtifact
       FileUtils.copy_file(path, saved)
       File.write(saved_manifest, "#{digest(saved)}  #{File.basename(saved)}\n")
     end
-    File.write(File.join(destination, 'ARTIFACT_ID'), artifact_id + "\n")
+    artifact_id
+  end
+
+  def stage(source, identity, destination, retained)
+    path, manifest = archive_paths(source, "release-#{identity}")
+    verified_tar(path, manifest, identity) do |reader|
+      Dir.mkdir(destination, 0o700)
+      reader.each { |entry| extract_member(entry, destination) }
+    end
+    artifact_id = retain_archive(path, retained, identity)
+    File.write(File.join(destination, 'ARTIFACT_ID'), "#{artifact_id}\n")
   end
 
   def main(arguments)
@@ -289,7 +331,8 @@ module ReleaseArtifact
       root, output, identity = values
       raise 'invalid release identity' if command == 'package' && !/\A[0-9a-f]{40}\z/.match?(identity)
 
-      write_package(root, output, identity, snapshot: command == 'snapshot')
+      artifact_id = write_package(root, output, identity, snapshot: command == 'snapshot')
+      puts artifact_id if command == 'snapshot'
     when 'stage'
       raise 'invalid arguments' unless values.length == 4
 

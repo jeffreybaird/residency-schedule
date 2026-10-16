@@ -360,20 +360,35 @@ behind the auth plug.
 
 ### Never commit secrets
 
-All production secrets live in `/home/deploy/residency_schedule/.env` on the
-server and in GitHub Actions Secrets. They must never appear in source code,
-`config/` files, or be logged.
+The requester designated GitHub Environments `prod` and `demo` as the source of
+truth for deployment runtime secrets and variables. Build and test jobs never
+receive those values. Render allowlisted configuration from step-scoped bindings
+with target/database preflight, transfer it privately separately from code
+artifacts, and fully validate it on the host before active changes. Retain
+protected versioned copies under `<INSTALL_DIR>.config`. The installed `.env`
+path is only a compatibility symlink selected with its release during promotion
+or recovery. Do not merge an old server `.env` or maintain it manually after
+transition. Never commit or log configuration values, cookies or transfer files.
 
-The variables required at runtime are:
-- `DATABASE_URL` — server-only, never in GitHub Secrets
-- `ACCESS_PASSWORD` — server-only, never in GitHub Secrets
-- `SECRET_KEY_BASE` — server-only; release builds do not receive runtime credentials
-- `PHX_HOST` — server-only
-- `CHAT_ENABLED` — optional; GitHub Variable, written to the server `.env` by the deploy
-- `ANTHROPIC_API_KEY` — optional; GitHub Secret, written to the server `.env` by the deploy; required at boot when `CHAT_ENABLED=true`
-- `OTEL_ENABLED` — optional; production GitHub Variable; telemetry defaults off
-- `OTEL_EXPORTER_OTLP_ENDPOINT` — production GitHub Variable; HTTPS collector base URL, required when `OTEL_ENABLED=true`
-- `OTEL_HUB_TOKEN` — production GitHub Secret; source-scoped ingest token, required when `OTEL_ENABLED=true`; never log or commit it
+Runtime configuration includes:
+
+- `DATABASE_URL`, `SECRET_KEY_BASE`, and `RELEASE_COOKIE` — environment secrets,
+  required for both deployment targets; cookie changes are not implicit rotation.
+- `ACCESS_PASSWORD` and `RESEND_API_KEY` — required production secrets.
+- `PHX_HOST`, `CONFIG_ENVIRONMENT`, and `EXPECTED_DATABASE_NAME` — explicit
+  environment variables; target/database guards do not prove database privileges
+  or substitute for independently verified demo isolation.
+- `CHAT_ENABLED` and `OTEL_ENABLED` — opt-in feature variables; removed/disabled
+  settings must clear stale provider credentials rather than preserve old values.
+- `ANTHROPIC_API_KEY` — required when the assistant is enabled.
+- `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_HUB_TOKEN` — required HTTPS endpoint
+  and source-scoped secret when telemetry is enabled.
+
+The complete allowlist, defaults, release node isolation, first-transition cookie
+checks, transfer cleanup and private configuration retention are documented in
+[the managed release runbook](phase0-release-artifacts.md). GitHub environment
+overrides must be configured explicitly: repository-secret fallback is not proof
+that a target has its own database or credentials.
 
 OTel Hub receives only fixed HTTP completion summaries, bounded method/status
 attributes, aggregate metrics, and bounded calendar/schedule/resident operation traces.
