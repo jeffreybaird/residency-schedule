@@ -11,6 +11,11 @@ below preserve the original October 15 baseline; they are not current claims tha
 local access or staging provisioning remain unavailable. Database recovery RTO/RPO
 remain unproved.
 
+The [October 17 database recovery record](phase0-database-recovery.md) records
+PR #78's successful merge/production deployment and the subsequent isolated
+backup/restore work. Read its current status before using the historical task
+statuses below.
+
 This record starts Phase 0 and tracks evidence needed before infrastructure
 changes are deployed. It does not certify production recovery readiness.
 
