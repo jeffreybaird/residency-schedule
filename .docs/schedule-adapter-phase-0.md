@@ -8,7 +8,12 @@ Progress and unresolved prerequisites: [Step 1 baseline](schedule-adapter-phase-
 October 17 continuation: [PR #78](https://github.com/jeffreybaird/residency-schedule/pull/78)
 is merged and its production/demo rollout is verified. The
 [database recovery record](phase0-database-recovery.md) tracks Step 4 tooling
-and isolated rehearsal. The checkboxes remain acceptance gates; unfinished
+and isolated rehearsal. [PR #79](https://github.com/jeffreybaird/residency-schedule/pull/79)
+is also merged, with its separately approved production/demo rollout verified.
+The [production backup preparation record](phase0-production-backups.md) tracks
+the next branch's scheduling, protected off-host storage and monitoring work;
+those controls are not yet activated in production.
+The checkboxes remain acceptance gates; unfinished
 database recovery objectives must not be inferred from the deployment success.
 
 Phase 0 establishes the ability to deploy, validate and recover the application
