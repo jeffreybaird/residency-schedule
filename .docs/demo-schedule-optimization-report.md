@@ -253,9 +253,15 @@ Completed application checks:
   before/after metrics, hard-constraint results and objective values. The fixture
   did not change during the upgrade, so the passing Elixir results apply to the
   final CSV.
-- Ruby deployment tests could not run locally because Ruby is unavailable.
-  Both CI workflows retain the existing Ruby deployment test and add Python
-  demo validation to the test job. Automatic demo seeding remains unchanged.
+- Initial local validation lacked Ruby, and CI exposed an obsolete test that
+  prohibited Python anywhere in the workflows. The corrected guard permits only
+  the exact demo unittest command once in each test job and still rejects Python
+  elsewhere, including deployment/runtime code. Subsequent local validation
+  passed **49 release-artifact tests (10,666 assertions)** and **43 database-recovery
+  tests (642 assertions)**, with no failures or errors. Both workflows retain
+  their Ruby checks and Python demo validation. Automatic demo seeding is unchanged.
+  These follow-up tests used isolated Debian Ruby 3.3.8; GitHub CI uses Ruby 3.3.12.
+  No project runtime dependency or deployment command changed.
 
 Accepted test hashes are
 `ba2da110ee7c52b677e5fa1fb38304cbeb1040919257f6964a7b7404d90fe9d9`
