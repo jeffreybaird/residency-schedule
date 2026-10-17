@@ -1,8 +1,15 @@
 # Phase 0 Step 1 baseline and recovery requirements
 
-Status: repository inventory complete; operational acceptance pending.
-Recorded: October 15, 2026.
+Status: repository and local live inventory collected; operational acceptance pending.
+Recorded: October 15, 2026. Local continuation: October 16, 2026.
 Parent: [Phase 0 runbook](schedule-adapter-phase-0.md).
+
+The [local rollout record](phase0-local-rollout-record.md) supersedes the access
+unknowns below with actual host/runtime/schema observations, configuration import,
+the approved separate staging host, and measured rehearsal outcomes. The tables
+below preserve the original October 15 baseline; they are not current claims that
+local access or staging provisioning remain unavailable. Database recovery RTO/RPO
+remain unproved.
 
 This record starts Phase 0 and tracks evidence needed before infrastructure
 changes are deployed. It does not certify production recovery readiness.

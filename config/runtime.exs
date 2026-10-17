@@ -101,8 +101,14 @@ if config_env() == :prod do
       api_key: System.fetch_env!("ANTHROPIC_API_KEY")
   end
 
+  # Staging retains login while delivering transactional email to an in-memory
+  # sink. Its managed profile never supplies outbound integration credentials.
+  if System.get_env("CONFIG_ENVIRONMENT") == "staging" do
+    config :residency_schedule, ResidencySchedule.Mailer, adapter: Swoosh.Adapters.Test
+  end
+
   # Resend for transactional email (magic links)
-  unless demo_mode do
+  unless demo_mode or System.get_env("CONFIG_ENVIRONMENT") == "staging" do
     config :residency_schedule, ResidencySchedule.Mailer,
       adapter: Swoosh.Adapters.Resend,
       api_key: System.fetch_env!("RESEND_API_KEY")

@@ -91,4 +91,43 @@ defmodule ResidencyScheduleWeb.LocalRenderProfileTest do
 
     assert Process.whereis(:eprof) == profiler
   end
+
+  test "owned profiler has exited before success, failure and immediate reuse return", %{
+    socket: socket
+  } do
+    for outcome <- [:success, :raise, :success] do
+      tag = make_ref()
+
+      tracked_socket =
+        Phoenix.LiveView.attach_hook(
+          socket,
+          :track_owned_profiler,
+          :after_render,
+          fn rendered_socket ->
+            profiler = Process.whereis(:eprof)
+            monitor = Process.monitor(profiler)
+            send(self(), {tag, profiler, monitor})
+
+            if outcome == :raise, do: raise("synthetic profiling pipeline failure")
+            rendered_socket
+          end
+        )
+
+      profile = fn ->
+        LocalRenderProfile.run(tracked_socket, Diff.new_fingerprints(), Diff.new_components(),
+          eprof: true
+        )
+      end
+
+      if outcome == :raise do
+        assert_raise RuntimeError, "synthetic profiling pipeline failure", profile
+      else
+        assert {:ok, _result} = profile.()
+      end
+
+      assert_received {^tag, profiler, monitor}
+      refute Process.whereis(:eprof)
+      assert_received {:DOWN, ^monitor, :process, ^profiler, :normal}
+    end
+  end
 end

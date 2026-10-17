@@ -86,7 +86,7 @@ defmodule ResidencySchedule.Observability.LocalRenderProfile do
     defp own_profiler(fun, profiler) do
       # OTP tools is loaded only for this explicit local request.
       case profiler.start() do
-        {:ok, _pid} ->
+        {:ok, pid} ->
           try do
             :profiling =
               profiler.start_profiling([self()], {:_, :_, :_}, set_on_spawn: false)
@@ -96,8 +96,13 @@ defmodule ResidencySchedule.Observability.LocalRenderProfile do
             profiler.analyze(:total, sort: :time)
             {:ok, result}
           after
+            monitor = Process.monitor(pid)
             profiler.stop_profiling()
             profiler.stop()
+
+            receive do
+              {:DOWN, ^monitor, :process, ^pid, _reason} -> :ok
+            end
           end
 
         {:error, {:already_started, _}} ->
