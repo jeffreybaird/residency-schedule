@@ -5,6 +5,12 @@ Recorded: October 15, 2026.
 Parent: [Schedule adapter migration release plan](schedule-adapter-release-plan.md).
 Progress and unresolved prerequisites: [Step 1 baseline](schedule-adapter-phase-0-baseline.md).
 
+October 17 continuation: [PR #78](https://github.com/jeffreybaird/residency-schedule/pull/78)
+is merged and its production/demo rollout is verified. The
+[database recovery record](phase0-database-recovery.md) tracks Step 4 tooling
+and isolated rehearsal. The checkboxes remain acceptance gates; unfinished
+database recovery objectives must not be inferred from the deployment success.
+
 Phase 0 establishes the ability to deploy, validate and recover the application
 before changing its schedule model. Deliver operational controls, tested scripts,
 staging and evidence. Do not introduce the adapter schema or migrate production
