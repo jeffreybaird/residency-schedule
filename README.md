@@ -1,12 +1,15 @@
 # Residency Schedule
 
 An Elixir / Phoenix LiveView application that imports OB/GYN residency schedules
-from CSV uploads and turns them into interactive views: a Gantt-style rotation
-grid, monthly calendars, side-by-side resident comparisons, and per-resident
-iCal feeds. It also includes an experimental schedule **builder** that generates
-draft rotation assignments under coverage and duty-hour constraints.
+from CSV uploads and QGenda Excel exports. It combines rotations and daily
+assignments in calendars, a Gantt-style grid, resident comparisons, and iCal
+feeds. Administrators can preview imports, update selected dates, edit
+assignments, review coverage requests, and generate draft schedules with the
+experimental **builder**. An optional chat assistant and OAuth-protected MCP API
+answer schedule questions.
 
-The full architectural spec lives in [`residency_schedule_plan_v2.md`](residency_schedule_plan_v2.md).
+The [original build plan](residency_schedule_plan_v2.md) is historical context.
+The guides below describe the current application.
 
 ## License
 
@@ -30,7 +33,9 @@ license. Separately licensed third-party materials retain their own licenses.
 | Database | PostgreSQL 14+ via Ecto 3.13 |
 | HTTP server | Bandit |
 | Assets | Tailwind + esbuild (downloaded by Mix — no Node required) |
-| Email | Swoosh |
+| Email | Swoosh; Resend in production, local mailbox in development |
+| Assistant | Optional Anthropic chat with the shared MCP tool catalogue |
+| Observability | Optional OTLP export with bounded operation and render diagnostics |
 | Auth | Session-based, with bcrypt passwords and magic-link email tokens |
 | Deploy | GitHub Actions → Digital Ocean droplet (systemd + Nginx + Let's Encrypt) |
 
@@ -49,12 +54,16 @@ lib/
 │   ├── schedules/                     # Schedule context + schema (one per academic year)
 │   ├── residents/                     # Resident + ScheduleResident contexts/schemas
 │   ├── rotations/                     # Rotation context + schema (a resident's assignment for a date slot)
-│   ├── shift_overrides/               # Manual edits layered on top of imported rotations
+│   ├── detailed_schedules/            # Daily activities, import provenance, and search
+│   ├── shift_overrides/               # Approved coverage layered on imported rotations
+│   ├── schedule_editor.ex            # Staged edits to saved rotations
+│   ├── schedule_cache.ex             # Shared schedule data and revision invalidation
+│   ├── observability/                # Operation tracing and render diagnostics
 │   ├── accounts/                      # Users, passwords, and magic-link tokens
 │   ├── oauth/                         # OAuth 2.1 authorization server backing the MCP endpoint
 │   ├── change_requests/               # Pending schedule-change requests (approval creates a ShiftOverride)
 │   ├── assistant/                     # Name/rotation resolvers, duty-hour check, question-answering facade
-│   ├── importer/                      # CSV → database pipeline
+│   ├── importer/                      # CSV imports/date updates and QGenda preview/parsing
 │   │   ├── csv_parser.ex              #   parse raw CSV into dated slots + resident rows
 │   │   ├── csv.ex                     #   low-level CSV decoding
 │   │   ├── name_normalizer.ex         #   canonicalize resident names
@@ -84,9 +93,10 @@ lib/
 │   │   └── page_controller.ex
 │   ├── mcp/                           # JSON-RPC handling, MCP server core, tool catalogue
 │   ├── live/                          # LiveView pages
-│   │   ├── schedule_live/             #   "/" — Gantt rotation grid
+│   │   ├── schedule_live/             #   "/schedule" — Gantt rotation grid
 │   │   ├── resident_live/             #   "/residents/:id" — one resident's year
-│   │   ├── calendar_live/             #   "/calendar" — monthly calendar
+│   │   ├── calendar_live/             #   "/" and "/calendar" — calendar
+│   │   ├── chat_live/                 #   assistant widget across signed-in pages
 │   │   ├── compare_live/              #   "/compare" — side-by-side residents
 │   │   ├── upload_live/               #   "/admin/upload" — CSV import
 │   │   ├── builder_live/              #   "/admin/build" — schedule generator
@@ -116,19 +126,29 @@ priv/repo/migrations/                  # Ecto migrations
 - **Resident** — a person; linked to a Schedule through **ScheduleResident**
   (their PGY level / position, like `R4-1`, for that year).
 - **Rotation** — a single resident's assignment for a single dated slot.
-- **ShiftOverride** — a manual edit layered on top of the imported rotations so
-  corrections survive re-imports.
+- **Activity / ImportBatch / ActivitySource** — daily commitments and their
+  provenance, stored separately from rotations and linked to resident people.
+- **ChangeRequest / ShiftOverride** — a coverage request and its approved override.
+  Direct schedule edits change saved rotations; overrides layer coverage on top.
+  Whole-year replacement can remove coverage history, so use date updates for
+  partial corrections. Saved daily activities block whole-year replacement.
 
 ### Routes at a glance
 
 | Path | Access | Purpose |
 |---|---|---|
-| `/login`, `/auth/verify`, `/auth/set-password` | public | Password + magic-link login (all roles) |
-| `/` | authenticated | Gantt rotation grid |
+| `/login`, `/login/*`, `/auth/verify`, `/auth/set-password` | public entry points | Email identification, password or magic-link login; password setup requires a session |
+| `/`, `/calendar` | authenticated | Calendar with rotations, daily tasks, and notes |
+| `/schedule` | authenticated | Continuous Gantt rotation timeline |
 | `/residents/:id` | authenticated | Per-resident year view |
-| `/calendar`, `/compare` | authenticated | Monthly calendar, comparison |
+| `/compare` | authenticated | Resident comparison |
 | `/residents/:id/calendar.ics`, `/feed/:token/calendar.ics` | authenticated / tokened | iCal subscription feeds |
-| `/admin`, `/admin/upload`, `/admin/build`, `/admin/edit` | admin role | Approvals, roles, CSV import, builder, editor |
+| `/admin`, `/admin/denied`, `/admin/upload`, `/admin/build`, `/admin/edit` | admin role | Approvals, denied users, coverage requests, imports, builder, editor |
+| `/mcp` | OAuth bearer token | Schedule and coverage tools (`POST` only) |
+
+The public demo bypasses login for read-only schedule views and blocks writes.
+There is no standalone Activities page; imported tasks appear within schedule
+views and are searchable through MCP and chat.
 
 Accounts carry a **role**: `user` (default — any email, needs admin approval;
 can follow a resident's schedule), `resident` (URMC email, auto-approved), or
@@ -136,7 +156,7 @@ can follow a resident's schedule), `resident` (URMC email, auto-approved), or
 `bin/residency_schedule eval 'ResidencySchedule.Release.promote_admin("email")'`).
 
 > **Convention:** every public function carries a doctest, and every branch is
-> covered by an ExUnit test. See [`CLAUDE.md`](CLAUDE.md) for the full code-style
+> covered by an ExUnit test. See [shared project guidance](.docs/project-guidance.md) for the full code-style
 > and testing rules this project enforces.
 
 ---
@@ -166,6 +186,7 @@ authorize, and token endpoints. Redirect URIs must be `https` or `localhost`.
 | `list_residents` | Residents in a schedule, optionally one residency year (R1–R4) | no |
 | `who_is_on` | Who is effectively on a service on a date ("strong ob", "onc", "NF") | no |
 | `resident_schedule` | A resident's effective blocks in a date range | no |
+| `search_activities` | Daily tasks and notes for an academic year, with text/date/resident filters and pagination | no |
 | `shifts_remaining` | A resident's working days from a date onward (float counts; vacation and post-call do not) | no |
 | `shared_shifts` | Days two residents are on the same shared service from a date onward (solo rotations such as float never count) | no |
 | `shared_shifts_by_coworker` | One resident's shared-shift count with every other resident, most shared first | no |
@@ -188,6 +209,18 @@ until an admin approves, either from the **Pending Change Requests** block on
 "Today" is America/New_York. The MCP server is stateless (no session ids, no
 server-initiated SSE stream).
 
+Daily activities supplement rotation answers: an empty search does not establish
+availability. See [activity search through MCP and chat](.docs/activity-search-mcp.md)
+for parameters and result boundaries.
+
+### Built-in chat
+
+The optional assistant widget uses the same tools and permissions as MCP.
+Conversations persist per user across signed-in pages; mutating tool calls
+require confirmation in chat. The default allowance is 50 messages per user per
+day. In development, setting `ANTHROPIC_API_KEY` enables chat; production also
+requires `CHAT_ENABLED=true`. Model and quota defaults live in `config/config.exs`.
+
 ---
 
 ## Quick start (development)
@@ -197,15 +230,21 @@ mix setup          # deps.get + ecto.setup + assets.setup + assets.build
 mix phx.server     # or: iex -S mix phx.server
 ```
 
-Visit [localhost:4000](http://localhost:4000) and log in with the dev password
-`dev-password` (configurable in `config/dev.exs`). Then upload a schedule at
-[/admin/upload](http://localhost:4000/admin/upload).
+Use Elixir 1.19 and patched OTP matching CI, with PostgreSQL running. Development
+and test default to `postgres` / `postgres` on `localhost`; adjust their config
+files for your local database.
 
-Run the checks CI enforces:
+Visit [localhost:4000](http://localhost:4000), enter an email, request a magic link,
+and open it from [/dev/mailbox](http://localhost:4000/dev/mailbox). New non-URMC
+users need approval; follow the local administrator bootstrap in
+[`DEVELOPMENT.md`](DEVELOPMENT.md) before uploading at `/admin/upload`. The legacy
+`access_password` setting does not provide a shared browser login.
+
+Run the application checks:
 
 ```bash
 mix test           # creates + migrates the test DB, then runs the suite
-mix precommit      # compile --warnings-as-errors, unused-deps, format, test
+mix precommit      # format --force, compile --warnings-as-errors, unused-deps, test
 ```
 
 Full setup instructions, the expected CSV format, and troubleshooting are in
@@ -229,7 +268,7 @@ in [`DEPLOY.md`](DEPLOY.md).
 
 On a fresh Ubuntu 24.04 droplet, as root:
 
-1. Install dependencies: `erlang elixir postgresql postgresql-contrib nginx certbot python3-certbot-nginx git curl`.
+1. Install PostgreSQL, Nginx, Certbot, Ruby 3.3, and release utilities as described in `DEPLOY.md`. The compiled release includes its runtime; build it with the pinned CI toolchain.
 2. Create a non-root `deploy` user and add the deploy SSH **public** key to `/home/deploy/.ssh/authorized_keys`.
 3. Grant `deploy` passwordless `systemctl` start/stop/restart on the `residency_schedule` service (`/etc/sudoers.d/deploy`).
 4. Create the PostgreSQL database `residency_schedule_prod`.
@@ -291,7 +330,7 @@ git push origin main
 
 The [`deploy.yml`](.github/workflows/deploy.yml) workflow:
 
-1. **test** — runs the application and deployment-script suites.
+1. **test** — runs application tests, release-artifact tests, and Python demo validation. PR CI additionally runs database-recovery and production-backup tests.
 2. **build** — packages one release with its commit identity and SHA256.
 3. **staging** (`needs: [test, build]`) — promotes the archive to persistent,
    isolated staging with outbound integrations disabled and no automatic reseed.
@@ -314,8 +353,7 @@ Then load data by uploading a CSV at `https://yourdomain.com/admin/upload`.
 
 ### Day-to-day
 
-Every push to `main` deploys automatically. For maintenance — logs, manual
-rollback, updating GitHub configuration, resetting the database — see the **Maintenance** and
+Every push to `main` deploys automatically. For maintenance — logs, recovery procedures, updating GitHub configuration, and backup tooling — see the **Maintenance** and
 **Troubleshooting** sections of [`DEPLOY.md`](DEPLOY.md).
 
 ---
@@ -328,5 +366,10 @@ rollback, updating GitHub configuration, resetting the database — see the **Ma
 | [`DEVELOPMENT.md`](DEVELOPMENT.md) | Local setup, CSV format, DB management, common issues |
 | [Assistant API](#assistant-api-mcp-over-oauth) | Connecting an MCP client, tools, permissions |
 | [`DEPLOY.md`](DEPLOY.md) | Step-by-step production provisioning + maintenance |
-| [`CLAUDE.md`](CLAUDE.md) | Code-style and testing rules enforced in this repo |
-| [`residency_schedule_plan_v2.md`](residency_schedule_plan_v2.md) | Full architectural spec |
+| [Shared project guidance](.docs/project-guidance.md) | Canonical code-style, privacy, and testing rules; `AGENTS.md` and `CLAUDE.md` are entry points |
+| [QGenda preview](.docs/qgenda-preview.md), [daily assignments](.docs/qgenda-activities.md) | Identity matching, additive imports, display rules, and replacement limits |
+| [Activity search](.docs/activity-search.md) | Query matching and pagination |
+| [Release artifacts](.docs/phase0-release-artifacts.md), [staging fixtures](.docs/staging-fixtures.md) | Managed promotion, configuration, and manual synthetic staging data |
+| [Database recovery](.docs/database-recovery-runbook.md), [production backups](.docs/production-backup-runbook.md) | Tool boundaries, operator procedures, and activation limits |
+| [Operation tracing](.docs/operation-tracing.md), [render diagnostics](.docs/render-diagnostics.md) | Telemetry configuration and privacy boundaries |
+| [`residency_schedule_plan_v2.md`](residency_schedule_plan_v2.md) | Historical build plan; not a current implementation contract |

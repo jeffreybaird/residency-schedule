@@ -1,5 +1,10 @@
 # OB/GYN Residency Schedule Visualizer — Build Plan (v2)
 
+> Historical design document: examples, dependencies, routes, and authentication
+> below describe the original plan, not the current implementation. Start with
+> [README.md](README.md), [DEVELOPMENT.md](DEVELOPMENT.md), and
+> [DEPLOY.md](DEPLOY.md) for current behavior and commands.
+
 > Updated after inspecting the actual CSV export of `2023-2024_Resident_Schedules_xlsx`.
 
 ---
