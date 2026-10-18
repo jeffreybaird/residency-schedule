@@ -1377,7 +1377,23 @@ class ReleaseArtifactsTest < Minitest::Test
       workflow = File.read(File.join(ROOT, '.github/workflows', name))
       assert_match(/ruby\s+test\/deploy\/release_artifacts_test\.rb/, workflow)
       assert_match(/uses:\s*ruby\/setup-ruby@/, workflow)
-      refute_match(/python/i, workflow)
+    end
+  end
+
+  def test_python_is_confined_to_the_demo_validator_in_test_jobs
+    validator_command = "python3 -m unittest discover -s test -p '*_test.py'"
+
+    %w[ci.yml deploy.yml].each do |name|
+      workflow = YAML.load_file(File.join(ROOT, '.github/workflows', name))
+      test_steps = workflow.fetch('jobs').fetch('test').fetch('steps')
+      validators = test_steps.select { |step| step['run'].to_s.strip == validator_command }
+      assert_equal 1, validators.length, "#{name} must run the exact demo validator once in its test job"
+
+      # Remove only the approved test command. Python in other commands, job
+      # definitions, setup actions, environments, or runtime installs still fails.
+      validators.fetch(0).delete('run')
+      refute_match(/python/i, workflow.to_yaml,
+                   "#{name} must not use Python outside the approved demo test command")
     end
   end
 
