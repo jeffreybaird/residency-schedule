@@ -32,9 +32,11 @@ Run `mix format --force` before the remaining repository verification checks.
 ## Project Overview
 
 An Elixir / Phoenix LiveView application that parses OB/GYN residency schedules from
-CSV uploads and visualizes them as interactive Gantt grids, monthly calendars, and
-comparison views. See `residency_schedule_plan_v2.md` in the repo root for the full
-architectural spec.
+CSV uploads and QGenda workbooks and visualizes rotations and daily assignments
+as interactive Gantt grids, calendars, and comparison views. It includes calendar
+feeds, coverage requests, schedule editing/building, and optional chat/MCP tools.
+See `README.md`, `DEVELOPMENT.md`, and `DEPLOY.md` for current behavior;
+`residency_schedule_plan_v2.md` is the historical build plan.
 
 ---
 

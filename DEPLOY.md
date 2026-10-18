@@ -13,11 +13,11 @@ This guide covers deploying the Residency Schedule app to a Digital Ocean Ubuntu
 | Reverse proxy | Nginx |
 | SSL | Let's Encrypt (Certbot) |
 | Database | PostgreSQL (self-hosted on the same droplet) |
-| Deploys | GitHub Actions — push to `main` triggers build → deploy |
+| Deploys | GitHub Actions — push to `main` triggers test → build → staging → production/demo |
 
-Deployments are fully automated after initial server setup. Pushing to `main` builds the release, runs tests, runs migrations, swaps the binary, and restarts the service. If the health check fails, the old release is automatically restored.
+Deployments are fully automated after initial server setup. Pushing to `main` runs tests, builds one release, promotes it to staging, then promotes the same archive to production and demo. Promotion runs migrations before swapping the binary and restarting the service. If the health check fails, the old release is automatically restored.
 
-Runtime settings are managed in GitHub's `prod` and `demo` environments. Each
+Runtime settings are managed in GitHub's `prod`, `demo`, and `staging` environments. Each
 deployment generates protected, versioned configuration outside the release
 directory and recovers the previous configuration with the previous code on
 failure. The promotion script requires an existing installed release; the host
@@ -45,7 +45,6 @@ ssh root@<your-droplet-ip>
 ```bash
 apt-get update && apt-get upgrade -y
 apt-get install -y \
-  erlang elixir \
   postgresql postgresql-contrib \
   nginx certbot python3-certbot-nginx \
   git curl
@@ -53,10 +52,13 @@ apt-get install -y \
 
 Verify versions:
 ```bash
-elixir --version   # CI: Elixir 1.19.5 / OTP 28.5.0.7; OTP 29 requires 29.1.1+
 psql --version     # should be 14+
 nginx -v
 ```
+
+The release bundles Erlang/OTP; the host does not need Mix or Elixir. Build
+with the workflow toolchain (Elixir 1.19.5 / OTP 28.5.0.7) on a compatible Linux
+system rather than relying on Ubuntu's default Elixir packages.
 
 The deployment tools also require a maintained Ruby 3.3 installation with its
 bundled RubyGems archive libraries, plus `flock` and checksum/tar utilities.
@@ -88,17 +90,18 @@ visudo -c   # verify the file is valid
 ### 1.5 Set up PostgreSQL
 
 ```bash
-# Set a password for the postgres superuser
-sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'your-db-password';"
+# Create a restricted application role; psql prompts for the password
+sudo -u postgres createuser --pwprompt rs_prod
+sudo -u postgres createdb --owner=rs_prod residency_schedule_prod
 
-# Create the production database
-sudo -u postgres createdb residency_schedule_prod
-
-# Verify the connection
-PGPASSWORD=your-db-password psql -U postgres -h localhost -d residency_schedule_prod -c "\conninfo"
+# Verify as the application role; enter its password at the prompt
+psql -W -U rs_prod -h localhost -d residency_schedule_prod -c '\conninfo'
 ```
 
-> **Security note:** For a managed database, use its connection string as the target GitHub environment's `DATABASE_URL` secret and set the `DB_SSL` variable to `true`. Use a restricted database role rather than a superuser.
+Use this role in the production environment's `DATABASE_URL`, not the PostgreSQL
+superuser. Configure separate restricted roles and databases for demo and staging,
+and verify cross-database access is denied as described in section 6.1. For a
+managed database, use its connection string and set `DB_SSL=true`.
 
 ### 1.6 Create the deployment directory
 
@@ -159,21 +162,14 @@ systemctl enable residency_schedule
 
 ### 1.9 Configure Nginx
 
+Start with HTTP so Nginx can load before a certificate exists. Certbot adds
+HTTPS in the next step; select its HTTP-to-HTTPS redirect option.
+
 ```bash
 cat > /etc/nginx/sites-available/residency_schedule << 'EOF'
 server {
     listen 80;
     server_name yourdomain.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    server_name yourdomain.com;
-
-    ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-
     location / {
         proxy_pass         http://localhost:4000;
         proxy_http_version 1.1;
@@ -211,6 +207,7 @@ Under **Settings → Secrets and variables → Actions**, configure transport ac
 | Secret | Value | Notes |
 |---|---|---|
 | `DEPLOY_HOST` | Droplet IP or domain | e.g. `143.198.12.34` |
+| `STAGING_DEPLOY_HOST` | Staging droplet IP or domain | Separate isolated installation and database |
 | `DEMO_DEPLOY_HOST` | Demo droplet IP or domain | May share a host with production, but uses a separate installation and database |
 | `DEPLOY_SSH_KEY` | Full private key PEM | Generate with `ssh-keygen -t ed25519 -C "deploy@github-actions" -f ~/.ssh/residency_deploy -N ""`, use the private key file |
 
@@ -220,9 +217,9 @@ environment. Configure runtime values there:
 
 | Environment secret | Required for | Notes |
 |---|---|---|
-| `DATABASE_URL` | Both targets | Distinct database and restricted role for each target |
-| `SECRET_KEY_BASE` | Both targets | Preserve the installation's signing secret; demo and production must differ |
-| `RELEASE_COOKIE` | Both targets | Preserve the effective existing Erlang distribution cookie |
+| `DATABASE_URL` | All three targets | Distinct database and restricted role for each target |
+| `SECRET_KEY_BASE` | All three targets | Preserve the installation's signing secret; demo and production must differ |
+| `RELEASE_COOKIE` | All three targets | Preserve the effective existing Erlang distribution cookie |
 | `ACCESS_PASSWORD` | Production and staging | Separate app login passwords |
 | `RESEND_API_KEY` | Production | Transactional email credential |
 | `ANTHROPIC_API_KEY` | Production with chat enabled | Provider credential |
@@ -260,7 +257,7 @@ do not retain their old provider credentials in the newly generated configuratio
 fragment. Use the separate `DB_SSL` variable for TLS; query parameters that could
 override the expected database are rejected.
 
-Populate both environments explicitly. GitHub can fall back to repository-level
+Populate all three environments explicitly. GitHub can fall back to repository-level
 secrets when an environment value is absent; production database credentials must
 not become demo defaults. Target and expected-database checks catch common
 misconfiguration but do not prove database grants are isolated. Verify the demo
@@ -318,10 +315,15 @@ git push origin main
 
 Monitor the deployment in the GitHub Actions tab. The workflow:
 
-1. **Test job** — runs the application and deployment-script tests.
+1. **Test job** — runs ExUnit, release-artifact tests, and Python demo validation.
+   PR CI additionally runs database-recovery and production-backup suites.
 2. **Build job** — creates one release archive identified by commit and SHA256,
    without server runtime credentials or a distribution cookie.
-3. **Deploy jobs** — download the same archive for production and demo. Each
+3. **Staging job** — promotes that archive to persistent isolated staging, with
+   authentication enabled, outbound integrations disabled, and no automatic seed.
+   Synthetic fixtures can be loaded manually using the
+   [guarded staging fixture procedure](.docs/staging-fixtures.md).
+4. **Deploy jobs** (`needs: [test, build, staging]`) — download the same archive for production and demo. Each
    destination has noncanceling workflow concurrency and a stable host lock.
    A separate private payload carries the validated GitHub configuration.
    The host verifies the artifact, retains the previous code archive, creates
@@ -351,7 +353,9 @@ Then visit `https://yourdomain.com` — you should see the login page.
 
 Every push to `main` automatically deploys. No manual steps required after initial setup.
 
-To deploy manually without a code change:
+Manual workflow dispatch deploys **staging only**, as do pushes to
+`codex/phase0-release-artifacts`. Production and demo require a push to `main`
+after the staging gate. To trigger that path without a code change:
 ```bash
 git commit --allow-empty -m "trigger deploy"
 git push
@@ -365,9 +369,15 @@ After the first deploy, the database exists but has no schedule data. Upload a s
 
 1. Go to `https://yourdomain.com/admin/upload`
 2. Select your CSV file
-3. Click **Import Schedule**
+3. Preview the import, review warnings and resident matches, then confirm **Import Schedule**
 
-The academic year is derived automatically from the dates in the CSV file. You can upload multiple academic years — each coexists in the database. To switch between years on the Gantt, Calendar, and Compare pages, use the year picker that appears when more than one schedule is loaded.
+The academic year is derived automatically from the dates in the CSV file. You can upload multiple academic years — each coexists in the database. Use the schedule/year controls to navigate loaded years. The Gantt at `/schedule` keeps a continuous timeline across schedules.
+
+Use **Update dates** for partial corrections; **Replace year** can remove coverage
+history and is blocked when saved daily activities depend on the roster. QGenda
+workbooks use a separate preview/save form and additive daily-activity storage.
+See [development import instructions](DEVELOPMENT.md#uploading-a-schedule-csv)
+and [QGenda import semantics](.docs/qgenda-activities.md).
 
 ---
 
@@ -432,12 +442,11 @@ instance a non-superuser role that owns only its own database, so a mistyped
 
 ```bash
 sudo -u postgres psql << 'EOF'
--- One role per instance, neither of them superuser.
-CREATE ROLE rs_prod LOGIN PASSWORD 'prod-db-password';
+-- Production already uses rs_prod from section 1.5.
+-- Create the separate demo role; neither role is a superuser.
 CREATE ROLE rs_demo LOGIN PASSWORD 'demo-db-password';
 
 CREATE DATABASE residency_schedule_demo OWNER rs_demo;
-ALTER DATABASE residency_schedule_prod OWNER TO rs_prod;
 
 -- Neither role may touch the other's database.
 REVOKE ALL ON DATABASE residency_schedule_prod FROM rs_demo, PUBLIC;
@@ -616,7 +625,7 @@ work; automatic startup recovery does not establish that capability.
 
 ### Updating runtime configuration
 
-Change the setting in the GitHub `prod` or `demo` environment, then deploy through
+Change the setting in the target GitHub `prod`, `demo`, or `staging` environment, then deploy through
 the reviewed workflow. A restart alone uses the currently installed configuration
 version; it does not fetch new GitHub settings.
 
@@ -633,17 +642,19 @@ retention window before pruning. These files must never enter build artifacts or
 ordinary diagnostic logs. Distribution-cookie rotation requires a separate
 reviewed procedure; normal deployment verifies continuity.
 
-### Resetting the database (destructive)
+### Backups and database recovery
 
-```bash
-ssh root@your-droplet
-test -f /home/deploy/residency_schedule.deploy.lock || exit 1
-flock -x --close /home/deploy/residency_schedule.deploy.lock bash
-sudo -u postgres dropdb residency_schedule_prod
-sudo -u postgres createdb residency_schedule_prod
-# Exit the maintenance lock before triggering the reviewed deployment workflow
-# to re-run migrations with the managed runtime configuration.
-```
+Use the [synthetic database recovery runbook](.docs/database-recovery-runbook.md)
+for the isolated staging rehearsal and the
+[production backup runbook](.docs/production-backup-runbook.md) for online backup
+and off-host checks. These have different formats and trust boundaries; the
+production backup output is not input to the synthetic restore CLI.
+
+The presence of tooling and systemd unit files does not mean production backups
+are active. Review activation decisions and operational evidence in
+[the production backup record](.docs/phase0-production-backups.md). Code rollback
+also does not reverse database migrations. Follow the reviewed recovery procedure
+and destination lock rather than dropping and recreating a live database.
 
 ---
 
