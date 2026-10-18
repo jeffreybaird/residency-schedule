@@ -147,6 +147,78 @@ class FairnessPriorityTest(unittest.TestCase):
         self.assertEqual(optimizer.fairness_objective(workload, {}), (0,) * 8)
 
 
+class VacationBlocksTest(unittest.TestCase):
+    def test_two_single_weeks_and_one_double_week_are_accepted(self):
+        slots = [slot(date(2026, 7, 6) + timedelta(weeks=n), 5) for n in range(8)]
+        self.assertEqual(optimizer.vacation_run_lengths(slots,
+                         ["VAC", "VAC", "OB", "VAC", "OB", "OB", "VAC", "OB"]), [2, 1, 1])
+
+    def test_weekend_cells_do_not_split_adjacent_vacation_weeks(self):
+        slots = [slot(date(2026, 7, 6), 5), slot(date(2026, 7, 11), 2, "weekend"),
+                 slot(date(2026, 7, 13), 5)]
+        self.assertEqual(optimizer.vacation_run_lengths(slots, ["VAC", "", "VAC"]), [2])
+
+    def test_float_other_rotation_and_missing_calendar_week_break_runs(self):
+        for slots, cells in [
+            ([slot(date(2026, 7, 6), 5), slot(date(2026, 7, 13), 7, "float"),
+              slot(date(2026, 7, 20), 5)], ["VAC", "FLOAT", "VAC"]),
+            ([slot(date(2026, 7, 6), 5), slot(date(2026, 7, 13), 5),
+              slot(date(2026, 7, 20), 5)], ["VAC", "OB", "VAC"]),
+            ([slot(date(2026, 7, 6), 5), slot(date(2026, 7, 20), 5)], ["VAC", "VAC"]),
+        ]:
+            with self.subTest(cells=cells):
+                self.assertEqual(optimizer.vacation_run_lengths(slots, cells), [1, 1])
+
+    def test_validator_rejects_other_four_week_vacation_shapes(self):
+        baseline = optimizer.load_schedule(BASELINE)
+        for weeks, expected in [([0, 2, 4, 6], [1, 1, 1, 1]),
+                                ([0, 1, 4, 5], [2, 2]),
+                                ([0, 1, 2, 5], [3, 1]),
+                                ([0, 1, 2, 3], [4])]:
+            with self.subTest(weeks=weeks):
+                candidate = self.with_vacation_weeks(baseline, weeks)
+                self.assertEqual(optimizer.vacation_run_lengths(candidate.slots, candidate.grid["R1-1"]), expected)
+                self.assertTrue(any(error["constraint"] == "vacation_blocks" and error.get("code") == "R1-1"
+                                    for error in optimizer.validate_schedule(candidate, baseline)))
+
+    def test_validator_accepts_required_shape_and_rejects_work_on_internal_weekend(self):
+        baseline = optimizer.load_schedule(BASELINE)
+        candidate = self.with_vacation_weeks(baseline, [0, 1, 4, 7])
+        weekend_index = next(n for n, entry in enumerate(candidate.slots) if entry["kind"] == "weekend")
+        candidate.grid["R1-1"][weekend_index] = ""
+        errors = optimizer.validate_schedule(candidate, baseline)
+        self.assertFalse(any(error["constraint"] in {"vacation_blocks", "protected_vacation_weekend"}
+                             and error.get("code") == "R1-1" for error in errors))
+        for label in ["SWD", "SWN", "HWD", "HWN", "AMB", "UG"]:
+            with self.subTest(label=label):
+                candidate.grid["R1-1"][weekend_index] = label
+                self.assertTrue(any(error["constraint"] == "protected_vacation_weekend"
+                                    and error.get("code") == "R1-1"
+                                    for error in optimizer.validate_schedule(candidate, baseline)))
+
+    def test_vacation_rule_does_not_add_protection_to_outer_weekends(self):
+        baseline = optimizer.load_schedule(BASELINE)
+        candidate = self.with_vacation_weeks(baseline, [0, 1, 4, 7])
+        weekend_indices = [n for n, entry in enumerate(candidate.slots) if entry["kind"] == "weekend"]
+        candidate.grid["R1-1"][weekend_indices[0]] = ""
+        candidate.grid["R1-1"][weekend_indices[1]] = "SWD"
+        self.assertFalse(any(error["constraint"] == "protected_vacation_weekend"
+                             and error.get("code") == "R1-1"
+                             for error in optimizer.validate_schedule(candidate, baseline)))
+
+    @staticmethod
+    def with_vacation_weeks(baseline, weeks):
+        candidate = copy.deepcopy(baseline)
+        cells = candidate.grid["R1-1"]
+        for index, label in enumerate(cells):
+            if label == "VAC":
+                cells[index] = "HGYN"
+        weekday_indices = [n for n, entry in enumerate(candidate.slots) if entry["kind"] == "weekday"]
+        for week in weeks:
+            cells[weekday_indices[week]] = "VAC"
+        return candidate
+
+
 class AnnualFixtureTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -181,6 +253,27 @@ class AnnualFixtureTest(unittest.TestCase):
         for code, original in self.baseline.grid.items():
             self.assertEqual([n for n, cell in enumerate(self.schedule.grid[code]) if cell == "FLOAT"],
                              [n for n, cell in enumerate(original) if cell == "FLOAT"])
+
+    def test_each_resident_has_two_single_vacations_and_one_protected_double_vacation(self):
+        for code, cells in self.schedule.grid.items():
+            vacation_starts = [entry["start"] for entry, label in zip(self.schedule.slots, cells)
+                               if entry["kind"] == "weekday" and label == "VAC"]
+            self.assertEqual(len(vacation_starts), 4, code)
+            groups = []
+            for start in vacation_starts:
+                if groups and start - groups[-1][-1] == timedelta(days=7):
+                    groups[-1].append(start)
+                else:
+                    groups.append([start])
+            self.assertEqual(sorted(map(len, groups)), [1, 1, 2], code)
+            projected_dates = {shift["date"] for shift in optimizer.project_resident(self.schedule.slots, cells)["shifts"]}
+            for group in groups:
+                if len(group) == 2:
+                    weekend = {group[0] + timedelta(days=5), group[0] + timedelta(days=6)}
+                    self.assertFalse(projected_dates & weekend, code)
+                    for entry, label in zip(self.schedule.slots, cells):
+                        if entry["start"] in weekend:
+                            self.assertIn(label, {"", "P"}, code)
 
     def test_preserves_class_night_weekend_and_vacation_service_budgets(self):
         for pgy, hnf, hwn, hwd in [(1, 16, 28, 28), (2, 16, 16, 40),

@@ -185,6 +185,35 @@ def education_counts(schedule):
             for c, cells in schedule.grid.items()}
 
 
+def vacation_run_lengths(slots, cells):
+    """Return maximal VAC weekday runs; only seven-day start adjacency joins weeks."""
+    runs, previous = [], None
+    for slot, cell in zip(slots, cells):
+        if slot["kind"] == "weekend":
+            continue
+        if slot["kind"] == "weekday" and cell.strip().upper() == "VAC":
+            if previous is not None and slot["start"] - previous == 7 * DAY:
+                runs[-1] += 1
+            else:
+                runs.append(1)
+            previous = slot["start"]
+        else:
+            previous = None
+    return runs
+
+
+def _vacation_pairs(slots, cells):
+    weekdays = [(slot, cell.strip().upper()) for slot, cell in zip(slots, cells) if slot["kind"] != "weekend"]
+    return [(left, right) for (left, a), (right, b) in zip(weekdays, weekdays[1:])
+            if left["kind"] == right["kind"] == "weekday" and a == b == "VAC"
+            and right["start"] - left["start"] == 7 * DAY]
+
+
+def _protected_vacation_dates(slots, cells):
+    return {day for left, right in _vacation_pairs(slots, cells)
+            for day in dates(left["end"] + DAY, right["start"] - DAY) if day.weekday() >= 5}
+
+
 def validate_schedule(schedule, baseline):
     errors = []
     expected = {f"R{y}-{n}" for y in range(1, 5) for n in range(1, 9)}
@@ -230,6 +259,9 @@ def validate_schedule(schedule, baseline):
             if totals[label] != required:
                 error("service_budget", pgy=year, rotation=label, actual=totals[label], required=required)
     for code, cells in schedule.grid.items():
+        runs = vacation_run_lengths(schedule.slots, cells)
+        if sorted(runs) != [1, 1, 2]:
+            error("vacation_blocks", code=code, lengths=runs)
         by_end = {slot["end"]: cell for slot, cell in zip(schedule.slots, cells)}
         for slot, cell in zip(schedule.slots, cells):
             if cell == "SWN" and by_end.get(slot["start"] - DAY) != "AMB":
@@ -238,6 +270,11 @@ def validate_schedule(schedule, baseline):
             projected = project_resident(schedule.slots, cells)
         except ValueError:
             continue
+        protected = _protected_vacation_dates(schedule.slots, cells)
+        working_dates = {shift["date"] for shift in projected["shifts"]}
+        if protected.intersection(working_dates):
+            error("protected_vacation_weekend", code=code,
+                  dates=sorted(str(day) for day in protected.intersection(working_dates)))
         for day, count in Counter(s["date"] for s in projected["shifts"]).items():
             if count > 1:
                 error("working_date_overlap", code=code, date=str(day), count=count)
@@ -271,6 +308,7 @@ def evaluate_schedule(schedule):
                                        required=count, actual=counts[label]))
     return dict(workloads=workloads, education=education, staffing_shortfalls=shortfalls,
                 rotation_quotas=_rotation_quotas(schedule),
+                vacation_blocks={code: vacation_run_lengths(schedule.slots, cells) for code, cells in schedule.grid.items()},
                 fairness=list(fairness_objective(workloads, education)),
                 target_deviation=education_target_deviation(education, TARGETS), quality=quality,
                 maximum_evaluable_28_day_hours=max(w["hours"] for ws in windows.values() for w in ws if w["complete"]),
@@ -378,6 +416,19 @@ def _solve_class(cp_model, baseline, year, seconds, seed, deterministic_time=1.0
         for i in weekdays:
             j = next(j for j in weekends if slots[j]["start"] == slots[i]["end"] + DAY)
             model.add(x[r, i, "AMB"] == x[r, j, "SWN"])
+        # Four weeks and exactly one VAC adjacency imply maximal runs [1,1,2].
+        # Calendar gaps and FLOAT periods do not create an adjacency.
+        model.add(sum(x[r, i, "VAC"] for i in weekdays) == 4)
+        vacation_pairs = []
+        for left, right in zip(weekdays, weekdays[1:]):
+            if slots[right]["start"] - slots[left]["start"] != 7 * DAY:
+                continue
+            pair = model.new_bool_var(f"{r}_vacation_pair_{left}")
+            model.add_min_equality(pair, [x[r, left, "VAC"], x[r, right, "VAC"]])
+            weekend = next(j for j in weekends if slots[j]["start"] == slots[left]["end"] + DAY)
+            model.add(x[r, weekend, ""] == 1).only_enforce_if(pair)
+            vacation_pairs.append(pair)
+        model.add(sum(vacation_pairs) == 1)
     # Each potential assignment has an exact independent projected footprint:
     # AMB/SWN are linked above, so their Friday boundary is never ambiguous.
     footprints = {}
@@ -510,7 +561,8 @@ def _solve_class(cp_model, baseline, year, seconds, seed, deterministic_time=1.0
     completion.parameters.fix_variables_to_their_hinted_value = True
     completion_status = completion.solve(model)
     if completion_status in (cp_model.INFEASIBLE, cp_model.MODEL_INVALID):
-        raise ValueError(f"PGY {year}: constructive model {completion.status_name(completion_status)}; output untouched")
+        raise ValueError(f"PGY {year}: fixed constructive hint rejected ({completion.status_name(completion_status)}); "
+                         "full-model feasibility not established; output untouched")
     if completion_status in (cp_model.FEASIBLE, cp_model.OPTIMAL):
         model.clear_hints()
         for index in range(len(model.proto.variables)):
@@ -596,8 +648,61 @@ def _constructive_hint(baseline, year):
             indices = per_code[code]
             for n in range(count):
                 grid[code][indices[n * len(indices) // count]] = label
-    grid = _balance_worked_weekends(grid, baseline.slots)
-    return _balance_week_blocks(grid, baseline.slots)
+    grid = _balance_week_blocks(_balance_worked_weekends(grid, baseline.slots), baseline.slots)
+    grid = _repair_vacation_blocks(grid, baseline.slots)
+    return _balance_week_blocks(_balance_worked_weekends(grid, baseline.slots), baseline.slots)
+
+
+def _repair_vacation_blocks(grid, slots):
+    """Arrange protected vacation pairs by swapping complete class week bundles.
+
+    Swaps preserve each resident's rotation, night-shift and weekend-shift totals,
+    and every period's service coverage. Only strictly improving vacation moves
+    with compatible projected shifts and modeled hours are accepted.
+    """
+    weekdays = [i for i, slot in enumerate(slots) if slot["kind"] == "weekday"]
+    weekend_for = {i: next(j for j, slot in enumerate(slots) if slot["start"] == slots[i]["end"] + DAY)
+                   for i in weekdays}
+    adjacent = [(left, right) for left, right in zip(weekdays, weekdays[1:])
+                if slots[right]["start"] - slots[left]["start"] == 7 * DAY]
+    if any(sum(cells[i] == "VAC" for i in weekdays) != 4 for cells in grid.values()):
+        raise ValueError("Constructive vacation repair requires four weeks per resident; output untouched")
+
+    def penalty(candidate):
+        total = 0
+        for cells in candidate.values():
+            pairs = [left for left, right in adjacent if cells[left] == cells[right] == "VAC"]
+            total += abs(len(pairs) - 1) + 10 * sum(cells[weekend_for[left]] in WEEKEND for left in pairs)
+        return total
+
+    current = penalty(grid)
+    while current:
+        improved = False
+        for left, right in combinations(weekdays, 2):
+            candidate = {code: list(cells) for code, cells in grid.items()}
+            for cells in candidate.values():
+                cells[left], cells[right] = cells[right], cells[left]
+                a, b = weekend_for[left], weekend_for[right]
+                cells[a], cells[b] = cells[b], cells[a]
+            after = penalty(candidate)
+            if after >= current:
+                continue
+            compatible = True
+            for cells in candidate.values():
+                projected = project_resident(slots, cells)
+                if any(n > 1 for n in Counter(shift["date"] for shift in projected["shifts"]).values()):
+                    compatible = False
+                    break
+                if any(window["complete"] and window["hours"] > 320
+                       for window in duty_windows(projected, slots[0]["start"], slots[-1]["end"])):
+                    compatible = False
+                    break
+            if compatible:
+                grid, current, improved = candidate, after, True
+                break
+        if not improved:
+            raise ValueError("No valid constructive vacation incumbent found; full-model feasibility is unproven; output untouched")
+    return grid
 
 
 def _balance_worked_weekends(grid, slots):
@@ -608,6 +713,7 @@ def _balance_worked_weekends(grid, slots):
     checked before accepting it; this is a deterministic local search.
     """
     codes = sorted(grid)
+    vacation_locked = all(sorted(vacation_run_lengths(slots, cells)) == [1, 1, 2] for cells in grid.values())
     weekends = [i for i, slot in enumerate(slots) if slot["kind"] == "weekend"]
     counts = {code: workload(project_resident(slots, cells))["weekends_worked"] for code, cells in grid.items()}
     improved = True
@@ -625,6 +731,8 @@ def _balance_worked_weekends(grid, slots):
                     cells = list(grid[code])
                     cells[old], cells[new] = "", label
                     projected = project_resident(slots, cells)
+                    if vacation_locked and _protected_vacation_dates(slots, cells).intersection(shift["date"] for shift in projected["shifts"]):
+                        continue
                     count = workload(projected)["weekends_worked"]
                     candidate_counts = [count if c == code else counts[c] for c in codes]
                     if range_deviation(candidate_counts) >= before:
@@ -647,6 +755,7 @@ def _balance_worked_weekends(grid, slots):
 def _balance_week_blocks(grid, slots):
     """Swap whole class weeks to improve weekend fairness without quota changes."""
     weekday_indices = [i for i, slot in enumerate(slots) if slot["kind"] == "weekday"]
+    vacation_locked = all(sorted(vacation_run_lengths(slots, cells)) == [1, 1, 2] for cells in grid.values())
     weekend_for = {i: next(j for j, s in enumerate(slots) if s["start"] == slots[i]["end"] + DAY)
                    for i in weekday_indices}
     def score(candidate):
@@ -660,12 +769,17 @@ def _balance_week_blocks(grid, slots):
                 cells[left], cells[right] = cells[right], cells[left]
                 a, b = weekend_for[left], weekend_for[right]
                 cells[a], cells[b] = cells[b], cells[a]
+            if vacation_locked and any(sorted(vacation_run_lengths(slots, cells)) != [1, 1, 2] for cells in candidate.values()):
+                continue
             after = score(candidate)
             if after >= current:
                 continue
             compatible = True
             for cells in candidate.values():
                 projected = project_resident(slots, cells)
+                if vacation_locked and _protected_vacation_dates(slots, cells).intersection(shift["date"] for shift in projected["shifts"]):
+                    compatible = False
+                    break
                 if any(n > 1 for n in Counter(s["date"] for s in projected["shifts"]).values()):
                     compatible = False
                     break

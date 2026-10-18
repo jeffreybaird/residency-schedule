@@ -15,7 +15,8 @@ The output remains `priv/demo/demo_schedule.csv`, consumed automatically by
 deployment process, or application scheduling semantics should change.
 
 Equal quantities within a class are **soft objectives**. Clinical staffing,
-assignment compatibility, fixed FLOAT, and the modeled duty-hour limit are hard.
+assignment compatibility, vacation structure, fixed FLOAT, and the modeled
+duty-hour limit are hard.
 Historical per-period coverage is not a constraint.
 
 ## Provisional hard staffing specification
@@ -68,6 +69,20 @@ weeks and same-class uniqueness. Its feasible maximum is 48, requiring at least
 eight fewer HGYN periods than that target and compensating educational periods
 elsewhere. This is an explicit educational-target deviation, not a relaxation
 of staffing or a claim to preserve an approved curriculum.
+
+## Vacation blocks and protected weekend
+
+Every resident must receive exactly four weekday VAC assignments arranged as
+two separate one-week blocks and one two-week block. The sorted lengths of
+maximal runs are therefore `[1, 1, 2]`. Only weekday starts exactly seven days
+apart join a run; another rotation, FLOAT, or a missing calendar week breaks it.
+Intervening weekend columns do not split adjacent vacation weeks.
+
+The Saturday and Sunday between the two weeks of the double block must contain
+no assigned working shifts, including shifts projected from other source cells.
+The generator leaves that weekend blank. This rule does not add protection to
+the outer weekends of any vacation block. Existing staffing, class budgets,
+FLOAT assignments, and duty-hour requirements remain hard.
 
 ## Objective priority
 
@@ -171,7 +186,8 @@ of that weekend period.
 Automated tests must establish parsing without unknown labels, 32 synthetic
 identities/eight per class, fixed calendar/FLOAT, staffing minima and maxima,
 PGY and slot compatibility, annual work budgets, projected night/weekend counts,
-daily-window modeled hours, and fixture import/name preservation/idempotence.
+daily-window modeled hours, vacation runs and their protected internal weekend,
+and fixture import/name preservation/idempotence.
 Test fairness metrics and priority ordering without turning equal individual
 quotas into hard feasibility conditions. An infeasible solve or failed validation
 must not overwrite the fixture or silently relax a constraint.

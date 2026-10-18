@@ -390,206 +390,206 @@
       1,
       32,
       5,
-      1,
+      0,
       88,
-      14,
+      0,
       0,
       0
     ],
     "incomplete_windows": 1760,
-    "maximum_evaluable_28_day_hours": 312,
+    "maximum_evaluable_28_day_hours": 320,
     "quality": {
       "R1-1": {
-        "demanding_triples": 7,
-        "night_to_day": 6,
-        "penalty": 31,
-        "recovery_opportunities": 2
-      },
-      "R1-2": {
-        "demanding_triples": 6,
-        "night_to_day": 6,
-        "penalty": 28,
-        "recovery_opportunities": 2
-      },
-      "R1-3": {
-        "demanding_triples": 7,
-        "night_to_day": 6,
-        "penalty": 31,
-        "recovery_opportunities": 2
-      },
-      "R1-4": {
-        "demanding_triples": 9,
-        "night_to_day": 5,
-        "penalty": 35,
-        "recovery_opportunities": 2
-      },
-      "R1-5": {
-        "demanding_triples": 8,
-        "night_to_day": 5,
-        "penalty": 32,
-        "recovery_opportunities": 2
-      },
-      "R1-6": {
-        "demanding_triples": 7,
-        "night_to_day": 5,
-        "penalty": 30,
-        "recovery_opportunities": 1
-      },
-      "R1-7": {
-        "demanding_triples": 7,
-        "night_to_day": 6,
-        "penalty": 30,
-        "recovery_opportunities": 3
-      },
-      "R1-8": {
-        "demanding_triples": 7,
-        "night_to_day": 6,
-        "penalty": 31,
-        "recovery_opportunities": 2
-      },
-      "R2-1": {
-        "demanding_triples": 9,
-        "night_to_day": 8,
-        "penalty": 41,
-        "recovery_opportunities": 2
-      },
-      "R2-2": {
-        "demanding_triples": 8,
-        "night_to_day": 8,
-        "penalty": 38,
-        "recovery_opportunities": 2
-      },
-      "R2-3": {
-        "demanding_triples": 9,
-        "night_to_day": 8,
-        "penalty": 41,
-        "recovery_opportunities": 2
-      },
-      "R2-4": {
-        "demanding_triples": 11,
-        "night_to_day": 7,
+        "demanding_triples": 13,
+        "night_to_day": 4,
         "penalty": 45,
         "recovery_opportunities": 2
       },
-      "R2-5": {
-        "demanding_triples": 10,
-        "night_to_day": 7,
-        "penalty": 42,
+      "R1-2": {
+        "demanding_triples": 9,
+        "night_to_day": 3,
+        "penalty": 30,
+        "recovery_opportunities": 3
+      },
+      "R1-3": {
+        "demanding_triples": 11,
+        "night_to_day": 6,
+        "penalty": 43,
         "recovery_opportunities": 2
       },
-      "R2-6": {
-        "demanding_triples": 9,
-        "night_to_day": 8,
-        "penalty": 42,
-        "recovery_opportunities": 1
-      },
-      "R2-7": {
-        "demanding_triples": 9,
-        "night_to_day": 7,
+      "R1-4": {
+        "demanding_triples": 11,
+        "night_to_day": 4,
         "penalty": 39,
         "recovery_opportunities": 2
       },
-      "R2-8": {
-        "demanding_triples": 9,
-        "night_to_day": 8,
-        "penalty": 41,
+      "R1-5": {
+        "demanding_triples": 13,
+        "night_to_day": 5,
+        "penalty": 47,
         "recovery_opportunities": 2
       },
-      "R3-1": {
-        "demanding_triples": 7,
-        "night_to_day": 4,
-        "penalty": 26,
-        "recovery_opportunities": 3
-      },
-      "R3-2": {
-        "demanding_triples": 9,
-        "night_to_day": 4,
-        "penalty": 31,
-        "recovery_opportunities": 4
-      },
-      "R3-3": {
-        "demanding_triples": 10,
-        "night_to_day": 5,
-        "penalty": 37,
-        "recovery_opportunities": 3
-      },
-      "R3-4": {
+      "R1-6": {
         "demanding_triples": 12,
         "night_to_day": 4,
-        "penalty": 41,
+        "penalty": 43,
+        "recovery_opportunities": 1
+      },
+      "R1-7": {
+        "demanding_triples": 13,
+        "night_to_day": 4,
+        "penalty": 44,
         "recovery_opportunities": 3
       },
-      "R3-5": {
-        "demanding_triples": 11,
+      "R1-8": {
+        "demanding_triples": 10,
         "night_to_day": 4,
+        "penalty": 36,
+        "recovery_opportunities": 2
+      },
+      "R2-1": {
+        "demanding_triples": 14,
+        "night_to_day": 7,
+        "penalty": 54,
+        "recovery_opportunities": 2
+      },
+      "R2-2": {
+        "demanding_triples": 14,
+        "night_to_day": 7,
+        "penalty": 54,
+        "recovery_opportunities": 2
+      },
+      "R2-3": {
+        "demanding_triples": 13,
+        "night_to_day": 6,
+        "penalty": 49,
+        "recovery_opportunities": 2
+      },
+      "R2-4": {
+        "demanding_triples": 15,
+        "night_to_day": 6,
+        "penalty": 55,
+        "recovery_opportunities": 2
+      },
+      "R2-5": {
+        "demanding_triples": 15,
+        "night_to_day": 6,
+        "penalty": 55,
+        "recovery_opportunities": 2
+      },
+      "R2-6": {
+        "demanding_triples": 15,
+        "night_to_day": 7,
+        "penalty": 58,
+        "recovery_opportunities": 1
+      },
+      "R2-7": {
+        "demanding_triples": 15,
+        "night_to_day": 5,
+        "penalty": 53,
+        "recovery_opportunities": 2
+      },
+      "R2-8": {
+        "demanding_triples": 15,
+        "night_to_day": 7,
+        "penalty": 58,
+        "recovery_opportunities": 1
+      },
+      "R3-1": {
+        "demanding_triples": 10,
+        "night_to_day": 5,
         "penalty": 38,
+        "recovery_opportunities": 2
+      },
+      "R3-2": {
+        "demanding_triples": 12,
+        "night_to_day": 6,
+        "penalty": 46,
+        "recovery_opportunities": 2
+      },
+      "R3-3": {
+        "demanding_triples": 15,
+        "night_to_day": 6,
+        "penalty": 56,
+        "recovery_opportunities": 1
+      },
+      "R3-4": {
+        "demanding_triples": 17,
+        "night_to_day": 4,
+        "penalty": 57,
+        "recovery_opportunities": 2
+      },
+      "R3-5": {
+        "demanding_triples": 13,
+        "night_to_day": 3,
+        "penalty": 42,
         "recovery_opportunities": 3
       },
       "R3-6": {
-        "demanding_triples": 10,
-        "night_to_day": 3,
+        "demanding_triples": 12,
+        "night_to_day": 5,
+        "penalty": 44,
+        "recovery_opportunities": 2
+      },
+      "R3-7": {
+        "demanding_triples": 14,
+        "night_to_day": 5,
+        "penalty": 50,
+        "recovery_opportunities": 2
+      },
+      "R3-8": {
+        "demanding_triples": 8,
+        "night_to_day": 5,
+        "penalty": 31,
+        "recovery_opportunities": 3
+      },
+      "R4-1": {
+        "demanding_triples": 13,
+        "night_to_day": 6,
+        "penalty": 48,
+        "recovery_opportunities": 3
+      },
+      "R4-2": {
+        "demanding_triples": 8,
+        "night_to_day": 6,
         "penalty": 33,
         "recovery_opportunities": 3
       },
-      "R3-7": {
+      "R4-3": {
+        "demanding_triples": 13,
+        "night_to_day": 6,
+        "penalty": 50,
+        "recovery_opportunities": 1
+      },
+      "R4-4": {
         "demanding_triples": 12,
         "night_to_day": 5,
         "penalty": 43,
         "recovery_opportunities": 3
       },
-      "R3-8": {
-        "demanding_triples": 9,
-        "night_to_day": 5,
-        "penalty": 34,
-        "recovery_opportunities": 3
-      },
-      "R4-1": {
-        "demanding_triples": 8,
-        "night_to_day": 7,
-        "penalty": 36,
-        "recovery_opportunities": 2
-      },
-      "R4-2": {
-        "demanding_triples": 7,
-        "night_to_day": 7,
-        "penalty": 33,
-        "recovery_opportunities": 2
-      },
-      "R4-3": {
-        "demanding_triples": 8,
-        "night_to_day": 7,
-        "penalty": 36,
-        "recovery_opportunities": 2
-      },
-      "R4-4": {
-        "demanding_triples": 9,
-        "night_to_day": 6,
-        "penalty": 37,
-        "recovery_opportunities": 2
-      },
       "R4-5": {
-        "demanding_triples": 8,
+        "demanding_triples": 13,
         "night_to_day": 6,
-        "penalty": 34,
-        "recovery_opportunities": 2
+        "penalty": 51,
+        "recovery_opportunities": 0
       },
       "R4-6": {
-        "demanding_triples": 7,
-        "night_to_day": 5,
-        "penalty": 29,
-        "recovery_opportunities": 2
-      },
-      "R4-7": {
-        "demanding_triples": 8,
-        "night_to_day": 7,
-        "penalty": 35,
+        "demanding_triples": 12,
+        "night_to_day": 4,
+        "penalty": 41,
         "recovery_opportunities": 3
       },
-      "R4-8": {
-        "demanding_triples": 8,
-        "night_to_day": 7,
-        "penalty": 36,
+      "R4-7": {
+        "demanding_triples": 15,
+        "night_to_day": 4,
+        "penalty": 51,
         "recovery_opportunities": 2
+      },
+      "R4-8": {
+        "demanding_triples": 13,
+        "night_to_day": 6,
+        "penalty": 48,
+        "recovery_opportunities": 3
       }
     },
     "rotation_quotas": {
@@ -2850,86 +2850,248 @@
         "vacation": 8
       }
     },
+    "vacation_blocks": {
+      "R1-1": [
+        2,
+        1,
+        1
+      ],
+      "R1-2": [
+        2,
+        1,
+        1
+      ],
+      "R1-3": [
+        2,
+        1,
+        1
+      ],
+      "R1-4": [
+        1,
+        2,
+        1
+      ],
+      "R1-5": [
+        2,
+        1,
+        1
+      ],
+      "R1-6": [
+        2,
+        1,
+        1
+      ],
+      "R1-7": [
+        1,
+        2,
+        1
+      ],
+      "R1-8": [
+        2,
+        1,
+        1
+      ],
+      "R2-1": [
+        2,
+        1,
+        1
+      ],
+      "R2-2": [
+        2,
+        1,
+        1
+      ],
+      "R2-3": [
+        2,
+        1,
+        1
+      ],
+      "R2-4": [
+        2,
+        1,
+        1
+      ],
+      "R2-5": [
+        2,
+        1,
+        1
+      ],
+      "R2-6": [
+        2,
+        1,
+        1
+      ],
+      "R2-7": [
+        2,
+        1,
+        1
+      ],
+      "R2-8": [
+        2,
+        1,
+        1
+      ],
+      "R3-1": [
+        2,
+        1,
+        1
+      ],
+      "R3-2": [
+        1,
+        1,
+        2
+      ],
+      "R3-3": [
+        2,
+        1,
+        1
+      ],
+      "R3-4": [
+        2,
+        1,
+        1
+      ],
+      "R3-5": [
+        1,
+        1,
+        2
+      ],
+      "R3-6": [
+        2,
+        1,
+        1
+      ],
+      "R3-7": [
+        2,
+        1,
+        1
+      ],
+      "R3-8": [
+        2,
+        1,
+        1
+      ],
+      "R4-1": [
+        2,
+        1,
+        1
+      ],
+      "R4-2": [
+        2,
+        1,
+        1
+      ],
+      "R4-3": [
+        1,
+        1,
+        2
+      ],
+      "R4-4": [
+        2,
+        1,
+        1
+      ],
+      "R4-5": [
+        2,
+        1,
+        1
+      ],
+      "R4-6": [
+        2,
+        1,
+        1
+      ],
+      "R4-7": [
+        2,
+        1,
+        1
+      ],
+      "R4-8": [
+        2,
+        1,
+        1
+      ]
+    },
     "workloads": {
       "R1-1": {
         "night_shifts": 57,
         "weekend_shifts": 45,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R1-2": {
         "night_shifts": 57,
         "weekend_shifts": 45,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R1-3": {
         "night_shifts": 57,
         "weekend_shifts": 45,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R1-4": {
         "night_shifts": 57,
         "weekend_shifts": 45,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R1-5": {
         "night_shifts": 58,
         "weekend_shifts": 44,
-        "weekends_worked": 24
+        "weekends_worked": 25
       },
       "R1-6": {
         "night_shifts": 58,
         "weekend_shifts": 44,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R1-7": {
         "night_shifts": 58,
         "weekend_shifts": 44,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R1-8": {
         "night_shifts": 58,
         "weekend_shifts": 44,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R2-1": {
         "night_shifts": 56,
         "weekend_shifts": 46,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R2-2": {
         "night_shifts": 56,
         "weekend_shifts": 46,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R2-3": {
         "night_shifts": 56,
         "weekend_shifts": 46,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R2-4": {
         "night_shifts": 56,
         "weekend_shifts": 46,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R2-5": {
         "night_shifts": 56,
         "weekend_shifts": 46,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R2-6": {
         "night_shifts": 56,
         "weekend_shifts": 46,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R2-7": {
         "night_shifts": 56,
         "weekend_shifts": 46,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R2-8": {
         "night_shifts": 56,
         "weekend_shifts": 46,
-        "weekends_worked": 23
+        "weekends_worked": 25
       },
       "R3-1": {
         "night_shifts": 63,
@@ -2974,42 +3136,42 @@
       "R4-1": {
         "night_shifts": 63,
         "weekend_shifts": 47,
-        "weekends_worked": 24
+        "weekends_worked": 26
       },
       "R4-2": {
         "night_shifts": 63,
         "weekend_shifts": 45,
-        "weekends_worked": 24
+        "weekends_worked": 26
       },
       "R4-3": {
         "night_shifts": 63,
         "weekend_shifts": 45,
-        "weekends_worked": 24
+        "weekends_worked": 26
       },
       "R4-4": {
         "night_shifts": 63,
         "weekend_shifts": 45,
-        "weekends_worked": 24
+        "weekends_worked": 26
       },
       "R4-5": {
         "night_shifts": 63,
         "weekend_shifts": 45,
-        "weekends_worked": 24
+        "weekends_worked": 26
       },
       "R4-6": {
         "night_shifts": 63,
         "weekend_shifts": 45,
-        "weekends_worked": 24
+        "weekends_worked": 26
       },
       "R4-7": {
         "night_shifts": 63,
         "weekend_shifts": 45,
-        "weekends_worked": 24
+        "weekends_worked": 26
       },
       "R4-8": {
         "night_shifts": 63,
         "weekend_shifts": 45,
-        "weekends_worked": 24
+        "weekends_worked": 26
       }
     }
   },
@@ -3507,9 +3669,39 @@
       "date": "2026-07-26"
     },
     {
+      "code": "R3-2",
+      "constraint": "vacation_blocks",
+      "lengths": [
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
       "code": "R3-8",
       "constraint": "ambulatory_weekend_pair",
       "start": "2027-01-18"
+    },
+    {
+      "code": "R2-1",
+      "constraint": "vacation_blocks",
+      "lengths": [
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "code": "R2-4",
+      "constraint": "vacation_blocks",
+      "lengths": [
+        1,
+        1,
+        1,
+        1
+      ]
     },
     {
       "code": "R1-4",
@@ -6672,6 +6864,171 @@
         "vacation": 8
       }
     },
+    "vacation_blocks": {
+      "R1-1": [
+        2,
+        1,
+        1
+      ],
+      "R1-2": [
+        1,
+        2,
+        1
+      ],
+      "R1-3": [
+        2,
+        1,
+        1
+      ],
+      "R1-4": [
+        2,
+        1,
+        1
+      ],
+      "R1-5": [
+        2,
+        1,
+        1
+      ],
+      "R1-6": [
+        2,
+        1,
+        1
+      ],
+      "R1-7": [
+        2,
+        1,
+        1
+      ],
+      "R1-8": [
+        1,
+        1,
+        2
+      ],
+      "R2-1": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "R2-2": [
+        1,
+        1,
+        2
+      ],
+      "R2-3": [
+        1,
+        1,
+        2
+      ],
+      "R2-4": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "R2-5": [
+        1,
+        2,
+        1
+      ],
+      "R2-6": [
+        1,
+        1,
+        2
+      ],
+      "R2-7": [
+        1,
+        1,
+        2
+      ],
+      "R2-8": [
+        1,
+        1,
+        2
+      ],
+      "R3-1": [
+        2,
+        1,
+        1
+      ],
+      "R3-2": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "R3-3": [
+        1,
+        1,
+        2
+      ],
+      "R3-4": [
+        1,
+        2,
+        1
+      ],
+      "R3-5": [
+        2,
+        1,
+        1
+      ],
+      "R3-6": [
+        1,
+        1,
+        2
+      ],
+      "R3-7": [
+        2,
+        1,
+        1
+      ],
+      "R3-8": [
+        1,
+        2,
+        1
+      ],
+      "R4-1": [
+        2,
+        1,
+        1
+      ],
+      "R4-2": [
+        2,
+        1,
+        1
+      ],
+      "R4-3": [
+        1,
+        2,
+        1
+      ],
+      "R4-4": [
+        1,
+        1,
+        2
+      ],
+      "R4-5": [
+        1,
+        1,
+        2
+      ],
+      "R4-6": [
+        1,
+        1,
+        2
+      ],
+      "R4-7": [
+        2,
+        1,
+        1
+      ],
+      "R4-8": [
+        1,
+        1,
+        2
+      ]
+    },
     "workloads": {
       "R1-1": {
         "night_shifts": 58,
@@ -6845,7 +7202,7 @@
       "stages": [
         {
           "bound": 1.0,
-          "deterministic_time": 0.14111890513818245,
+          "deterministic_time": 0.1545626166730031,
           "objective": "night_range",
           "status": "OPTIMAL",
           "value": 1,
@@ -6853,7 +7210,7 @@
         },
         {
           "bound": 32.0,
-          "deterministic_time": 0.1384625278543631,
+          "deterministic_time": 0.1617974793070399,
           "objective": "night_deviation",
           "status": "OPTIMAL",
           "value": 32,
@@ -6861,7 +7218,7 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.000095536975318,
+          "deterministic_time": 1.0001057687624042,
           "objective": "weekend_shift_range",
           "status": "FEASIBLE",
           "value": 1,
@@ -6869,15 +7226,15 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.0005140426712749,
+          "deterministic_time": 0.17104070218233716,
           "objective": "weekends_worked_range",
-          "status": "FEASIBLE",
-          "value": 1,
+          "status": "OPTIMAL",
+          "value": 0,
           "wall_limit_reached": false
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.000579230411918,
+          "deterministic_time": 1.0000953007985447,
           "objective": "weekend_shift_deviation",
           "status": "FEASIBLE",
           "value": 32,
@@ -6885,15 +7242,15 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.0006065712812595,
+          "deterministic_time": 0.0,
           "objective": "weekends_worked_deviation",
-          "status": "FEASIBLE",
-          "value": 14,
+          "status": "OPTIMAL",
+          "value": 0,
           "wall_limit_reached": false
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.0005362945228105,
+          "deterministic_time": 1.0000998519909818,
           "objective": "educational_target_deviation",
           "status": "FEASIBLE",
           "value": 16,
@@ -6901,7 +7258,7 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 0.64231258856147,
+          "deterministic_time": 0.8184746744951701,
           "objective": "educational_range",
           "status": "OPTIMAL",
           "value": 0,
@@ -6917,31 +7274,31 @@
         },
         {
           "bound": -4.0,
-          "deterministic_time": 1.0003656037488773,
+          "deterministic_time": 1.0004262174905274,
           "objective": "worst_sequence_penalty",
           "status": "FEASIBLE",
-          "value": 35,
+          "value": 47,
           "wall_limit_reached": false
         },
         {
-          "bound": -32.0,
-          "deterministic_time": 1.0005729649172985,
+          "bound": -270.0,
+          "deterministic_time": 1.0003024270280676,
           "objective": "total_sequence_penalty",
           "status": "FEASIBLE",
-          "value": 248,
+          "value": 327,
           "wall_limit_reached": false
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.0003538693280118,
+          "deterministic_time": 1.0002781375839453,
           "objective": "sequence_penalty_range",
           "status": "FEASIBLE",
-          "value": 7,
+          "value": 17,
           "wall_limit_reached": false
         },
         {
           "bound": -1344.0,
-          "deterministic_time": 1.0001889672784494,
+          "deterministic_time": 1.0004206076814102,
           "objective": "negative_vacation_timing_diversity",
           "status": "FEASIBLE",
           "value": -224,
@@ -6954,7 +7311,7 @@
       "stages": [
         {
           "bound": 0.0,
-          "deterministic_time": 0.14279701263553563,
+          "deterministic_time": 0.15684146073102379,
           "objective": "night_range",
           "status": "OPTIMAL",
           "value": 0,
@@ -6970,7 +7327,7 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 0.15380511229654917,
+          "deterministic_time": 0.16366595800466968,
           "objective": "weekend_shift_range",
           "status": "OPTIMAL",
           "value": 0,
@@ -6978,7 +7335,7 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 0.16495610269615285,
+          "deterministic_time": 0.17591962040426384,
           "objective": "weekends_worked_range",
           "status": "OPTIMAL",
           "value": 0,
@@ -7009,8 +7366,8 @@
           "wall_limit_reached": false
         },
         {
-          "bound": -12.0,
-          "deterministic_time": 1.0001101180361607,
+          "bound": -18.0,
+          "deterministic_time": 1.0001182251522387,
           "objective": "educational_range",
           "status": "FEASIBLE",
           "value": 0,
@@ -7025,32 +7382,32 @@
           "wall_limit_reached": false
         },
         {
-          "bound": -4.0,
-          "deterministic_time": 1.0004852571470355,
+          "bound": -41.0,
+          "deterministic_time": 1.0003933939349785,
           "objective": "worst_sequence_penalty",
           "status": "FEASIBLE",
-          "value": 45,
+          "value": 58,
           "wall_limit_reached": false
         },
         {
-          "bound": -328.0,
-          "deterministic_time": 1.000330587913457,
+          "bound": -295.0,
+          "deterministic_time": 1.0002281198733063,
           "objective": "total_sequence_penalty",
           "status": "FEASIBLE",
-          "value": 329,
+          "value": 436,
           "wall_limit_reached": false
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.0004842004565426,
+          "deterministic_time": 1.0003824468737286,
           "objective": "sequence_penalty_range",
           "status": "FEASIBLE",
-          "value": 7,
+          "value": 9,
           "wall_limit_reached": false
         },
         {
           "bound": -1344.0,
-          "deterministic_time": 1.0004993687712584,
+          "deterministic_time": 1.0003161081542387,
           "objective": "negative_vacation_timing_diversity",
           "status": "FEASIBLE",
           "value": -224,
@@ -7063,7 +7420,7 @@
       "stages": [
         {
           "bound": 0.0,
-          "deterministic_time": 0.14302364439276283,
+          "deterministic_time": 0.15451758929502354,
           "objective": "night_range",
           "status": "OPTIMAL",
           "value": 0,
@@ -7079,7 +7436,7 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.0002122806575637,
+          "deterministic_time": 1.000101916691929,
           "objective": "weekend_shift_range",
           "status": "FEASIBLE",
           "value": 2,
@@ -7087,7 +7444,7 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 0.1525793937017859,
+          "deterministic_time": 0.1689990000264835,
           "objective": "weekends_worked_range",
           "status": "OPTIMAL",
           "value": 0,
@@ -7095,7 +7452,7 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.0004215555869966,
+          "deterministic_time": 1.000095203562565,
           "objective": "weekend_shift_deviation",
           "status": "FEASIBLE",
           "value": 28,
@@ -7119,7 +7476,7 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 0.2905933383125056,
+          "deterministic_time": 0.3429939164807964,
           "objective": "educational_range",
           "status": "OPTIMAL",
           "value": 0,
@@ -7135,31 +7492,31 @@
         },
         {
           "bound": -4.0,
-          "deterministic_time": 1.0003222496746151,
+          "deterministic_time": 1.0003744828567553,
           "objective": "worst_sequence_penalty",
           "status": "FEASIBLE",
-          "value": 43,
+          "value": 57,
           "wall_limit_reached": false
         },
         {
           "bound": -328.0,
-          "deterministic_time": 1.0004802089469378,
+          "deterministic_time": 1.0004652240184388,
           "objective": "total_sequence_penalty",
           "status": "FEASIBLE",
-          "value": 283,
+          "value": 364,
           "wall_limit_reached": false
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.0001315165832847,
+          "deterministic_time": 1.0003595405761305,
           "objective": "sequence_penalty_range",
           "status": "FEASIBLE",
-          "value": 17,
+          "value": 26,
           "wall_limit_reached": false
         },
         {
           "bound": -1344.0,
-          "deterministic_time": 1.0004363967299768,
+          "deterministic_time": 1.000510060253193,
           "objective": "negative_vacation_timing_diversity",
           "status": "FEASIBLE",
           "value": -224,
@@ -7172,7 +7529,7 @@
       "stages": [
         {
           "bound": 0.0,
-          "deterministic_time": 0.1463577508632992,
+          "deterministic_time": 0.15616401584899348,
           "objective": "night_range",
           "status": "OPTIMAL",
           "value": 0,
@@ -7188,7 +7545,7 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.0000951105774147,
+          "deterministic_time": 1.0002203687690359,
           "objective": "weekend_shift_range",
           "status": "FEASIBLE",
           "value": 2,
@@ -7196,7 +7553,7 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 0.16101770870255933,
+          "deterministic_time": 0.1705001447624498,
           "objective": "weekends_worked_range",
           "status": "OPTIMAL",
           "value": 0,
@@ -7204,7 +7561,7 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.0004100138292813,
+          "deterministic_time": 1.0002983449604677,
           "objective": "weekend_shift_deviation",
           "status": "FEASIBLE",
           "value": 28,
@@ -7228,7 +7585,7 @@
         },
         {
           "bound": 0.0,
-          "deterministic_time": 0.7452751287901562,
+          "deterministic_time": 0.45788521950751065,
           "objective": "educational_range",
           "status": "OPTIMAL",
           "value": 0,
@@ -7243,32 +7600,32 @@
           "wall_limit_reached": false
         },
         {
-          "bound": -4.0,
-          "deterministic_time": 1.0004743724285967,
+          "bound": -5.0,
+          "deterministic_time": 1.0004340877003082,
           "objective": "worst_sequence_penalty",
           "status": "FEASIBLE",
-          "value": 37,
+          "value": 51,
           "wall_limit_reached": false
         },
         {
-          "bound": -144.0,
-          "deterministic_time": 1.0004927275287576,
+          "bound": -234.0,
+          "deterministic_time": 1.0003976585536298,
           "objective": "total_sequence_penalty",
           "status": "FEASIBLE",
-          "value": 276,
+          "value": 365,
           "wall_limit_reached": false
         },
         {
           "bound": 0.0,
-          "deterministic_time": 1.000505626676126,
+          "deterministic_time": 1.000484873406601,
           "objective": "sequence_penalty_range",
           "status": "FEASIBLE",
-          "value": 8,
+          "value": 18,
           "wall_limit_reached": false
         },
         {
           "bound": -1344.0,
-          "deterministic_time": 1.0004558102894172,
+          "deterministic_time": 1.0004934585047869,
           "objective": "negative_vacation_timing_diversity",
           "status": "FEASIBLE",
           "value": -224,
