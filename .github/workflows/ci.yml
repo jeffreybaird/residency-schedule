@@ -55,6 +55,7 @@ jobs:
           ruby-version: '3.3'
       - run: ruby test/deploy/release_artifacts_test.rb
       - run: ruby test/deploy/database_recovery_test.rb
+      - run: ruby test/deploy/production_backup_test.rb
       - name: Validate synthetic demo schedule
         run: python3 -m unittest discover -s test -p '*_test.py'
       - run: mix deps.get

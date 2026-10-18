@@ -1,0 +1,12 @@
+[Unit]
+Description=Check residency schedule backup freshness every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=yes
+Unit=residency-schedule-backup-monitor.service
+
+[Install]
+WantedBy=timers.target

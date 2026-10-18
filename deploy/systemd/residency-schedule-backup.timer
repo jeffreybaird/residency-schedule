@@ -1,0 +1,12 @@
+[Unit]
+Description=Back up residency schedules every five minutes
+
+[Timer]
+OnCalendar=*-*-* *:00/5:00
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=yes
+Unit=residency-schedule-backup.service
+
+[Install]
+WantedBy=timers.target

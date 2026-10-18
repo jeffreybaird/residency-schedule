@@ -1,0 +1,30 @@
+[Unit]
+Description=Independently verify off-host residency schedule backups
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+LimitCORE=0
+WorkingDirectory=/
+ExecStart=/usr/local/bin/ruby /usr/local/lib/residency-schedule-backup/production_backup.rb check /etc/residency-schedule-backup/reader.json /var/lib/residency-schedule-backup-monitor/status.json
+TimeoutStartSec=165s
+TimeoutStopSec=5s
+KillMode=control-group
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=tmpfs
+ReadWritePaths=/var/lib/residency-schedule-backup-monitor
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
