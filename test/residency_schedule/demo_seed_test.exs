@@ -123,6 +123,57 @@ defmodule ResidencySchedule.DemoSeedTest do
       assert current_headers == baseline_headers
     end
 
+    test "each imported resident has two single vacation weeks and one protected double week", %{
+      residents: residents
+    } do
+      for resident <- residents do
+        vacations =
+          resident.rotations
+          |> Enum.filter(&(&1.rotation_type == :vacation))
+          |> Enum.sort_by(& &1.start_date, Date)
+
+        assert length(vacations) == 4, resident.position_code
+        assert Enum.all?(vacations, &(Date.diff(&1.end_date, &1.start_date) == 4))
+
+        blocks =
+          vacations
+          |> Enum.with_index()
+          |> Enum.group_by(fn {rotation, index} ->
+            Date.to_gregorian_days(rotation.start_date) - 7 * index
+          end)
+          |> Map.values()
+
+        assert Enum.sort(Enum.map(blocks, &length/1)) == [1, 1, 2], resident.position_code
+
+        [{first_week, _}, {_second_week, _}] = Enum.find(blocks, &(length(&1) == 2))
+
+        protected_days =
+          Date.range(Date.add(first_week.start_date, 5), Date.add(first_week.start_date, 6))
+
+        projected =
+          resident.rotations
+          |> Enum.map(fn rotation ->
+            %Rotation{
+              id: rotation.slot_index,
+              schedule_resident_id: resident.position_code,
+              rotation_type: Atom.to_string(rotation.rotation_type),
+              start_date: rotation.start_date,
+              end_date: rotation.end_date
+            }
+          end)
+          |> StrongNightBoundaries.project([], [])
+
+        for day <- protected_days do
+          refute Enum.any?(projected, fn rotation ->
+                   rotation.rotation_type not in ["float", "vacation", "post_call"] and
+                     Date.compare(rotation.start_date, day) != :gt and
+                     Date.compare(rotation.end_date, day) != :lt
+                 end),
+                 resident.position_code
+        end
+      end
+    end
+
     test "meets documented weekday staffing in each class and weekend staffing", %{
       residents: residents
     } do
