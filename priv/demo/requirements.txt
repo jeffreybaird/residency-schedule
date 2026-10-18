@@ -1,0 +1,4 @@
+# Only required for regeneration; deployment imports the checked-in CSV.
+ortools==9.15.6755
+# Patched for GHSA-7gcm-g887-7qv7; satisfies OR-Tools' >=6.33.1,<6.34 range.
+protobuf==6.33.5
