@@ -1,8 +1,9 @@
 # Online backup tooling verification
 
-Status: final code/CI accepted; authoritative 58-test suite, restricted-role,
-restore and final-hash blocked-query cleanup checks are green. Scheduled timer
-evidence and final operational closeout remain pending. Production backups are inactive.
+Status: accepted tooling; synthetic operational rehearsal passed. The final 59-test
+suite, restricted-role, restore, blocked-query cleanup, scheduled cadence and
+final reader smoke checks passed. Original tooling CI passed; follow-up-head CI
+is pending. Production backups remain inactive.
 Branch: `codex/phase0-production-backups`, based on merged PR #79 at
 `9d87d544eed3d1565b822b63683c2341b442530c`.
 
@@ -125,14 +126,13 @@ network disabled, a read-only repository and real Linux `flock`. The recovery
 assertion count differs from earlier macOS runs because of platform-conditional
 cases; its frozen test bytes were unchanged. Ruby syntax, changed CI YAML parsing
 and `git diff --check` passed. Actual systemd, PostgreSQL and official AWS CLI
-rehearsal evidence remains a separate acceptance gate.
+rehearsal evidence was subsequently recorded in the sections below.
 
 After source/test owners completed partitioned correcting formatting without
 changing Elixir files or the frozen Ruby hashes, the runner's read-only checks
 also passed: formatting, compilation with warnings as errors, strict Credo
 (320 files, 69 checks, zero issues), unused-dependency checking and a fresh Hex
-advisory audit. The source helper, CI change and operational outcomes still
-require the final independent diff review.
+advisory audit. The final independent diff reviews are recorded below.
 
 ## Actual restricted-role red and green
 
@@ -191,8 +191,8 @@ services successfully. The runner independently verified their loaded hashes,
 success/status zero, zero soft/hard core limits, four source bounding capabilities
 with only ambient UID switching, and empty monitor capability sets. The accepted
 readonly unit fixture also passed again under the final source properties.
-The final concurrent capture and restore subsequently passed as detailed below;
-the real blocked-query deadline check remains pending.
+The concurrent capture, restore and blocked-query deadline checks subsequently
+passed as detailed below.
 
 The initial concurrent fixture updated related note/auth/provenance markers but
 did not advance a sequence. Before final rehearsal the writer added explicit
@@ -318,8 +318,8 @@ The runner then recorded authoritative green on `1e937d…` and the corrected
 suite: **55 tests, 1,106 assertions, zero failures/errors/skips**, with the
 successive-run case separately passing all nine assertions. The actual blocked
 query and real healthy runtime evidence above therefore complement a clean
-offline contract; a final path-trust hardening revision remains in its own
-accepted-test pipeline before the scheduled timer rehearsal.
+offline contract. The path-trust hardening pipeline below followed before the
+scheduled timer rehearsal.
 
 ## Final path-trust hardening
 
@@ -335,13 +335,13 @@ positive control and the reviewed `root:false` exception.
 The runner recorded three expected failures against `1e937d…`. The private-path
 unit preserves actual inner file/directory modes but scopes ownership/external
 temporary-directory simulation for portable testing; it is not an OS privilege
-proof. Unmocked root-service capture remains required. An optional Minitest mock
+proof. Unmocked root-service captures below supplied integration evidence. An optional Minitest mock
 dependency was removed in favor of standard Ruby scoped method wrappers that
 restore the original methods in `ensure`, supporting both Minitest 5 and 6.
 The final accepted 58-test suite is
 `e8ddafabbf0476f7b9b3e19505c842855dbb090069e1486272ccef6c78d40ad8`.
 
-Final helper candidate
+Path-hardened helper
 `1295c017ad3dab1d165a180f623b8c0586ead5522070c3a8b386bf5d647a78bb`
 pins all five canonical executables and validates production root-owned ancestry,
 preserving the configured fixed-runuser policy and deploy-owned lock exception.
@@ -353,7 +353,7 @@ and twenty assertions. The final full suite then passed **58 tests and 1,126
 assertions**, with zero failures/errors/skips on patched Linux Ruby 3.3.12/Resolv
 0.3.2, network disabled and a read-only repository. Frozen source/test hashes
 matched before and after. Syntax, diff, read-only formatting and a fresh Hex
-advisory audit also passed. Final-hash runtime and timer gates remain pending.
+advisory audit also passed. Final-hash runtime and timer results follow below.
 
 The runner then replayed the accepted blocked-query fixture against final helper
 `1295c017…`: actual wait observed, helper exit in 8.899 seconds, server backends
@@ -363,12 +363,88 @@ zero after bounded rollback and private-config cleanup. The reviewer accepted
 final code/CI and frozen hashes, confirmed old PR #79 source/tests unchanged, and
 reviewed eleven new audit entries: all ambiguous overlaps matching authorized
 role-owned work, with no unauthorized finding or exclusive violation. Scheduled
-timer evidence and final operational documentation remain separate gates.
+timer evidence and operational closeout follow below.
 
 The final exact helper's normal root service and full monitor verification also
 passed unmocked: snapshot `17:34:00.907689Z`, publication complete
 `17:34:11.945487Z` (11.037798 seconds), monitor healthy age 29.576536969 seconds.
 Runtime-only reviewed timers started at `17:34:30Z`, with planned scheduled source
-firings at 17:35, 17:40 and 17:45 UTC. This observation remains pending until the
-third point is fully verified and the temporary units are stopped/removed; no
-competing captures or probes run during that window.
+firings at 17:35, 17:40 and 17:45 UTC. Those three points were independently
+verified; the additional fourth firing and completed cleanup are recorded below.
+No competing captures or probes ran during that window.
+
+## Scheduled cadence and final closeout
+
+The scheduled source/reader evidence is anchored to helper `1295c017…` and the
+reviewed unchanged timer units. Runtime-only timers started at 17:34:30 UTC on
+October 17, 2026; all times below are UTC on that date.
+
+| Scheduled snapshot | Publication complete | Independent full verification |
+| --- | --- | --- |
+| 17:35:04.566551 | 17:35:29.217770 | 17:36:14.134108 |
+| 17:40:05.171242 | 17:40:28.822807 | 17:41:16.203111 |
+| 17:45:05.089528 | 17:45:30.285494 | 17:46:17.590026 |
+
+The first two snapshot intervals were 300.604691 and 299.918286 seconds. Both
+services exited zero, and protected source/reader status copies were retained.
+One additional scheduled source point fired before shutdown:
+`17:50:04.542523Z` to `17:50:28.855555Z`; its metadata was preserved explicitly,
+rather than describing the run as exactly three firings. Timers were then
+stopped. These synthetic measurements demonstrate the configured cadence and
+freshness checks, not an ongoing production RPO guarantee or a separate physical
+monitoring failure domain.
+
+Final review found one reader classification edge case: duplicate keys in a newer
+receipt raised a generic error instead of allowing the existing narrow malformed
+candidate fallback. The writer added a regression that first verifies an older
+point, reads the newer duplicate-key receipt and requires healthy older fallback.
+The runner recorded meaningful RED (one test, five assertions, one failure).
+The reviewer accepted frozen suite
+`3a3ccbd6baa67b2c58bb4e7f09d90e61ce5e31847311cb1da87f20fc21b0c071`.
+Final helper
+`a47ef4cb33f0797c8eb5a6f7803f8f7fa65c8caba119b2bbdc68f0dd678c1c09`
+changes only `Error` to `JSON::ParserError` for duplicate JSON keys versus the
+saved exact `1295c017…` baseline. Duplicate configuration still fails closed;
+archive, source, timeout and cadence behavior are unchanged.
+
+Authoritative final GREEN: **59 tests, 1,136 assertions**, zero failures/errors/
+skips, with frozen hashes unchanged before/after. The new selected case passed
+all ten assertions; syntax, formatting, whitespace and a fresh Hex audit passed.
+Both original commit `03d502f` CI runs (`39054652722` and `39054649260`) passed;
+those results are explicitly distinct from the follow-up fix head's CI.
+
+After the scheduled window, the final helper passed an unmocked fresh source and
+full monitor smoke: snapshot `18:48:43.675515Z`, completion `18:48:53.904633Z`
+(10.229118 seconds), full verification at `18:49:09.172216Z`, healthy age
+25.496663735 seconds; both service exits were zero. The fresh point avoided
+confusing intentionally stopped timers' aging historical points with a failure
+of the final reader.
+
+At 18:49:45 UTC, both timers were stopped, all four temporary `/run` unit files
+were removed and systemd reloaded, the loopback object fixture stopped, and only
+the guarded isolated PostgreSQL cluster on port 5544 was stopped with fast
+shutdown. Original staging stayed active. Recovery data/database, encrypted
+copies, protected configurations and the synthetic test key remain retained;
+plaintext/passfiles had already been removed. Safe fixture operation counts were
+GET 108, HEAD 26, LIST 58 and PUT 34, all status 200. No paid bucket, real
+production backup key, production schedule or external alert was activated.
+
+## Delivery after PR #81 merged
+
+PR #81 merged October 18 as `9b9e6cc`. The reviewed reader correction and final
+operational evidence remained local when the conflict-only commit was pushed;
+they are carried forward on `codex/phase0-backup-activation`, based on that merge.
+Source and accepted-test hashes still match `a47ef4cb…` and `3a3ccbd6…` exactly.
+Independent review again accepted the one-exception-class fix and unchanged
+fallback/configuration contracts, including the authorized native stash-apply
+audit observation. No dependency or unrelated behavior changed.
+
+Fresh authoritative checks on the new base passed: production **59 tests /
+1,136 assertions**, recovery **43 / 642**, release artifacts **49 / 10,666**;
+all zero failures/errors/skips on patched Linux Ruby 3.3.12/Resolv 0.3.2, image
+`135e4c6c…`, network disabled and repository read-only. Hashes matched before and
+after. Syntax, read-only formatting, working/staged whitespace and a fresh Hex
+advisory audit passed. No live probe or rehearsal repeat was performed. Broader
+OS/AWS/GPG advisories were not reaudited for this one-line follow-up; the existing
+documented workstation PostgreSQL exclusions remain. Follow-up CI is distinct
+from the original PR's green runs.

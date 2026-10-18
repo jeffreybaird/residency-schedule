@@ -1,7 +1,9 @@
 # Phase 0 production backup preparation — October 17, 2026
 
 Status: tooling passed its accepted tests and independent code/security review;
-the bounded synthetic scheduling proof is in progress. Production backup
+the bounded synthetic scheduling proof and final reader closeout passed.
+PR #81 merged; the final reader fix and evidence are being delivered in the
+activation-preparation follow-up. Production backup
 scheduling, off-host storage/key custody and alerting are not activated.
 Production RTO/RPO and PITR remain unproven.
 
@@ -11,6 +13,25 @@ Branch `codex/phase0-production-backups` starts at `main` commit
 The requester authorized proceeding to this next task. The earlier
 [database recovery record](phase0-database-recovery.md) remains the evidence for
 the isolated synthetic restore; it does not certify production backup coverage.
+
+[PR #81](https://github.com/jeffreybaird/residency-schedule/pull/81) merged on
+October 18, 2026 at 14:37:52 UTC as `9b9e6ccf6523c83203ae38add62d3453162ab81a`.
+It includes the initial tooling and conflict-resolution commit `4259b04`.
+Both initial commit `03d502f`'s
+[PR CI](https://github.com/jeffreybaird/residency-schedule/actions/runs/39054652722)
+and [push CI](https://github.com/jeffreybaird/residency-schedule/actions/runs/39054649260)
+passed. The final reader fix and operational closeout had remained local when
+the conflict-only merge was pushed. They are preserved on
+`codex/phase0-backup-activation`, based on merged `main`, for a focused follow-up.
+The requester explicitly authorized unsigned delivery after 1Password signing
+failed; Git's permanent signing configuration remains unchanged. Fresh local
+verification and final-head CI must certify this follow-up separately.
+
+The [activation packet](production-backup-activation.md) records the owner's
+October 18 choices: a dedicated private Spaces bucket, a dedicated 1Password key
+item plus protected offline recovery copy, and email alerts to the designated
+HEY address. These are preparation choices; no paid bucket, production key,
+production backup service or test message has been created or activated.
 
 ## Verified predecessor rollout
 
@@ -161,7 +182,8 @@ completion. The exact reader unit
 performed full ciphertext verification and reported healthy at snapshot age
 57.811 seconds, with an empty capability set. Both loaded units have hard and
 soft core-dump limits of zero. These are synthetic loopback transport results;
-concurrent-write restore, deadline and recurring-schedule evidence remain pending.
+concurrent-write restore, deadline and recurring-schedule evidence were still
+pending at that stage; their subsequent results appear below.
 The temporary private native-debug logs were removed after diagnosis.
 That exploratory synthetic point took 10.188 seconds from snapshot start to
 completion: encrypted dump 70,365 bytes, encrypted manifest 60,716 bytes and
@@ -230,7 +252,7 @@ deployment lock, left no client processes and preserved its prior verified
 status, but the PostgreSQL backend remained blocked for more than the five-second
 cleanup grace while the blocker still held the lock. The bounded synthetic
 blocker then rolled back normally. This is a real cleanup defect; it is not a
-passing deadline test. Scheduling remains off pending the role-owned timeout fix
+passing deadline test. Scheduling remained off pending the role-owned timeout fix
 and authoritative repetition. No production database settings were changed.
 
 The timeout-only candidate
@@ -281,7 +303,55 @@ completed it at 17:34:11.945487 UTC (**11.038 seconds**). The exact monitor full
 verified it and reported healthy at age **29.577 seconds**. The reviewed timers
 were started only as temporary `/run/systemd/system` units on staging at
 17:34:30 UTC, for three scheduled source points at 17:35, 17:40 and 17:45 UTC
-with one-minute monitor checks. Results and timer shutdown remain pending.
+with one-minute monitor checks. Three consecutive scheduled points passed:
+
+| Snapshot start (UTC) | Publication duration | Full verification completed (UTC) |
+| --- | --- | --- |
+| 17:35:04.566551 | 24.651 seconds | 17:36:14.134108 |
+| 17:40:05.171242 | 23.652 seconds | 17:41:16.203111 |
+| 17:45:05.089528 | 25.196 seconds | 17:46:17.590026 |
+
+Snapshot intervals were 300.605 and 299.918 seconds. Full verification completed
+at snapshot ages approximately 69.568, 71.032 and 72.500 seconds, within the
+900-second threshold. Subsequent version-pinned checks remained healthy.
+One additional point fired at 17:50:04.542523 UTC and completed at
+17:50:28.855555 UTC before the stop command completed. Both timers and their
+services were then inactive with successful exits. The reader still reported
+the third, fully verified point as healthy at age 331.216 seconds; the fourth
+point awaits the separate final-reader check. Protected status/receipt copies
+retain these identities. The third source status had already advanced to the
+fourth point, so its completion time was recovered from the exact third receipt
+in the protected synthetic fixture and matched to the reader's point identity.
+
+Final review then found a reader-only edge case: duplicate JSON keys in a newer
+receipt stopped discovery instead of allowing the previous valid point. A new
+accepted regression reproduced the failure. The focused fix classifies duplicate
+keys as a JSON parse error, preserving strict rejection while allowing the
+existing reader fallback. The final helper is
+`a47ef4cb33f0797c8eb5a6f7803f8f7fa65c8caba119b2bbdc68f0dd678c1c09`;
+the frozen suite is
+`3a3ccbd6baa67b2c58bb4e7f09d90e61ce5e31847311cb1da87f20fc21b0c071`.
+The runner recorded **59 tests / 1,136 assertions**, zero failures/errors/skips,
+with syntax, diff, read-only formatting and a fresh Hex audit passing. The
+one-exception-class delta changes no capture, archive, deadline or timer behavior.
+The three-point schedule remains anchored to `1295c017…`. After the timers
+stopped, the exact final helper captured a fresh synthetic point at
+18:48:43.675515 UTC and completed publication at 18:48:53.904633 UTC
+(10.229 seconds). Its normal reader service fully verified that same point at
+18:49:09.172216 UTC, reporting healthy at snapshot age 25.497 seconds. Both
+services exited successfully. This also superseded the extra 17:50 point; it
+does not relabel the scheduled observations as final-hash cadence evidence.
+
+Cleanup completed at 18:49:45 UTC. Both timers were stopped, all four temporary
+`/run/systemd/system` unit files were removed and systemd reloaded. The loopback
+S3 fixture was stopped. After checking the exact isolated cluster identifier,
+PostgreSQL on port 5544 was stopped with a fast, clean shutdown. The original
+staging application remained active. Synthetic encrypted objects, protected
+metadata/configuration, the operator key and isolated restored database files
+were retained; plaintext restore copies and temporary passwords had already
+been removed. The fixture's final aggregate log contained 108 GET, 26 HEAD,
+58 LIST and 34 PUT operations, all HTTP 200; these counts include exploratory
+probes and checks, not only the scheduled window.
 
 The source rehearsal, object fixture and reader unit share the staging machine.
 Separate reader credentials/state and a capability-free unit demonstrate the
@@ -334,7 +404,8 @@ reviewed retention process exists.
 
 The accepted test/review pipeline, real restricted-role capture, concurrent
 synthetic restore, explicit permissions and backend-cleanup checks have passed.
-The three scheduled captures, final operational closeout and CI remain pending.
+The three scheduled captures and final operational closeout passed. Final-head
+CI remains pending.
 Production activation additionally requires a
 concrete approved storage/cost policy, durable key recovery, retention and alert
 destination, restricted production restore handling and an owner go/no-go.
