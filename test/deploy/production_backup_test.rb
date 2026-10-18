@@ -847,6 +847,22 @@ class ProductionBackupTest < Minitest::Test
     assert_equal older, check.fetch('point_prefix')
   end
 
+  def test_duplicate_keys_in_new_receipt_do_not_hide_previous_valid_recovery_point
+    older = seed_point(age: 180, suffix: 'older')
+    assert_equal older, check.fetch('point_prefix')
+    newer = seed_point(age: 30, suffix: 'newer-duplicate')
+    mutate_state do |state|
+      object = state.fetch('objects').fetch(newer + 'complete.json')
+      body = Base64.strict_decode64(object.fetch('body'))
+      object['body'] = Base64.strict_encode64(body.sub('{', '{"schema_version":1,'))
+    end
+    reset_events
+
+    assert_equal older, check.fetch('point_prefix')
+    assert events.any? { |event| event['operation'] == 'get-object' && event['key'] == newer + 'complete.json' }
+    assert_equal older, JSON.parse(File.read(@status)).fetch('point_prefix')
+  end
+
   def test_selects_newest_valid_snapshot_not_newest_completion_time
     older = seed_point(age: 180, suffix: 'older')
     newer = seed_point(age: 60, suffix: 'newer')

@@ -33,7 +33,7 @@ module ProductionBackup
 
   class UniqueObject < Hash
     def []=(key, value)
-      raise Error, 'duplicate key' if key?(key)
+      raise JSON::ParserError, 'duplicate key' if key?(key)
 
       super
     end
