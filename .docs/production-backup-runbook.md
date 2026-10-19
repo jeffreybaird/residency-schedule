@@ -1,7 +1,9 @@
 # Production logical backup and off-host checks
 
-Status: implementation contract under independent review. No paid storage,
-production key, production role, service or timer is activated by these files.
+Status: tooling contracts are accepted; synthetic restore, deadline and
+scheduled-cadence rehearsals passed. Original tooling CI passed; follow-up-head
+CI is pending and tracked in the operational record. No paid storage, production key, production role,
+service or timer is activated by these files.
 Operational decisions and results belong in
 [the production backup record](phase0-production-backups.md).
 
