@@ -119,12 +119,13 @@ closed again. The software checks passed at 10:41–10:42 UTC on October 19 usin
 GnuPG 2.5.24 / libgcrypt 1.12.4. See the
 [custody verification record](production-backup-tooling-verification.md#production-recipient-custody--october-19).
 
-**Owner custody confirmation remains pending:** retain and test the image's
-`Offline container password` independently outside both 1Password and the drive,
-then safely eject/disconnect the drive. Merely keeping that password in the
-vault cannot recover the image if vault access is lost. The owner has been asked
-to test the independent record without sharing it in chat. Until confirmed,
-offline custody is incomplete. Only the public recipient may go on production;
+**Owner custody confirmation completed October 19:** the owner confirmed that
+the independently retained image password record was tested and the drive was
+disconnected. Subsequent local checks found neither the external volume nor the
+recovery image mounted. The independent password test and physical disconnection
+are owner attestations, distinct from the software checks above. Retain that
+password outside both 1Password and the drive so loss of vault access does not
+prevent offline recovery. Only the public recipient may go on production;
 the reader needs neither public nor secret GPG material. A workstation temporary
 directory does not count as durable offline custody.
 

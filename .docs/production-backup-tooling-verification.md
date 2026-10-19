@@ -498,9 +498,12 @@ using its vault-held password and checked against the saved private export. It
 was then closed again. No plaintext challenge was written outside the image;
 no production database backup or timer activation occurred.
 
-Owner confirmation of an independently retained/tested image password and safe
-physical drive disconnection remains pending. The recovery instructions and
-vault item explicitly preserve those open gates. These operator-side checks do
+On October 19, the owner confirmed: “Password record tested; drive disconnected.”
+This attests to testing the independently retained image password and safely
+disconnecting the drive. Subsequent local checks found neither the external
+volume nor the recovery image mounted; those observations do not independently
+prove the physical disconnection or password test. Custody preparation is
+complete. These operator-side checks do
 not replace real provider access/versioning checks, production-source client
 compatibility verification, protected production restore approval or the final
 production go/no-go.
