@@ -448,3 +448,59 @@ advisory audit passed. No live probe or rehearsal repeat was performed. Broader
 OS/AWS/GPG advisories were not reaudited for this one-line follow-up; the existing
 documented workstation PostgreSQL exclusions remain. Follow-up CI is distinct
 from the original PR's green runs.
+
+## Production recipient custody — October 19
+
+The owner identified the 1Password vault and external volume privately. The
+volume was writable but unencrypted. A new 128 MiB AES-256 encrypted disk image
+was created there without replacing existing files. An earlier empty,
+unencrypted image created through Disk Utility in Documents was preserved and
+was not used for custody. Private material exists only in the designated vault
+and encrypted image; no production data or private key went to a server or Git.
+
+Interactive-terminal execution resolved the missing 1Password CLI prompt;
+noninteractive item requests had timed out. The dedicated custody item stores
+the private/public exports, key passphrase, revocation certificate and image
+unlock password. Secret payloads traveled through private stdin/memory, never
+command arguments or tool output. Private files inside the image use mode 600,
+with keyring directories mode 700.
+
+GnuPG was updated from 2.5.21 to 2.5.24, and libgcrypt from 1.12.2 to 1.12.4,
+using Homebrew core. The vendor's
+[libgcrypt release](https://lists.gnupg.org/pipermail/gnupg-announce/2026q3/000510.html)
+lists fixes including RSA-PSS salt/input handling (T8377, T8391) and OAEP padding
+validation (T8390); the new recipient uses Ed25519/cv25519. Homebrew also updated
+required libraries and dependents including GPGME, GPGME++ and Poppler. No
+repository dependency or application service changed. This was a targeted
+runtime update, not a complete workstation security audit.
+
+New production fingerprint:
+`CDED2E523FD7AC8F0E2A9924D7CA786EE4D64F0A`, expiry
+`2027-10-19T10:35:15Z`. The v4 fingerprint and encryption subkey are distinct from
+the synthetic key. Private export/readback from 1Password matched the encrypted
+drive's export before recovery checks.
+
+The first public-only import exposed a local GPG-agent path limit. A controlled
+public-key probe failed with an agent socket path of 104 bytes and passed at
+84 bytes. Short, fresh verification homes resolved it; the production key was
+not regenerated. A subsequent test harness comparison incorrectly treated equal
+binary bytes as unequal because Ruby's captured UTF-8 string differed from the
+generated ASCII-8BIT string. A separate diagnostic confirmed both 64-byte values
+matched exactly. The corrected comparison uses raw bytes, and both recovery
+checks were rerun in new keyrings rather than accepting the failed attempt.
+
+At `2026-10-19T10:41:20Z`, a public-only home had no private key and encrypted a
+fresh synthetic 64-byte challenge. Separate empty homes then imported the vault
+copy and drive copy, verified the fingerprint and independently decrypted the
+exact original bytes. Isolated agents holding private material were stopped.
+At `10:42:32Z`, the encrypted image was closed, confirmed encrypted, reopened
+using its vault-held password and checked against the saved private export. It
+was then closed again. No plaintext challenge was written outside the image;
+no production database backup or timer activation occurred.
+
+Owner confirmation of an independently retained/tested image password and safe
+physical drive disconnection remains pending. The recovery instructions and
+vault item explicitly preserve those open gates. These operator-side checks do
+not replace real provider access/versioning checks, production-source client
+compatibility verification, protected production restore approval or the final
+production go/no-go.

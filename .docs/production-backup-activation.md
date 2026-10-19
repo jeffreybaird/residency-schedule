@@ -94,16 +94,39 @@ code/configuration recovery copy is deleted by this work.
 
 ## Key custody and alerts
 
-The owner selected a dedicated 1Password item plus a protected offline recovery
-copy. Proposed item title: `Residency Schedule production backup decryption`.
-Choose the actual vault and an owner-controlled encrypted offline destination
-before generation. Generate a production recipient separately from the expiring
-synthetic test key; do not reuse that key. Save the secret key, recovery material,
-fingerprint and expiry/rotation instructions privately. Import and decrypt a
-known ciphertext using each recovery copy in an isolated operator session before
-declaring custody complete. Only the public recipient goes on production; the
-reader gets neither public nor secret GPG material. A private temporary directory
-on the workstation is not durable offline custody.
+The owner selected the actual vault and external recovery volume. On October 19,
+the dedicated item `Residency Schedule production backup decryption` was created
+in that vault. Because the external volume is unencrypted, recovery files were
+placed inside a new AES-256 encrypted disk image rather than directly on it.
+The secret export, its passphrase, revocation certificate, public recipient and
+recovery instructions are protected in the vault and encrypted image. No private
+key was placed on a droplet, in the repository or in a plaintext temporary file
+outside the encrypted image.
+
+Production recipient fingerprint:
+`CDED2E523FD7AC8F0E2A9924D7CA786EE4D64F0A`.
+The certification primary is Ed25519, with a cv25519 encryption subkey; expiry is
+October 19, 2027 at 10:35:15 UTC. This is a new production recipient, distinct
+from the earlier expiring synthetic rehearsal key. Retain its private material
+for existing backups even after encryption expiry, and review renewal before
+that date. No public recipient has yet been installed for production backups.
+
+A public-only keyring with no secret keys encrypted a synthetic challenge.
+Fresh, separate keyrings imported the vault export and drive export, and each
+recovered the exact original bytes. The encrypted image was then closed,
+reopened using its vault-held password, checked against the saved export and
+closed again. The software checks passed at 10:41–10:42 UTC on October 19 using
+GnuPG 2.5.24 / libgcrypt 1.12.4. See the
+[custody verification record](production-backup-tooling-verification.md#production-recipient-custody--october-19).
+
+**Owner custody confirmation remains pending:** retain and test the image's
+`Offline container password` independently outside both 1Password and the drive,
+then safely eject/disconnect the drive. Merely keeping that password in the
+vault cannot recover the image if vault access is lost. The owner has been asked
+to test the independent record without sharing it in chat. Until confirmed,
+offline custody is incomplete. Only the public recipient may go on production;
+the reader needs neither public nor secret GPG material. A workstation temporary
+directory does not count as durable offline custody.
 
 The selected alert address is held in private operational configuration, not
 committed to this repository. Alerts must contain only fixed service/health
