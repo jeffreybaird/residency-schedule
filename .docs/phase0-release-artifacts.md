@@ -19,6 +19,17 @@ alone; the exact candidate branch is enabled explicitly so rehearsal works
 before the dispatcher reaches the default branch.
 Existing demo-only seeding remains separate from production.
 
+Production and demo promote automatically once staging passes; neither GitHub
+environment carries a required-reviewer gate. The `prod` gate used for the
+initial PR #78 rollout was removed on 2026-10-20: approval was only available
+from a desktop browser, and because each deployment job holds the
+`deploy-<target>` concurrency group, an unapproved production job did not
+simply wait; GitHub cancelled every later push's production job behind it while
+demo kept deploying, so `main` silently stopped reaching production. Do not
+reintroduce a required reviewer on `prod` or `demo` without also handling that
+queue behaviour. Branch restrictions on the environments remain the control
+that keeps candidate branches off production and demo.
+
 Build jobs receive no server `.env`, `SECRET_KEY_BASE`, provider token or other
 runtime deployment secret. The release packager excludes Mix's generated
 `releases/COOKIE` distribution credential. Package and legacy snapshot capture

@@ -211,9 +211,12 @@ Under **Settings → Secrets and variables → Actions**, configure transport ac
 | `DEMO_DEPLOY_HOST` | Demo droplet IP or domain | May share a host with production, but uses a separate installation and database |
 | `DEPLOY_SSH_KEY` | Full private key PEM | Generate with `ssh-keygen -t ed25519 -C "deploy@github-actions" -f ~/.ssh/residency_deploy -N ""`, use the private key file |
 
-Create **Settings → Environments → `prod`, `demo` and `staging`**, with the desired branch
-restrictions and deployment approvals. Each deployment job selects its target
-environment. Configure runtime values there:
+Create **Settings → Environments → `prod`, `demo` and `staging`**, with branch
+restrictions limiting `prod` and `demo` to `main`. Do not add required reviewers:
+a deployment waiting for approval holds its concurrency group, and GitHub
+cancels every later push's deployment job behind it, so production silently
+stops updating (see [the release runbook](.docs/phase0-release-artifacts.md)).
+Each deployment job selects its target environment. Configure runtime values there:
 
 | Environment secret | Required for | Notes |
 |---|---|---|
