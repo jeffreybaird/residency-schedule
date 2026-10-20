@@ -875,4 +875,187 @@ defmodule ResidencySchedule.RotationsTest do
       assert top.shared_shifts == length(Rotations.list_effective_co_service_days(ra.id, rc.id))
     end
   end
+
+  describe "list_coworker_shared_shift_counts/2" do
+    setup %{schedule: sched} do
+      # rc shares 2023-07-03..07 oncology with ra; rd shares 2023-07-05..07.
+      {:ok, rc} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R3-1",
+          residency_year: 3,
+          schedule_number: 1,
+          name: "Pat"
+        })
+
+      {:ok, rd} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R2-1",
+          residency_year: 2,
+          schedule_number: 1,
+          name: "Morgan"
+        })
+
+      {:ok, _} =
+        Rotations.insert_rotations(rc.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-03],
+            end_date: ~D[2023-07-07],
+            rotation_type: :oncology
+          }
+        ])
+
+      {:ok, _} =
+        Rotations.insert_rotations(rd.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-05],
+            end_date: ~D[2023-07-07],
+            rotation_type: :oncology
+          }
+        ])
+
+      %{rc: rc, rd: rd}
+    end
+
+    test "a from_date before every shared day matches the full-year counts", %{ra: ra} do
+      result = Rotations.list_coworker_shared_shift_counts(ra.id, ~D[2023-07-01])
+
+      assert result == Rotations.list_coworker_shared_shift_counts(ra.id)
+      assert Enum.map(result, & &1.shared_shifts) == [5, 3]
+    end
+
+    test "counts only shared days on or after a mid-range from_date", %{
+      ra: ra,
+      rc: rc,
+      rd: rd
+    } do
+      result = Rotations.list_coworker_shared_shift_counts(ra.id, ~D[2023-07-06])
+
+      # Both have two remaining days; the tie is broken by residency year (rd is R2).
+      assert Enum.map(result, &{&1.resident.id, &1.shared_shifts}) == [
+               {rd.id, 2},
+               {rc.id, 2}
+             ]
+    end
+
+    test "includes shared days falling exactly on from_date", %{ra: ra, rc: rc, rd: rd} do
+      result = Rotations.list_coworker_shared_shift_counts(ra.id, ~D[2023-07-07])
+
+      assert Enum.map(result, &{&1.resident.id, &1.shared_shifts}) == [
+               {rd.id, 1},
+               {rc.id, 1}
+             ]
+    end
+
+    test "excludes coworkers whose shared days are all before from_date", %{
+      schedule: sched,
+      ra: ra,
+      rc: rc,
+      rd: rd
+    } do
+      # re shares only 2023-07-03..04 with ra.
+      {:ok, re} =
+        Residents.insert_resident(sched.id, %{
+          position_code: "R1-1",
+          residency_year: 1,
+          schedule_number: 1,
+          name: "Rowan"
+        })
+
+      {:ok, _} =
+        Rotations.insert_rotations(re.id, [
+          %{
+            slot_index: 0,
+            start_date: ~D[2023-07-03],
+            end_date: ~D[2023-07-04],
+            rotation_type: :oncology
+          }
+        ])
+
+      assert Enum.any?(
+               Rotations.list_coworker_shared_shift_counts(ra.id),
+               &(&1.resident.id == re.id)
+             )
+
+      result = Rotations.list_coworker_shared_shift_counts(ra.id, ~D[2023-07-05])
+
+      assert Enum.map(result, &{&1.resident.id, &1.shared_shifts}) == [
+               {rd.id, 3},
+               {rc.id, 3}
+             ]
+    end
+
+    test "breaks remaining-count ties by schedule number within a residency year", %{
+      schedule: sched,
+      ra: ra,
+      rc: rc,
+      rd: rd
+    } do
+      # Insert the higher schedule number first so insertion order cannot pass.
+      [later, earlier] =
+        for number <- [3, 2] do
+          {:ok, resident} =
+            Residents.insert_resident(sched.id, %{
+              position_code: "R1-#{number}",
+              residency_year: 1,
+              schedule_number: number,
+              name: "Sage #{number}"
+            })
+
+          {:ok, _} =
+            Rotations.insert_rotations(resident.id, [
+              %{
+                slot_index: 0,
+                start_date: ~D[2023-07-05],
+                end_date: ~D[2023-07-07],
+                rotation_type: :oncology
+              }
+            ])
+
+          resident
+        end
+
+      result = Rotations.list_coworker_shared_shift_counts(ra.id, ~D[2023-07-06])
+
+      assert Enum.map(result, &{&1.resident.id, &1.shared_shifts}) == [
+               {earlier.id, 2},
+               {later.id, 2},
+               {rd.id, 2},
+               {rc.id, 2}
+             ]
+    end
+
+    test "returns an empty list when from_date is after every shared day", %{ra: ra} do
+      assert Rotations.list_coworker_shared_shift_counts(ra.id, ~D[2023-07-08]) == []
+    end
+
+    test "excludes the resident themselves", %{ra: ra} do
+      result = Rotations.list_coworker_shared_shift_counts(ra.id, ~D[2023-07-01])
+      refute Enum.any?(result, &(&1.resident.id == ra.id))
+    end
+
+    test "excludes coworkers with no shared shifts", %{ra: ra, rb: rb} do
+      result = Rotations.list_coworker_shared_shift_counts(ra.id, ~D[2023-07-01])
+      refute Enum.any?(result, &(&1.resident.id == rb.id))
+    end
+
+    test "each count matches the effective co-service days on or after from_date", %{
+      ra: ra,
+      rc: rc,
+      rd: rd
+    } do
+      from_date = ~D[2023-07-04]
+      result = Rotations.list_coworker_shared_shift_counts(ra.id, from_date)
+
+      for coworker <- [rc, rd] do
+        expected =
+          ra.id
+          |> Rotations.list_effective_co_service_days(coworker.id)
+          |> Enum.count(&(Date.compare(&1.date, from_date) != :lt))
+
+        assert Enum.find(result, &(&1.resident.id == coworker.id)).shared_shifts == expected
+      end
+    end
+  end
 end

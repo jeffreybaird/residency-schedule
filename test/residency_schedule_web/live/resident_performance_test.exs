@@ -69,7 +69,7 @@ defmodule ResidencyScheduleWeb.ResidentPerformanceTest do
     data = ScheduleFixtures.seed_mini_schedule()
 
     expected =
-      Rotations.list_coworker_shared_shift_counts(data.clare.id)
+      Rotations.list_coworker_shared_shift_counts(data.clare.id, ~D[2026-07-05])
       |> ResidentDisplayNames.apply_to_entries()
 
     assert expected != []

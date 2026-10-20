@@ -357,7 +357,10 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
   end
 
   describe "coworkers tab" do
+    @coworkers_current_date ~D[2024-01-15]
+
     setup %{conn: conn} do
+      put_current_date(@coworkers_current_date)
       seed_schedule()
       resident = ResidencySchedule.Residents.get_resident_by_position!("R4-1")
       {:ok, view, _html} = live(conn, "/residents/#{resident.id}")
@@ -368,17 +371,20 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       assert has_element?(view, "button[phx-value-tab='coworkers']")
     end
 
-    test "switching to the coworkers tab shows the coworkers table", %{view: view} do
-      html = view |> element("button[phx-value-tab='coworkers']") |> render_click()
-
-      assert html =~ "Shared Shifts"
-      assert has_element?(view, "#coworkers-tab")
-    end
-
-    test "renders a row per coworker with shared shifts", %{view: view, resident: resident} do
+    test "switching to the coworkers tab shows the remaining shared shifts table", %{view: view} do
       view |> element("button[phx-value-tab='coworkers']") |> render_click()
 
-      counts = Rotations.list_coworker_shared_shift_counts(resident.id)
+      assert has_element?(view, "#coworkers-tab")
+      assert has_element?(view, "#coworkers-tab th", "Shared Shifts Remaining")
+    end
+
+    test "renders a row per coworker with shared shifts remaining", %{
+      view: view,
+      resident: resident
+    } do
+      view |> element("button[phx-value-tab='coworkers']") |> render_click()
+
+      counts = Rotations.list_coworker_shared_shift_counts(resident.id, @coworkers_current_date)
       assert counts != []
 
       for coworker <- counts do
@@ -386,17 +392,117 @@ defmodule ResidencyScheduleWeb.ResidentLiveTest do
       end
     end
 
+    test "each row displays the shared shifts remaining as of the current date", %{
+      view: view,
+      resident: resident
+    } do
+      view |> element("button[phx-value-tab='coworkers']") |> render_click()
+
+      for coworker <-
+            Rotations.list_coworker_shared_shift_counts(resident.id, @coworkers_current_date) do
+        assert coworker_row_count(view, coworker.resident.id) ==
+                 Integer.to_string(coworker.shared_shifts)
+      end
+    end
+
+    test "coworkers whose shared shifts are all in the past have no row", %{
+      view: view,
+      resident: resident
+    } do
+      view |> element("button[phx-value-tab='coworkers']") |> render_click()
+
+      past_only =
+        resident.id
+        |> Rotations.list_coworker_shared_shift_counts()
+        |> Enum.filter(&all_shared_days_before?(resident.id, &1.resident.id))
+
+      assert past_only != []
+
+      for coworker <- past_only do
+        refute has_element?(view, "#coworker-row-#{coworker.resident.id}")
+      end
+    end
+
+    test "rows are ordered by shared shifts remaining, most to least", %{
+      view: view,
+      resident: resident
+    } do
+      view |> element("button[phx-value-tab='coworkers']") |> render_click()
+
+      expected_ids =
+        resident.id
+        |> Rotations.list_coworker_shared_shift_counts(@coworkers_current_date)
+        |> Enum.map(&"coworker-row-#{&1.resident.id}")
+
+      assert expected_ids != []
+      assert coworker_row_ids(view) == expected_ids
+    end
+
     test "clicking a coworker row navigates to the compare page for that pair", %{
       view: view,
       resident: resident
     } do
       view |> element("button[phx-value-tab='coworkers']") |> render_click()
-      top = hd(Rotations.list_coworker_shared_shift_counts(resident.id))
+
+      top =
+        hd(Rotations.list_coworker_shared_shift_counts(resident.id, @coworkers_current_date))
 
       view |> element("#coworker-row-#{top.resident.id}") |> render_click()
 
       assert_redirect(view, "/compare?a=#{resident.id}&b=#{top.resident.id}")
     end
+
+    test "shows the empty state when no shared shifts remain this year", %{
+      conn: conn,
+      resident: resident
+    } do
+      put_current_date(~D[2025-01-01])
+      {:ok, view, _html} = live(conn, "/residents/#{resident.id}")
+      view |> element("button[phx-value-tab='coworkers']") |> render_click()
+
+      refute has_element?(view, "[id^='coworker-row-']")
+
+      assert has_element?(
+               view,
+               "#coworkers-tab",
+               "No remaining shared shifts with any other resident."
+             )
+    end
+  end
+
+  defp put_current_date(date) do
+    previous = Application.get_env(:residency_schedule, :current_date)
+    Application.put_env(:residency_schedule, :current_date, date)
+
+    on_exit(fn ->
+      if previous,
+        do: Application.put_env(:residency_schedule, :current_date, previous),
+        else: Application.delete_env(:residency_schedule, :current_date)
+    end)
+  end
+
+  defp coworker_row_ids(view) do
+    view
+    |> element("#coworkers-tab")
+    |> render()
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.query("[id^='coworker-row-']")
+    |> LazyHTML.attribute("id")
+  end
+
+  defp coworker_row_count(view, coworker_id) do
+    view
+    |> element("#coworker-row-#{coworker_id} td:last-child")
+    |> render()
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.text()
+    |> String.trim()
+  end
+
+  defp all_shared_days_before?(resident_id, coworker_id) do
+    resident_id
+    |> Rotations.list_effective_co_service_days(coworker_id)
+    |> Enum.all?(&(Date.compare(&1.date, @coworkers_current_date) == :lt))
   end
 
   describe "multi-year career" do
