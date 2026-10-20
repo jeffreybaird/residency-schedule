@@ -87,6 +87,15 @@ defmodule ResidencyScheduleWeb.ImportedResidentNamesTest do
   end
 
   test "rotation coworker modal and coworkers tab show the preferred names", ctx do
+    previous = Application.get_env(:residency_schedule, :current_date)
+    Application.put_env(:residency_schedule, :current_date, ~D[2026-12-01])
+
+    on_exit(fn ->
+      if previous,
+        do: Application.put_env(:residency_schedule, :current_date, previous),
+        else: Application.delete_env(:residency_schedule, :current_date)
+    end)
+
     {:ok, view, _} = live(ctx.conn, "/residents/#{ctx.iris.id}")
     view |> element("#rotation-entry-strong_gynecology-0-2026-12-28-2026-12-29") |> render_click()
     assert has_element?(view, "#shift-coworkers-list", "Juniper Vale")

@@ -1059,26 +1059,45 @@ defmodule ResidencySchedule.Rotations do
   Exempt from doctest — hits the database. See `RotationsTest`.
   """
   def list_coworker_shared_shift_counts(schedule_resident_id) do
+    rank_coworker_shared_shift_counts(schedule_resident_id, fn _day -> true end)
+  end
+
+  @doc """
+  Lists every coworker of a schedule resident who shares at least one service
+  day with them on or after `from_date` (inclusive), each as
+  `%{resident: ScheduleResident, shared_shifts: count}` where the count covers
+  only those remaining days. Uses the same effective co-service rules and sort
+  order as `list_coworker_shared_shift_counts/1`.
+
+  Exempt from doctest — hits the database. See `RotationsTest`.
+  """
+  def list_coworker_shared_shift_counts(schedule_resident_id, %Date{} = from_date) do
+    rank_coworker_shared_shift_counts(schedule_resident_id, &on_or_after_date?(&1, from_date))
+  end
+
+  defp rank_coworker_shared_shift_counts(schedule_resident_id, day_filter) do
     schedule_id = Residents.get_resident!(schedule_resident_id).schedule_id
     segments = effective_segments_for_schedule(schedule_id)
 
     schedule_id
     |> Residents.list_residents_for_schedule()
     |> Enum.reject(&(&1.id == schedule_resident_id))
-    |> Enum.map(&build_coworker_shared_count(schedule_resident_id, &1, segments))
+    |> Enum.map(&build_coworker_shared_count(schedule_resident_id, &1, segments, day_filter))
     |> Enum.reject(&(&1.shared_shifts == 0))
     |> Enum.sort_by(&coworker_shared_count_sort_key/1)
   end
 
-  defp build_coworker_shared_count(schedule_resident_id, coworker, segments) do
+  defp build_coworker_shared_count(schedule_resident_id, coworker, segments, day_filter) do
     shared_shifts =
       segments
       |> Map.get(schedule_resident_id, [])
       |> co_service_days(Map.get(segments, coworker.id, []))
-      |> length()
+      |> Enum.count(day_filter)
 
     %{resident: coworker, shared_shifts: shared_shifts}
   end
+
+  defp on_or_after_date?(%{date: date}, from_date), do: Date.compare(date, from_date) != :lt
 
   defp coworker_shared_count_sort_key(%{resident: coworker, shared_shifts: shared_shifts}) do
     {-shared_shifts, coworker.residency_year, coworker.schedule_number}

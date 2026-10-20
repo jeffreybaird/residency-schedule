@@ -113,7 +113,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
         Tracing.phase(:resident_coworkers, fn ->
           coworkers =
             socket.assigns.resident.id
-            |> Rotations.list_coworker_shared_shift_counts()
+            |> Rotations.list_coworker_shared_shift_counts(socket.assigns.today)
             |> ResidentDisplayNames.apply_to_entries()
 
           Tracing.count(:results, length(coworkers))
@@ -859,12 +859,12 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
         <div id="coworkers-tab">
           <%= if @coworkers == [] do %>
             <p class="text-gray-500 dark:text-gray-300 py-8 text-center">
-              No shared shifts with any other resident this year.
+              No remaining shared shifts with any other resident.
             </p>
           <% else %>
             <p class="mb-3 text-sm text-gray-500 dark:text-gray-300">
-              Residents {@resident.name} shares shifts with, most to least. Select a row to compare
-              their schedules side by side.
+              Residents with remaining shared shifts with {@resident.name}, most to least. Select
+              a row to compare their schedules side by side.
             </p>
             <div class="rounded-xl border-2 border-gray-300 dark:border-gray-600 overflow-hidden">
               <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
@@ -874,7 +874,7 @@ defmodule ResidencyScheduleWeb.ResidentLive.Show do
                       Resident
                     </th>
                     <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">
-                      Shared Shifts
+                      Shared Shifts Remaining
                     </th>
                   </tr>
                 </thead>
