@@ -212,7 +212,14 @@ defmodule ResidencySchedule.Importer.DateUpdater do
       Enum.each(fragments, fn fragment ->
         insert_rotation(
           id,
-          Map.take(fragment, [:rotation_type, :slot_index, :start_date, :end_date])
+          Map.take(fragment, [
+            :rotation_type,
+            :slot_index,
+            :start_date,
+            :end_date,
+            :source_kind,
+            :source_metadata
+          ])
         )
       end)
     end)
@@ -250,7 +257,12 @@ defmodule ResidencySchedule.Importer.DateUpdater do
     attrs =
       Map.update!(attrs, :slot_index, fn index -> if index < 0, do: index, else: -index - 1 end)
 
-    %Rotation{} |> Rotation.changeset(Map.put(attrs, :schedule_resident_id, id)) |> Repo.insert!()
+    %Rotation{
+      source_kind: Map.get(attrs, :source_kind, "csv"),
+      source_metadata: Map.get(attrs, :source_metadata, %{})
+    }
+    |> Rotation.changeset(Map.put(attrs, :schedule_resident_id, id))
+    |> Repo.insert!()
   end
 
   defp update_range(parsed) do

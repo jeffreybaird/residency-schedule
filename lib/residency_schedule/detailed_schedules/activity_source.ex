@@ -1,5 +1,5 @@
 defmodule ResidencySchedule.DetailedSchedules.ActivitySource do
-  @moduledoc "An occurrence of a detailed task in an imported workbook."
+  @moduledoc "An occurrence of a detailed task with a format-independent source reference."
   use Ecto.Schema
 
   schema "detailed_activity_sources" do
@@ -7,6 +7,7 @@ defmodule ResidencySchedule.DetailedSchedules.ActivitySource do
     belongs_to :batch, ResidencySchedule.DetailedSchedules.ImportBatch
     field :source_sheet, :string
     field :source_cell, :string
+    field :source_reference, :map, default: %{}
     field :raw_staff, :string
     field :display_name, :string
     field :previous_name, :string

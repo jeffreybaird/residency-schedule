@@ -1118,6 +1118,8 @@ defmodule ResidencySchedule.Rotations do
           start_date: r.start_date,
           end_date: r.end_date,
           slot_index: r.slot_index,
+          source_kind: Map.get(r, :source_kind, "legacy"),
+          source_metadata: Map.get(r, :source_metadata, %{}),
           inserted_at: now,
           updated_at: now
         }

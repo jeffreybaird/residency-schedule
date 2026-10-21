@@ -34,7 +34,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   """
   def import_csv(csv_binary) do
     with {:ok, document} <- Csv.parse(csv_binary, []),
-         {:ok, result} <- persist(document.residents, document.academic_year) do
+         {:ok, result} <- persist(document.residents, document.academic_year, source_kind: "csv") do
       {:ok, result, document.warnings}
     end
   end
@@ -69,7 +69,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
 
   def commit(parsed_residents, academic_year, links) do
     case ResidentLinker.validate(links, parsed_residents, Residents.list_residents()) do
-      {:ok, links} -> persist(parsed_residents, academic_year, links)
+      {:ok, links} -> persist_linked(parsed_residents, academic_year, links, "csv")
       {:error, messages} -> {:error, Enum.join(messages, "; ")}
     end
   end
@@ -187,11 +187,43 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   """
   def persist([], _academic_year), do: {:error, "No residents or rotations to import"}
 
-  def persist(parsed_residents, academic_year), do: persist(parsed_residents, academic_year, %{})
+  def persist(parsed_residents, academic_year), do: persist(parsed_residents, academic_year, [])
+
+  @doc """
+  Persists domain resident input with a known originating writer.
+
+  `:source_kind` accepts `"csv"`, `"builder"`, `"editor"` or `"legacy"`.
+  It defaults to `"legacy"` because unannotated callers do not establish origin.
+  This metadata does not enable an adapter's write path. Database operation;
+  covered by integration tests instead of doctests.
+  """
+  def persist(parsed_residents, academic_year, options) do
+    with {:ok, source_kind} <- source_kind(options) do
+      persist_linked(parsed_residents, academic_year, %{}, source_kind)
+    end
+  end
+
+  defp source_kind(options) when is_list(options) do
+    if Keyword.keyword?(options) and Enum.all?(Keyword.keys(options), &(&1 == :source_kind)) do
+      validate_source_kind(Keyword.get(options, :source_kind, "legacy"))
+    else
+      {:error, "Choose a known rotation source kind."}
+    end
+  end
+
+  defp source_kind(_options), do: {:error, "Choose a known rotation source kind."}
+
+  defp validate_source_kind(kind) when kind in ["csv", "builder", "editor", "legacy"],
+    do: {:ok, kind}
+
+  defp validate_source_kind(_kind), do: {:error, "Choose a known rotation source kind."}
 
   # Links map position codes to an existing person id or :new; rows absent
   # from the map fall back to matching an existing person by exact name.
-  defp persist(parsed_residents, academic_year, links) do
+  defp persist_linked([], _academic_year, _links, _source_kind),
+    do: {:error, "No residents or rotations to import"}
+
+  defp persist_linked(parsed_residents, academic_year, links, source_kind) do
     label = Schedules.academic_year_label(academic_year)
 
     Repo.transaction(fn ->
@@ -211,7 +243,10 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
           {:ok, schedule_resident} =
             Residents.insert_resident(schedule.id, resident_attrs(parsed, links))
 
-          {:ok, rot_count} = Rotations.insert_rotations(schedule_resident.id, parsed.rotations)
+          rotations =
+            Enum.map(parsed.rotations, &Map.put(&1, :source_kind, source_kind))
+
+          {:ok, rot_count} = Rotations.insert_rotations(schedule_resident.id, rotations)
           {r_acc + 1, rot_acc + rot_count}
         end)
 

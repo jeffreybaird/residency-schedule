@@ -1,7 +1,10 @@
 # Schedule adapter migration release plan
 
-Status: Phase 1 adapter boundary implemented locally; Phase 2 additive schema is
-next. The [old recovery program is canceled](schedule-adapter-recovery-decision.md).
+Status: Phase 1 adapter boundary merged in
+[PR #87](https://github.com/jeffreybaird/residency-schedule/pull/87). The first
+Phase 2 delivery implements [source provenance](schedule-source-provenance.md)
+locally; mappings and classifications are next.
+The [old recovery program is canceled](schedule-adapter-recovery-decision.md).
 See the [Phase 1 contract](schedule-adapter-phase-1.md) and
 [verification record](schedule-adapter-phase-1-verification.md) for checks and limits.
 Recorded: October 15, 2026.
@@ -12,8 +15,9 @@ import contract, pluggable adapters, and a shared effective-schedule service.
 Release the transition in small, tested increments. Preserve current
 behavior before introducing new import semantics.
 
-Phase 1 retains existing persistence and rendering. The next model work is
-Phase 2's additive schema. The old Phase 0 recovery program is retired, with no
+Phase 1 retains existing persistence and rendering. Phase 2's source-provenance
+schema and backfill are implemented locally; production execution remains separate.
+The old Phase 0 recovery program is retired, with no
 pending recovery deliverables or gates. Production deployment and data migration
 remain separate actions on a reviewed implementation.
 
@@ -63,12 +67,24 @@ Preserve these invariants throughout the transition:
 
 | Phase | Scope | Acceptance |
 | --- | --- | --- |
-| 1: Adapter boundary (implemented locally) | Shared import document, CSV/QGenda adapters, shared previews and builder domain input. Existing persistence and rendering retained; JSON is preview-only. | Existing formats retain their behavior; a new adapter can preview without storage or view changes. |
-| 2: Additive schema (next) | Generic provenance, mappings, classifications and timing metadata; small restartable backfills. Keep existing columns and IDs. | Records, notes and references reconcile; repeating the backfill makes no changes. |
+| 1: Adapter boundary (merged) | Shared import document, CSV/QGenda adapters, shared previews and builder domain input. Existing persistence and rendering retained; JSON is preview-only. | Existing formats retain their behavior; a new adapter can preview without storage or view changes. |
+| 2: Additive schema (in progress) | Source provenance and its backfill implemented locally; mappings, classifications and timing metadata remain. Keep existing columns and IDs. | Records, notes and references reconcile; repeating each backfill makes no changes. |
 | 3: Compare new reads | Compute new effective schedules alongside existing reads; users receive existing results. | No unexplained differences in schedule meaning; acceptable measured performance. |
 | 4: Enable new reads | Enable a selected schedule, then expand consistently across consumers. | Representative views, exports, statistics and assistant queries agree. |
 | 5: Enable new writes | Common writer for existing formats first, then deliberate enablement of new adapters. | Reimport, correction, concurrency and stale-preview tests pass; writes match the preview. |
 | 6: Retire compatibility | Remove old paths and obsolete columns in a separate change. | All consumers migrated and representative import/edit validation passes. |
+
+Deliver Phase 2 in small schema-plus-backfill increments:
+
+1. [Source provenance](schedule-source-provenance.md): extend existing batch,
+   activity-source and rotation records; preserve known facts and explicitly mark
+   unknown historical origins as legacy. Schema and bounded backfill implemented
+   locally; [validation](schedule-source-provenance-verification.md) uses synthetic data.
+2. Mappings and classifications, with their own backfill and validation.
+3. Timing metadata, with its own backfill and validation.
+
+Backfill is part of each increment, not a separate final phase. Each increment
+keeps current reads and writes in use while adding the new representation.
 
 Keep each delivery reviewable with its tests and observed results. There is no
 Phase 0 closeout, minimum observation period or required number of real import
