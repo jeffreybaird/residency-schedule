@@ -1,6 +1,7 @@
 defmodule ResidencySchedule.Importer.QgendaPreview do
   @moduledoc "Read-only reconciliation of QGenda detail against a selected academic-year roster."
-  alias ResidencySchedule.Importer.{Csv, QgendaParser}
+  alias ResidencySchedule.Importer.Adapters.Qgenda
+  alias ResidencySchedule.Importer.{Csv, ImportDocument}
   alias ResidencySchedule.{Residents, Schedules}
 
   @known_tasks [
@@ -102,17 +103,29 @@ defmodule ResidencySchedule.Importer.QgendaPreview do
   Database function; covered by integration tests instead of doctests.
   """
   def prepare(binary, options) do
-    year = Keyword.get(options, :academic_year)
+    with {:ok, document} <- Qgenda.parse(binary, options) do
+      prepare_document(document, options)
+    end
+  end
+
+  @doc """
+  Reconciles domain activity input with the selected existing roster.
+  Source fingerprints retain the legacy activity projection. New adapters keep
+  their preview-only status through reconciliation.
+  Database operation; covered by integration tests instead of doctests.
+  """
+  def prepare_document(%ImportDocument{kind: :activities} = document, options) do
+    year = document.academic_year
 
     with true <- is_integer(year),
          schedule when not is_nil(schedule) <- Schedules.get_by_year(year),
-         {:ok, parsed} <- QgendaParser.parse(binary),
          roster = Residents.list_residents_for_schedule(schedule.id),
          {:ok, crosswalk} <- resolve_crosswalk(options, year, roster) do
       aliases = Map.merge(crosswalk.aliases, Keyword.get(options, :aliases, %{}))
 
       preview =
-        parsed
+        document
+        |> Map.take([:assignments, :header_dates, :notes, :unlinked_notes])
         |> build(roster, aliases: aliases)
         |> Map.put(:warnings, crosswalk.warnings)
         |> Map.put(:crosswalk_source, crosswalk.source)
@@ -123,12 +136,15 @@ defmodule ResidencySchedule.Importer.QgendaPreview do
           Enum.map(roster, &Map.take(&1, [:id, :resident_id, :position_code, :name]))
         )
 
-      {:ok, preview}
+      {:ok, mark_preview_only(preview, document.preview_only)}
     else
       {:error, reason} -> {:error, reason}
       _ -> {:error, "Select an existing academic-year schedule for the preview."}
     end
   end
+
+  defp mark_preview_only(preview, true), do: Map.put(preview, :preview_only, true)
+  defp mark_preview_only(preview, false), do: preview
 
   @doc """
   Reconciles parsed assignments with an explicit roster without database access.

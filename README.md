@@ -370,6 +370,6 @@ Every push to `main` deploys automatically. For maintenance — logs, recovery p
 | [QGenda preview](.docs/qgenda-preview.md), [daily assignments](.docs/qgenda-activities.md) | Identity matching, additive imports, display rules, and replacement limits |
 | [Activity search](.docs/activity-search.md) | Query matching and pagination |
 | [Release artifacts](.docs/phase0-release-artifacts.md), [staging fixtures](.docs/staging-fixtures.md) | Managed promotion, configuration, and manual synthetic staging data |
-| [Database recovery](.docs/database-recovery-runbook.md), [production backups](.docs/production-backup-runbook.md) | Tool boundaries, operator procedures, and activation limits |
+| [Database recovery](.docs/database-recovery-runbook.md), [production backups](.docs/production-backup-runbook.md) | Optional utility references; [recovery program retired](.docs/schedule-adapter-recovery-decision.md) |
 | [Operation tracing](.docs/operation-tracing.md), [render diagnostics](.docs/render-diagnostics.md) | Telemetry configuration and privacy boundaries |
 | [`residency_schedule_plan_v2.md`](residency_schedule_plan_v2.md) | Historical build plan; not a current implementation contract |

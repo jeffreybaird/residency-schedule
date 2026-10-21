@@ -1,5 +1,9 @@
 # Production logical backup and off-host checks
 
+> Reference for existing utilities only. The [old recovery program is retired](schedule-adapter-recovery-decision.md);
+> this document does not require backup activation, provisioning or rehearsals.
+> The boundaries below still apply if an operator chooses to use these tools.
+
 Status: implementation contract under independent review. No paid storage,
 production key, production role, service or timer is activated by these files.
 Operational decisions and results belong in

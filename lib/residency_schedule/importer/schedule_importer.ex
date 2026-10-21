@@ -9,8 +9,10 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   """
 
   alias ResidencySchedule.DetailedSchedules
+  alias ResidencySchedule.Importer.Adapters.Csv
   alias ResidencySchedule.Importer.CsvParser
   alias ResidencySchedule.Importer.DateUpdater
+  alias ResidencySchedule.Importer.ImportDocument
   alias ResidencySchedule.Importer.ResidentLinker
   alias ResidencySchedule.Repo
   alias ResidencySchedule.Residents
@@ -31,9 +33,9 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
       {:error, _}
   """
   def import_csv(csv_binary) do
-    with {:ok, parsed_residents, warnings} <- CsvParser.parse(csv_binary),
-         {:ok, result} <- persist(parsed_residents) do
-      {:ok, result, warnings}
+    with {:ok, document} <- Csv.parse(csv_binary, []),
+         {:ok, result} <- persist(document.residents, document.academic_year) do
+      {:ok, result, document.warnings}
     end
   end
 
@@ -49,17 +51,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
       {:error, _}
   """
   def prepare(csv_binary) do
-    with {:ok, parsed_residents, warnings} <- CsvParser.parse(csv_binary),
-         {:ok, academic_year} <- academic_year_of(parsed_residents),
-         :ok <- ensure_replaceable(academic_year) do
-      {:ok,
-       %{
-         parsed: parsed_residents,
-         academic_year: academic_year,
-         proposals: ResidentLinker.propose(parsed_residents, Residents.list_residents()),
-         warnings: warnings
-       }}
-    end
+    prepare(csv_binary, [])
   end
 
   @doc """
@@ -110,19 +102,36 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   Exempt from doctest — hits the database.
   """
   def prepare(csv_binary, options) do
+    with {:ok, document} <- Csv.parse(csv_binary, options) do
+      prepare_document(document, options)
+    end
+  end
+
+  @doc """
+  Reconciles domain roster input without depending on a source parser.
+  Database operation; covered by integration tests instead of doctests.
+  """
+  def prepare_document(%ImportDocument{kind: :rotations} = document, options) do
     case Keyword.get(options, :mode, :replace_year) do
       :replace_year ->
-        prepare(csv_binary)
+        with :ok <- ensure_replaceable(document.academic_year) do
+          {:ok,
+           %{
+             parsed: document.residents,
+             academic_year: document.academic_year,
+             proposals: ResidentLinker.propose(document.residents, Residents.list_residents()),
+             warnings: document.warnings
+           }}
+        end
 
       :update_dates ->
-        year = Keyword.get(options, :academic_year)
+        year = document.academic_year
 
-        with {:ok, parsed, warnings} <- CsvParser.parse_date_update(csv_binary, year),
-             {:ok, prepared} <- DateUpdater.prepare(parsed, year) do
+        with {:ok, prepared} <- DateUpdater.prepare(document.residents, year) do
           {:ok,
            Map.merge(prepared, %{
-             parsed: parsed,
-             warnings: warnings,
+             parsed: document.residents,
+             warnings: document.warnings,
              academic_year: year,
              mode: :update_dates
            })}
@@ -147,7 +156,8 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   end
 
   @doc """
-  Imports a list of parsed `%CsvParser{}` structs into the database.
+  Imports domain resident input into the database. Legacy parser structs remain
+  compatible for callers that already hold parsed input.
 
   Derives the academic year from the earliest date across all residents' rotations,
   upserts the schedule, deletes and reloads schedule_residents/rotations for that year.
@@ -165,7 +175,7 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
   end
 
   @doc """
-  Imports a list of parsed `%CsvParser{}` structs for an explicit academic year.
+  Imports domain resident input for an explicit academic year.
 
   Used by the schedule builder so the target year is always the loaded/generated year,
   not re-derived from rotation dates (which can be sparse or empty).
@@ -237,11 +247,6 @@ defmodule ResidencySchedule.Importer.ScheduleImporter do
     do: Map.put(attrs, :resident_id, person_id)
 
   defp put_linked_person(attrs, _new_or_unlinked), do: attrs
-
-  defp academic_year_of([]), do: {:error, "No residents or rotations to import"}
-
-  defp academic_year_of(parsed_residents),
-    do: {:ok, derive_academic_year_from_residents(parsed_residents)}
 
   defp derive_academic_year_from_residents(parsed_residents) do
     parsed_residents

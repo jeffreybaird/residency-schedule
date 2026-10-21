@@ -20,6 +20,7 @@ defmodule ResidencySchedule.ScheduleBuilder do
   }
 
   alias ResidencySchedule.Importer.{CsvParser, ScheduleImporter}
+  alias ResidencySchedule.Importer.ImportDocument.Resident
   alias ResidencySchedule.{Residents, Rotations, Schedules}
   alias ResidencySchedule.Rotations.HighlandPostCall
 
@@ -313,8 +314,8 @@ defmodule ResidencySchedule.ScheduleBuilder do
   @doc """
   Saves the builder state as a real schedule in the database.
 
-  Converts the in-memory assignments into `%CsvParser{}` structs and calls
-  `ScheduleImporter.persist/1`. Returns `{:ok, result}` or `{:error, reason}`.
+  Converts the in-memory assignments into domain resident input and calls
+  `ScheduleImporter.persist/2`. Returns `{:ok, result}` or `{:error, reason}`.
 
   Exempt from doctest — hits the database.
   """
@@ -554,7 +555,7 @@ defmodule ResidencySchedule.ScheduleBuilder do
           Map.get(state, :literal_dates?, false)
         )
 
-      %CsvParser{
+      %Resident{
         position_code: resident.position_code,
         residency_year: resident.residency_year,
         schedule_number: resident.schedule_number,

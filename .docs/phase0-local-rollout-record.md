@@ -1,5 +1,9 @@
 # Phase 0 local continuation — October 16, 2026
 
+> Historical record. The owner canceled the Phase 0 recovery program on October
+> 21, 2026. Pending tasks, targets, activation proposals and gates below are
+> retired, not a continuation queue. See the [current recovery decision](schedule-adapter-recovery-decision.md).
+
 Status: repository changes independently accepted; staging rehearsed; final owner decision pending.
 Parent: [handoff](schedule-adapter-phase-0-handoff.md).
 
