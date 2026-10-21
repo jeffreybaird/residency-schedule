@@ -1,38 +1,29 @@
-# Recovery scope decision — October 21, 2026
+# Recovery decision — October 21, 2026
 
-The owner revised the recovery requirements while authorizing continuation of
-the residency scheduler model/adapter work. This app serves four family members,
-and its data changes infrequently. The owner accepts rebuilding the server and
-restoring a database snapshot if recovery is needed, including the associated
-downtime and loss of changes since that snapshot.
+The owner canceled the old Phase 0 recovery program. This is a four-user family
+app with infrequent data changes. The accepted fallback is to rebuild the server
+and restore an available database snapshot, accepting downtime and changes lost
+since that snapshot.
 
-This decision supersedes the recovery prerequisites in the October 15 release
-plan, Phase 0 checklist and earlier handoffs. It does not assert that any snapshot
-exists or has been verified, or that unfinished Phase 0 work was completed.
+The old recovery plan is retired, not deferred or waiting for closeout. Its
+checklists, handoffs, recovery-time/data-loss targets, backup activation,
+additional storage and monitoring provisioning, PITR and formal recovery drills
+are removed from the model migration scope. They are not development or release
+gates and should not be resumed without a new request from the owner.
 
-## What changes
+For a production data change, note the snapshot being relied on and the existing
+[server setup/deployment instructions](../DEPLOY.md). This is a practical
+snapshot-and-rebuild fallback, not a new recovery program or rehearsal requirement.
+No snapshot availability or successful restore is asserted by this document.
 
-- Proceed with Phase 1: shared import contract, parser adapters, preview
-  orchestration and builder domain input, preserving existing persistence and
-  rendering. New adapters remain preview-only until deliberately enabled.
-- Defer production backup activation, additional storage/monitor provisioning,
-  PITR, formal recovery drills and the 10-minute application / 60-minute database
-  recovery and 15-minute lost-write objectives as prerequisites to development.
-- Keep existing deployment locks, retained artifacts, staging, backup tooling and
-  tests. This decision does not remove infrastructure, alter an active timer or
-  change an existing paid subscription.
-- Before a production data/schema change, identify the snapshot to recover from
-  and the existing server rebuild/deployment instructions. Do not claim verified
-  recovery or silently assume an application rollback restores the database.
-- Keep ordinary correctness checks: preserve stable identities, coverage links,
-  notes, simultaneous activities, overnight boundaries and import idempotency.
-  Test changes through the repository's role-owned workflow.
+Keep existing deployment locks, staging, retained artifacts, backup utilities and
+tests. No services, timers, resources, subscriptions or credentials are changed
+by retiring the plan. Operational records and utility instructions are reference
+material, not outstanding work.
 
-Production deployment remains a separate action on a concrete reviewed change;
-this decision authorizes development, not a deployment or production migration.
+Ordinary correctness checks still apply: preserve identities, coverage links,
+notes, simultaneous activities, overnight boundaries and import idempotency.
+Production deployment remains a separate action on a reviewed implementation.
 
-## Next delivery
-
-Implement the Phase 1 adapter boundary without schema migrations. Split the work
-into complete tested increments, and record any remaining Phase 1 scope honestly.
-The later additive schema and read/write transition remain separate deliveries.
+Continue the [model migration plan](schedule-adapter-release-plan.md): Phase 1 is
+implemented locally; the next model work is Phase 2's additive schema.

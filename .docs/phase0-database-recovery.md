@@ -1,5 +1,9 @@
 # Phase 0 database recovery — October 17, 2026
 
+> Historical record. The owner canceled the Phase 0 recovery program on October
+> 21, 2026. Pending tasks, targets, activation proposals and gates below are
+> retired, not a continuation queue. See the [current recovery decision](schedule-adapter-recovery-decision.md).
+
 Status: tooling and isolated synthetic restore rehearsal independently accepted.
 Production database backup/restore and the accepted production database RTO/RPO
 are not yet proven.

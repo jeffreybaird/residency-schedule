@@ -1,5 +1,9 @@
 # Synthetic database backup and isolated restore
 
+> Reference for existing utilities only. The [old recovery program is retired](schedule-adapter-recovery-decision.md);
+> this document does not require backup activation, provisioning or rehearsals.
+> The boundaries below still apply if an operator chooses to use these tools.
+
 Status: implementation independently accepted; exact-tool operational rehearsal
 is recorded separately in the recovery record.
 This work continues Phase 0 Step 4 from merged PR #78. It does not change the

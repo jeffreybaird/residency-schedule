@@ -332,7 +332,7 @@ Monitor the deployment in the GitHub Actions tab. The workflow:
    restore the previous application and its configuration, and verifies recovery.
 
 See [release artifact and locking operations](.docs/phase0-release-artifacts.md)
-for retained paths, cookie handling, failure limits and pending recovery gates.
+for retained paths, cookie handling and the existing startup-failure behavior.
 This upgrade path requires an existing installation with recoverable configuration
 and a matching distribution cookie. It accepts the legacy regular `.env` for the
 initial transition and managed configuration links thereafter. Initial provisioning
@@ -619,9 +619,9 @@ sudo systemctl restart residency_schedule
 The deployment now retains checksummed code archives rather than a disposable
 `_old` directory. Do not use an unguarded directory swap: every recovery operation
 must hold `/home/deploy/residency_schedule.deploy.lock`. See the
-[artifact runbook](.docs/phase0-release-artifacts.md). A checksum-verified,
-schema-compatible manual rollback command and rehearsal remain Phase 0 Step 6
-work; automatic startup recovery does not establish that capability.
+[artifact runbook](.docs/phase0-release-artifacts.md). Automatic startup recovery
+is implemented; a separate operator rollback command/rehearsal is not claimed.
+The old Phase 0 rollback work is canceled, not a deployment prerequisite.
 
 ### Updating runtime configuration
 
@@ -644,17 +644,22 @@ reviewed procedure; normal deployment verifies continuity.
 
 ### Backups and database recovery
 
-Use the [synthetic database recovery runbook](.docs/database-recovery-runbook.md)
-for the isolated staging rehearsal and the
-[production backup runbook](.docs/production-backup-runbook.md) for online backup
-and off-host checks. These have different formats and trust boundaries; the
-production backup output is not input to the synthetic restore CLI.
+The [current recovery decision](.docs/schedule-adapter-recovery-decision.md)
+accepts rebuilding the server and restoring an available database snapshot,
+including downtime and post-snapshot write loss. Before changing production data,
+note the snapshot being relied on and use this guide's server setup/deployment
+instructions. Code rollback does not reverse database migrations.
 
-The presence of tooling and systemd unit files does not mean production backups
-are active. Review activation decisions and operational evidence in
-[the production backup record](.docs/phase0-production-backups.md). Code rollback
-also does not reverse database migrations. Follow the reviewed recovery procedure
-and destination lock rather than dropping and recreating a live database.
+The former Phase 0 recovery program is canceled. Production backup activation,
+new storage/monitor provisioning, PITR, formal restore drills and recovery-time
+or data-loss targets are not pending tasks or release gates.
+
+Existing [synthetic restore](.docs/database-recovery-runbook.md) and
+[online backup](.docs/production-backup-runbook.md) utilities remain optional tool
+references. Their formats differ: production backup output is not input to the
+synthetic restore CLI. The existence of tooling does not mean backups are active
+or a snapshot has been verified. Historical operational evidence is preserved in
+[the backup record](.docs/phase0-production-backups.md).
 
 ---
 

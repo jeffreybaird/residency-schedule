@@ -2,7 +2,7 @@
 
 Phase 1 separates uploaded source formats from schedule reconciliation and
 persistence. The [owner's recovery decision](schedule-adapter-recovery-decision.md)
-allows this work to proceed without completing the older Phase 0 program.
+retires the older Phase 0 program; it has no remaining acceptance gates.
 
 ## Contract and compatibility
 

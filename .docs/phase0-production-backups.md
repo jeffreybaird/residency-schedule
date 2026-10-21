@@ -1,5 +1,9 @@
 # Phase 0 production backup preparation — October 17, 2026
 
+> Historical record. The owner canceled the Phase 0 recovery program on October
+> 21, 2026. Pending tasks, targets, activation proposals and gates below are
+> retired, not a continuation queue. See the [current recovery decision](schedule-adapter-recovery-decision.md).
+
 Status: tooling passed its accepted tests and independent code/security review;
 the bounded synthetic scheduling proof is in progress. Production backup
 scheduling, off-host storage/key custody and alerting are not activated.

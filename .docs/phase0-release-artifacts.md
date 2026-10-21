@@ -1,11 +1,9 @@
 # Phase 0 release artifacts and deployment serialization
 
-This implements the bounded Step 3 controls described in the
-[Phase 0 baseline PR](https://github.com/jeffreybaird/residency-schedule/pull/77).
-It does not establish persistent staging, demonstrated recovery objectives,
-database restore capability, semantic smoke checks, or a rehearsed operator
-rollback. Accepted ownership and recovery targets are recorded in that baseline
-PR; operational validation remains a separate Phase 0 prerequisite.
+This documents existing release artifacts, deployment locks and startup-failure
+handling delivered during the former Phase 0 work. Those tools remain in use.
+The [old recovery program is retired](schedule-adapter-recovery-decision.md);
+there are no outstanding Phase 0 recovery targets or operational gates here.
 
 ## Build once and promote
 
@@ -230,8 +228,8 @@ schedule-meaning, authentication or LiveView acceptance evidence.
 
 Binary rollback does not undo migrations or restore database writes. Abrupt
 power loss or `SIGKILL` can bypass shell traps; an operator must inspect the
-protected work directory and retained artifacts under the same lock. Additive
-schema compatibility and disaster recovery remain later Phase 0 gates.
+protected work directory and retained artifacts under the same lock. Test actual
+schema changes for correctness; the retired recovery program adds no further gates.
 
 Run current security checks before every commit under the shared workflow. The
 former Bandit audit exception has expired following the published 1.13.0 fix;
