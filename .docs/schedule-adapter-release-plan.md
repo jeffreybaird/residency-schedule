@@ -1,7 +1,9 @@
 # Schedule adapter migration release plan
 
-Status: Phase 0 safeguards delivered in part; Phase 1 development may proceed
-under the [October 21 recovery decision](schedule-adapter-recovery-decision.md).
+Status: Phase 0 safeguards delivered in part; Phase 1 adapter boundary implemented
+locally under the [October 21 recovery decision](schedule-adapter-recovery-decision.md).
+See the [Phase 1 contract](schedule-adapter-phase-1.md) and
+[verification record](schedule-adapter-phase-1-verification.md) for checks and limits.
 Recorded: October 15, 2026.
 Code baseline reviewed: `88fb94d0b2a6638622eb2b25ee5d53e3ea83ebd6`.
 
@@ -10,8 +12,9 @@ import contract, pluggable adapters, and a shared effective-schedule service.
 Release the transition in independently reversible increments. Preserve current
 behavior before introducing new import semantics.
 
-The next implementation scope is Phase 1. Remaining Phase 0 operational work is
-deferred under the owner's revised recovery requirements. The original
+Phase 1 retains existing persistence and rendering; production deployment remains
+separate. The next model work is Phase 2's additive schema. Remaining Phase 0
+operational work is deferred under the owner's revised recovery requirements. The original
 [Phase 0 recovery runbook](schedule-adapter-phase-0.md) remains historical evidence,
 not a prerequisite to Phase 1 development.
 This plan does not authorize a production deployment or data migration.

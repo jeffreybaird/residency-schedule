@@ -20,6 +20,9 @@ defmodule ResidencySchedule.DetailedSchedules do
   Saves a server-held preview after rechecking administrator access and roster identity.
   Imports are additive and idempotent. Exempt from doctest — database operation.
   """
+  def commit(%{preview_only: true}, _user),
+    do: {:error, "This adapter supports preview only; its assignments cannot be saved."}
+
   def commit(%{schedule_id: schedule_id, academic_year: year} = preview, %User{id: user_id}) do
     Repo.transaction(fn ->
       Revision.lock()
