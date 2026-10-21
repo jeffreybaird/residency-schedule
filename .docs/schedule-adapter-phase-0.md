@@ -1,6 +1,8 @@
 # Schedule adapter migration Phase 0 recovery readiness
 
-Status: started; repository baseline recorded, operational evidence pending.
+Status: remaining work deferred by the owner on October 21, 2026; no longer a
+gate to Phase 1 development. See the
+[revised recovery decision](schedule-adapter-recovery-decision.md).
 Recorded: October 15, 2026.
 Parent: [Schedule adapter migration release plan](schedule-adapter-release-plan.md).
 Progress and unresolved prerequisites: [Step 1 baseline](schedule-adapter-phase-0-baseline.md).
@@ -13,8 +15,13 @@ is also merged, with its separately approved production/demo rollout verified.
 The [production backup preparation record](phase0-production-backups.md) tracks
 the next branch's scheduling, protected off-host storage and monitoring work;
 those controls are not yet activated in production.
-The checkboxes remain acceptance gates; unfinished
-database recovery objectives must not be inferred from the deployment success.
+Unfinished database recovery objectives must not be inferred from the deployment
+success; the checklist below records the original acceptance criteria.
+
+The original acceptance checklist below is retained as historical scope. Unchecked
+items are not claims of completion, and their old blocking language is superseded
+by the October 21 decision. Keep delivered safeguards; do not activate new paid
+resources, backup timers or alert integrations as part of Phase 1 development.
 
 Phase 0 establishes the ability to deploy, validate and recover the application
 before changing its schedule model. Deliver operational controls, tested scripts,
