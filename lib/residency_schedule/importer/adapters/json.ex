@@ -20,10 +20,43 @@ defmodule ResidencySchedule.Importer.Adapters.Json do
   @doc """
   Parses literal activity input into a partial preview-only document.
 
-      iex> json = Jason.encode!(%{academic_year: 2026, assignments: [%{date: "2026-12-28", raw_staff: "Iris Reed", raw_task: "Clinic"}]})
+  Literal assignments retain their notes and source coordinates. Dates become
+  `Date` values, missing coordinates receive defaults, and the partial scope
+  identifies the source's people and dates without enabling writes.
+
+      iex> json = Jason.encode!(%{
+      ...>   academic_year: 2026,
+      ...>   assignments: [%{date: "2026-12-28", raw_staff: "Iris Reed", raw_task: "Clinic", notes: ["Bring kit"]}]
+      ...> })
       iex> {:ok, document} = ResidencySchedule.Importer.Adapters.Json.parse(json, [])
-      iex> document.preview_only
-      true
+      iex> document
+      %ResidencySchedule.Importer.ImportDocument{
+        source: :json,
+        kind: :activities,
+        academic_year: 2026,
+        residents: [],
+        assignments: [
+          %{
+            date: ~D[2026-12-28],
+            raw_staff: "Iris Reed",
+            raw_task: "Clinic",
+            notes: ["Bring kit"],
+            source_sheet: "JSON",
+            source_cell: "entry-1"
+          }
+        ],
+        header_dates: [~D[2026-12-28]],
+        notes: [],
+        unlinked_notes: [],
+        warnings: [],
+        scope: %{
+          completeness: :partial,
+          record_kinds: [:activities],
+          people: ["Iris Reed"],
+          dates: [~D[2026-12-28]]
+        },
+        preview_only: true
+      }
   """
   @impl true
   def parse(binary, options) when is_binary(binary) and byte_size(binary) <= 5_000_000 do

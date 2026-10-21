@@ -8,10 +8,49 @@ defmodule ResidencySchedule.Importer.Adapters.Csv do
   @doc """
   Parses roster replacement or literal date-update facts without writing records.
 
-      iex> csv = File.read!("test/fixtures/sample.csv")
+  A whole-year roster produces rotation blocks under domain resident input.
+  Other source collections remain empty; the scope describes the covered roster
+  positions and date ranges. This example uses a year outside the configured
+  name roster so the supplied name is preserved.
+
+      iex> csv = Enum.join([",Dates,2099-07-06", ",,2099-07-10", ",,", "R1-1,Iris Reed,GYN"], <<10>>)
       iex> {:ok, document} = ResidencySchedule.Importer.Adapters.Csv.parse(csv, [])
-      iex> document.source
-      :csv
+      iex> document
+      %ResidencySchedule.Importer.ImportDocument{
+        source: :csv,
+        kind: :rotations,
+        academic_year: 2099,
+        residents: [
+          %ResidencySchedule.Importer.ImportDocument.Resident{
+            position_code: "R1-1",
+            residency_year: 1,
+            schedule_number: 1,
+            name: "Iris Reed",
+            rotations: [
+              %{
+                rotation_type: :strong_gynecology,
+                start_date: ~D[2099-07-06],
+                end_date: ~D[2099-07-10],
+                slot_index: 0
+              }
+            ],
+            date_updates: []
+          }
+        ],
+        assignments: [],
+        header_dates: [],
+        notes: [],
+        unlinked_notes: [],
+        warnings: [],
+        scope: %{
+          completeness: :complete,
+          record_kinds: [:rotations],
+          people: ["R1-1"],
+          dates: [~D[2099-07-06], ~D[2099-07-10]],
+          date_ranges: [{~D[2099-07-06], ~D[2099-07-10]}]
+        },
+        preview_only: false
+      }
   """
   @impl true
   def parse(binary, options) do
