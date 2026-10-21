@@ -1,4 +1,10 @@
 defmodule ResidencySchedule.Rotations.Rotation do
+  @moduledoc """
+  A rotation block with its latest originating write's source kind and metadata.
+
+  Unknown historical or direct-write origins remain `legacy`. Programmatic source
+  attribution is not accepted through assignment form changesets.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -7,6 +13,8 @@ defmodule ResidencySchedule.Rotations.Rotation do
     field :start_date, :date
     field :end_date, :date
     field :slot_index, :integer
+    field :source_kind, :string, default: "legacy"
+    field :source_metadata, :map, default: %{}
     field :source_assignment_date, :date, virtual: true
     field :source_tasks, {:array, :string}, virtual: true, default: []
 

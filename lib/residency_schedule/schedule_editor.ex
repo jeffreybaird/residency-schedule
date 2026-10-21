@@ -223,13 +223,17 @@ defmodule ResidencySchedule.ScheduleEditor do
   defp touched_ids({:delete, rotation}), do: [rotation.id]
 
   defp apply_operation({:add, id, attrs}) do
-    %Rotation{}
+    %Rotation{source_kind: "editor"}
     |> Rotation.changeset(Map.merge(attrs, %{schedule_resident_id: id, slot_index: -1}))
     |> persist(:insert)
   end
 
-  defp apply_operation({:update, rotation, attrs}),
-    do: rotation |> Rotation.changeset(attrs) |> persist(:update)
+  defp apply_operation({:update, rotation, attrs}) do
+    rotation
+    |> Rotation.changeset(attrs)
+    |> Ecto.Changeset.change(source_kind: "editor", source_metadata: %{})
+    |> persist(:update)
+  end
 
   defp apply_operation({:delete, rotation}), do: Repo.delete!(rotation)
 

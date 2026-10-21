@@ -3,6 +3,7 @@ defmodule ResidencySchedule.Release do
 
   alias Ecto.Adapters.SQL
   alias ResidencySchedule.Importer.ScheduleImporter
+  alias ResidencySchedule.SourceProvenance
   alias ResidencySchedule.StagingFixtures
   @app :residency_schedule
 
@@ -74,6 +75,26 @@ defmodule ResidencySchedule.Release do
     [repo] = repos()
 
     {:ok, result, _apps} = Ecto.Migrator.with_repo(repo, fn _repo -> import_demo_csv() end)
+
+    result
+  end
+
+  @doc """
+  Backfills generic source references using retained QGenda coordinates.
+
+  Callable after migration from a compiled release:
+
+      bin/residency_schedule eval 'IO.inspect(ResidencySchedule.Release.backfill_source_provenance())'
+
+  Repeating the call preserves populated references. Requires a database; covered
+  by integration tests instead of doctests.
+  """
+  def backfill_source_provenance do
+    load_app()
+    [repo] = repos()
+
+    {:ok, result, _apps} =
+      Ecto.Migrator.with_repo(repo, fn _repo -> SourceProvenance.backfill() end)
 
     result
   end

@@ -315,7 +315,8 @@ defmodule ResidencySchedule.ScheduleBuilder do
   Saves the builder state as a real schedule in the database.
 
   Converts the in-memory assignments into domain resident input and calls
-  `ScheduleImporter.persist/2`. Returns `{:ok, result}` or `{:error, reason}`.
+  `ScheduleImporter.persist/3` with the builder source kind. Returns
+  `{:ok, result}` or `{:error, reason}`.
 
   Exempt from doctest — hits the database.
   """
@@ -325,7 +326,7 @@ defmodule ResidencySchedule.ScheduleBuilder do
       |> build_parsed_residents()
       |> preserve_literal_slot_markers(Map.get(state, :literal_dates?, false))
 
-    case ScheduleImporter.persist(parsed_residents, state.academic_year) do
+    case ScheduleImporter.persist(parsed_residents, state.academic_year, source_kind: "builder") do
       {:ok, result} -> {:ok, result}
       {:error, reason} -> {:error, reason}
     end
