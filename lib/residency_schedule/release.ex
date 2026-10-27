@@ -2,6 +2,7 @@ defmodule ResidencySchedule.Release do
   @moduledoc "Provides database tasks for application releases."
 
   alias Ecto.Adapters.SQL
+  alias ResidencySchedule.IdentityMappings
   alias ResidencySchedule.Importer.ScheduleImporter
   alias ResidencySchedule.SourceProvenance
   alias ResidencySchedule.StagingFixtures
@@ -95,6 +96,25 @@ defmodule ResidencySchedule.Release do
 
     {:ok, result, _apps} =
       Ecto.Migrator.with_repo(repo, fn _repo -> SourceProvenance.backfill() end)
+
+    result
+  end
+
+  @doc """
+  Records existing QGenda associations as observed identity evidence only.
+
+  Run after migration and print the bounded, repeatable operation's counts:
+
+      bin/residency_schedule eval 'IO.inspect(ResidencySchedule.Release.backfill_identity_mappings())'
+
+  Requires a database; covered by integration tests instead of doctests.
+  """
+  def backfill_identity_mappings do
+    load_app()
+    [repo] = repos()
+
+    {:ok, result, _apps} =
+      Ecto.Migrator.with_repo(repo, fn _repo -> IdentityMappings.backfill() end)
 
     result
   end
