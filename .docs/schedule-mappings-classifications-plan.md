@@ -8,10 +8,12 @@ and classifications follow in PR 2. PR 1 merged in
 [operator contract](resident-identity-mappings.md) and
 [verification record](resident-identity-mappings-verification.md) describe the
 delivered API and local evidence. Deployment and production backfill are separate.
-PR 2 starts from merged `main` commit `e9b1e0b` and is implemented on this branch;
+PR 2 started from merged `main` commit `e9b1e0b` and merged in
+[PR #91](https://github.com/jeffreybaird/residency-schedule/pull/91);
 see its [operator contract](task-mappings-classifications.md) and
-[local verification](task-mappings-classifications-verification.md). Timing and
-reader/writer cutovers remain separate increments.
+[local verification](task-mappings-classifications-verification.md). Timing
+metadata follows in its [own increment](timing-metadata.md); reader/writer
+cutovers remain separate.
 
 ## Goal and delivery order
 
