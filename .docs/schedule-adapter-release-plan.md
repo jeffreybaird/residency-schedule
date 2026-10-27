@@ -1,9 +1,15 @@
 # Schedule adapter migration release plan
 
 Status: Phase 1 adapter boundary merged in
-[PR #87](https://github.com/jeffreybaird/residency-schedule/pull/87). The first
-Phase 2 delivery implements [source provenance](schedule-source-provenance.md)
-locally; mappings and classifications are next.
+[PR #87](https://github.com/jeffreybaird/residency-schedule/pull/87). Source
+provenance merged in [PR #88](https://github.com/jeffreybaird/residency-schedule/pull/88),
+with a successful [deployment workflow](https://github.com/jeffreybaird/residency-schedule/actions/runs/39663863198).
+Its manual production backfill still needs confirmation. Resident identity
+mappings are implemented on the current branch; see the
+[operator contract](resident-identity-mappings.md) and
+[local verification](resident-identity-mappings-verification.md).
+Task mappings and classifications are next in the
+[two-increment plan](schedule-mappings-classifications-plan.md).
 The [old recovery program is canceled](schedule-adapter-recovery-decision.md).
 See the [Phase 1 contract](schedule-adapter-phase-1.md) and
 [verification record](schedule-adapter-phase-1-verification.md) for checks and limits.
@@ -16,7 +22,8 @@ Release the transition in small, tested increments. Preserve current
 behavior before introducing new import semantics.
 
 Phase 1 retains existing persistence and rendering. Phase 2's source-provenance
-schema and backfill are implemented locally; production execution remains separate.
+schema and backfill utility are merged; the deployment workflow passed, but no
+manual production backfill result has been recorded here.
 The old Phase 0 recovery program is retired, with no
 pending recovery deliverables or gates. Production deployment and data migration
 remain separate actions on a reviewed implementation.
@@ -68,7 +75,7 @@ Preserve these invariants throughout the transition:
 | Phase | Scope | Acceptance |
 | --- | --- | --- |
 | 1: Adapter boundary (merged) | Shared import document, CSV/QGenda adapters, shared previews and builder domain input. Existing persistence and rendering retained; JSON is preview-only. | Existing formats retain their behavior; a new adapter can preview without storage or view changes. |
-| 2: Additive schema (in progress) | Source provenance and its backfill implemented locally; mappings, classifications and timing metadata remain. Keep existing columns and IDs. | Records, notes and references reconcile; repeating each backfill makes no changes. |
+| 2: Additive schema (in progress) | Source provenance merged; confirm its production backfill. Resident identity mappings implemented on this branch; task mappings/classifications are next, followed by timing metadata. Keep existing columns and IDs. | Records, notes and references reconcile; repeating each backfill makes no changes. |
 | 3: Compare new reads | Compute new effective schedules alongside existing reads; users receive existing results. | No unexplained differences in schedule meaning; acceptable measured performance. |
 | 4: Enable new reads | Enable a selected schedule, then expand consistently across consumers. | Representative views, exports, statistics and assistant queries agree. |
 | 5: Enable new writes | Common writer for existing formats first, then deliberate enablement of new adapters. | Reimport, correction, concurrency and stale-preview tests pass; writes match the preview. |
@@ -78,9 +85,13 @@ Deliver Phase 2 in small schema-plus-backfill increments:
 
 1. [Source provenance](schedule-source-provenance.md): extend existing batch,
    activity-source and rotation records; preserve known facts and explicitly mark
-   unknown historical origins as legacy. Schema and bounded backfill implemented
-   locally; [validation](schedule-source-provenance-verification.md) uses synthetic data.
-2. Mappings and classifications, with their own backfill and validation.
+   unknown historical origins as legacy. Schema and bounded backfill utility merged;
+   [validation](schedule-source-provenance-verification.md) uses synthetic data.
+   Confirm the separately run production backfill.
+2. [Mappings and classifications](schedule-mappings-classifications-plan.md):
+   [resident identity mappings](resident-identity-mappings.md) implemented on this
+   branch, then task mappings and classification rules.
+   Each implementation PR includes its own backfill and validation.
 3. Timing metadata, with its own backfill and validation.
 
 Backfill is part of each increment, not a separate final phase. Each increment
