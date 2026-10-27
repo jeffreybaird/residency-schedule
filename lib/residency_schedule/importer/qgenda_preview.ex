@@ -96,6 +96,14 @@ defmodule ResidencySchedule.Importer.QgendaPreview do
   ]
 
   @doc """
+  Returns exact recognized task labels without implying service equivalence.
+
+      iex> "Lattimore MFM Clinic PM" in ResidencySchedule.Importer.QgendaPreview.known_tasks()
+      true
+  """
+  def known_tasks, do: @known_tasks
+
+  @doc """
   Prepares a preview using an existing academic year. Never writes records.
   An optional `:crosswalk_csv` binary replaces the configured name crosswalk for
   this call only. Uploaded mappings must match the selected year and current

@@ -45,6 +45,14 @@ defmodule ResidencySchedule.DetailedSchedules.TaskEquivalence do
   }
 
   @doc """
+  Returns reviewed exact equivalences, preserving tasks with multiple targets.
+
+      iex> ResidencySchedule.DetailedSchedules.TaskEquivalence.equivalences()["HH Nights 3rd Call"]
+      ["highland_weekend_nights", "highland_night_float"]
+  """
+  def equivalences, do: @equivalents
+
+  @doc """
   Checks whether an exact imported task describes the supplied rotation type.
 
       iex> ResidencySchedule.DetailedSchedules.TaskEquivalence.matches_rotation?("SMH GYN R2 Day", "strong_gynecology")

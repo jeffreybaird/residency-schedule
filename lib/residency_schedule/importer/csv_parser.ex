@@ -67,6 +67,23 @@ defmodule ResidencySchedule.Importer.CsvParser do
   }
 
   @doc """
+  Returns the reviewed CSV abbreviation facts as stable string codes.
+
+      iex> ResidencySchedule.Importer.CsvParser.rotation_abbreviations()["gyn"]
+      "strong_gynecology"
+  """
+  def rotation_abbreviations,
+    do: Map.new(@rotation_abbreviations, fn {label, code} -> {label, Atom.to_string(code)} end)
+
+  @doc """
+  Exposes the existing CSV task-label normalization without changing parsing.
+
+      iex> ResidencySchedule.Importer.CsvParser.normalize_task_label(" GYN - till 8p ")
+      "gyn"
+  """
+  def normalize_task_label(label), do: normalize_rotation_key(label)
+
+  @doc """
   Parses a CSV binary into a list of resident structs plus warnings.
 
   Returns `{:ok, residents, warnings}` where:

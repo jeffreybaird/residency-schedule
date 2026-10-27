@@ -6,6 +6,7 @@ defmodule ResidencySchedule.Release do
   alias ResidencySchedule.Importer.ScheduleImporter
   alias ResidencySchedule.SourceProvenance
   alias ResidencySchedule.StagingFixtures
+  alias ResidencySchedule.TaskMappings
   @app :residency_schedule
 
   @doc """
@@ -119,6 +120,35 @@ defmodule ResidencySchedule.Release do
 
     {:ok, result, _apps} =
       Ecto.Migrator.with_repo(repo, fn _repo -> IdentityMappings.backfill() end)
+
+    result
+  end
+
+  @doc """
+  Seeds reviewed legacy task facts and fills initial source interpretations.
+
+  Run after schema deployment from the installed release:
+
+      bin/residency_schedule eval 'IO.inspect(ResidencySchedule.Release.backfill_task_classifications())'
+
+  This executable example uses a synthetic source in the test SQL sandbox.
+
+      iex> _ctx = ResidencySchedule.TaskMappingDoctestFixtures.source()
+      iex> {:ok, result} = ResidencySchedule.Release.backfill_task_classifications()
+      iex> {result.seed.mappings_added > 0, result.classifications.processed, result.classifications.resolved}
+      {true, 1, 1}
+  """
+  def backfill_task_classifications do
+    load_app()
+    [repo] = repos()
+
+    {:ok, result, _apps} =
+      Ecto.Migrator.with_repo(repo, fn _repo ->
+        with {:ok, seed} <- TaskMappings.seed_legacy(),
+             {:ok, classifications} <- TaskMappings.backfill() do
+          {:ok, %{seed: seed, classifications: classifications}}
+        end
+      end)
 
     result
   end

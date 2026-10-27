@@ -5,11 +5,14 @@ Status: Phase 1 adapter boundary merged in
 provenance merged in [PR #88](https://github.com/jeffreybaird/residency-schedule/pull/88),
 with a successful [deployment workflow](https://github.com/jeffreybaird/residency-schedule/actions/runs/39663863198).
 Its manual production backfill still needs confirmation. Resident identity
-mappings are implemented on the current branch; see the
+mappings merged in [PR #90](https://github.com/jeffreybaird/residency-schedule/pull/90); see the
 [operator contract](resident-identity-mappings.md) and
 [local verification](resident-identity-mappings-verification.md).
-Task mappings and classifications are next in the
+Task mappings and classifications are implemented on this branch; see the
+[operator contract](task-mappings-classifications.md),
+[local verification](task-mappings-classifications-verification.md) and
 [two-increment plan](schedule-mappings-classifications-plan.md).
+Timing metadata remains the next additive-schema increment.
 The [old recovery program is canceled](schedule-adapter-recovery-decision.md).
 See the [Phase 1 contract](schedule-adapter-phase-1.md) and
 [verification record](schedule-adapter-phase-1-verification.md) for checks and limits.
@@ -75,7 +78,7 @@ Preserve these invariants throughout the transition:
 | Phase | Scope | Acceptance |
 | --- | --- | --- |
 | 1: Adapter boundary (merged) | Shared import document, CSV/QGenda adapters, shared previews and builder domain input. Existing persistence and rendering retained; JSON is preview-only. | Existing formats retain their behavior; a new adapter can preview without storage or view changes. |
-| 2: Additive schema (in progress) | Source provenance merged; confirm its production backfill. Resident identity mappings implemented on this branch; task mappings/classifications are next, followed by timing metadata. Keep existing columns and IDs. | Records, notes and references reconcile; repeating each backfill makes no changes. |
+| 2: Additive schema (in progress) | Source provenance and resident mappings merged; task mappings/classifications implemented on this branch. Timing metadata remains. Confirm production backfills separately. Keep existing columns and IDs. | Records, notes and references reconcile; repeating each backfill makes no changes. |
 | 3: Compare new reads | Compute new effective schedules alongside existing reads; users receive existing results. | No unexplained differences in schedule meaning; acceptable measured performance. |
 | 4: Enable new reads | Enable a selected schedule, then expand consistently across consumers. | Representative views, exports, statistics and assistant queries agree. |
 | 5: Enable new writes | Common writer for existing formats first, then deliberate enablement of new adapters. | Reimport, correction, concurrency and stale-preview tests pass; writes match the preview. |
@@ -89,8 +92,9 @@ Deliver Phase 2 in small schema-plus-backfill increments:
    [validation](schedule-source-provenance-verification.md) uses synthetic data.
    Confirm the separately run production backfill.
 2. [Mappings and classifications](schedule-mappings-classifications-plan.md):
-   [resident identity mappings](resident-identity-mappings.md) implemented on this
-   branch, then task mappings and classification rules.
+   [resident identity mappings](resident-identity-mappings.md) merged in PR #90;
+   [task mappings and classification rules](task-mappings-classifications.md)
+   implemented on this branch.
    Each implementation PR includes its own backfill and validation.
 3. Timing metadata, with its own backfill and validation.
 
