@@ -3,10 +3,15 @@
 Plan approved for PR 1 implementation on October 27, 2026. The resident identity
 mapping increment starts from `main` commit `1cec070`, after merged
 [PR #89](https://github.com/jeffreybaird/residency-schedule/pull/89). Task mappings
-and classifications remain planned separately. PR 1 is implemented on this
-branch; its [operator contract](resident-identity-mappings.md) and
+and classifications follow in PR 2. PR 1 merged in
+[PR #90](https://github.com/jeffreybaird/residency-schedule/pull/90); its
+[operator contract](resident-identity-mappings.md) and
 [verification record](resident-identity-mappings-verification.md) describe the
 delivered API and local evidence. Deployment and production backfill are separate.
+PR 2 starts from merged `main` commit `e9b1e0b` and is implemented on this branch;
+see its [operator contract](task-mappings-classifications.md) and
+[local verification](task-mappings-classifications-verification.md). Timing and
+reader/writer cutovers remain separate increments.
 
 ## Goal and delivery order
 
