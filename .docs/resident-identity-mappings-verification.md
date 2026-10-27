@@ -145,3 +145,52 @@ migration and omitted-column compatibility tests. No production migration,
 production backfill, deploy, merge, browser walkthrough, comprehensive external
 dependency audit, or native source/test hook activation was verified. Role
 ownership and accepted-test hashes were followed independently of hook activation.
+
+## Executable documentation follow-up
+
+The follow-up requires real happy-path executable examples for the new public
+identity APIs, including database-backed functions. The reviewer accepted the
+fixture helper SHA256
+`50e1b370f0d3b41170a40da4492903714b1ee7610c5eb70c464f393d244dfc9a`
+and corrected doctest contract SHA256
+`911c562545384b4a133b1826475c50dc5d80dcd88e5127e72b16b189b8f7a7c9`
+before source documentation edits. The runner reconfirmed database
+`residency_schedule_testidentity` and these hashes. An initial overly narrow
+Release doctest filter caused a compilation-only registration error and was
+corrected by the test writer and reaccepted; it was not used as formal red.
+
+The authoritative isolated doctest-contract run returned **4 doctests, two
+tests, one expected failure**, seed `282739`, exit 2. The assertion identified
+18 public functions lacking executable examples; the real scoped-data fixture
+smoke test and existing Release examples passed. Source documentation work was
+released after that assertion red. A separate migration doctest registration
+load-order error was returned to the test writer; it was not treated as expected
+behavioral red. The orchestrator subsequently excluded incidental migration
+doctest registration from this documentation follow-up. Migration source and
+behavioral tests were restored exactly to the accepted committed version,
+retaining all migration compatibility assertions and the original test hash
+`3afaaabeb63cf660018b2c5d774e25bc62af1c557a899d0fa470b49a0b67094b`.
+
+The final accepted fixture and doctest-contract hashes above remained unchanged;
+the original core identity test retained hash
+`4e37cba09d40e064d472f81b2300f2600ea5bf46acef9c58c73b6716a8bf41ab`.
+The final batch executed:
+
+```sh
+MIX_ENV=test MIX_TEST_PARTITION=identity mix test test/residency_schedule/contexts/identity_mappings_doctest_test.exs test/residency_schedule/contexts/identity_mappings_test.exs test/residency_schedule/repo/migrations/add_source_identity_mappings_test.exs test/residency_schedule/release_test.exs
+```
+
+Result: **33 doctests, 27 tests, zero failures**, 1.8 seconds, seed `735825`,
+exit zero. All examples use synthetic test data inside the isolated test
+database. The reviewer accepted the fixture, final registration, restored
+migration contract, and source documentation changes.
+
+Read-only formatting, warnings-as-errors compilation, strict Credo, unused-lock
+check, fresh Hex advisory audit, and diff whitespace check all passed. Final
+Credo checked 343 files with 69 checks and found no issues. The fresh audit
+reported no retired or security advisory packages; lockfile SHA256 remained
+`0ca292f932368c6241c5b8208cad03873047b992a672f6c6db3a54cc3d49390d`.
+The follow-up changes documentation, doctest registration, and synthetic fixtures;
+runtime function bodies and the migration are unchanged. Targeted verification
+was therefore used for this follow-up; the earlier whole-suite result remains
+the runtime implementation baseline, without claiming a new whole-suite run.

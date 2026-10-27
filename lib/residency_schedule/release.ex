@@ -107,7 +107,11 @@ defmodule ResidencySchedule.Release do
 
       bin/residency_schedule eval 'IO.inspect(ResidencySchedule.Release.backfill_identity_mappings())'
 
-  Requires a database; covered by integration tests instead of doctests.
+  The explicit synthetic fixture runs this example in the test database sandbox.
+
+      iex> _ctx = ResidencySchedule.IdentityMappingDoctestFixtures.with_source()
+      iex> ResidencySchedule.Release.backfill_identity_mappings()
+      {:ok, %{observations_added: 1, unchanged: 0, conflicting_keys: 0}}
   """
   def backfill_identity_mappings do
     load_app()

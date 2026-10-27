@@ -9,7 +9,16 @@ defmodule ResidencySchedule.IdentityMappings.Backfill do
   alias ResidencySchedule.Residents.{Resident, ScheduleResident}
   alias ResidencySchedule.ScheduleCache.Revision
 
-  @doc "Retains historical associations as observations only. Database integration tested."
+  @doc """
+  Retains historical associations as observations only, in bounded batches.
+
+      iex> ctx = ResidencySchedule.IdentityMappingDoctestFixtures.with_source()
+      iex> ResidencySchedule.IdentityMappings.Backfill.run(batch_size: 1)
+      {:ok, %{observations_added: 1, unchanged: 0, conflicting_keys: 0}}
+      iex> {:ok, result} = ResidencySchedule.IdentityMappings.resolve(ctx.schedule.id, :qgenda, "Legacy Iris")
+      iex> {result.status, result.reason}
+      {:held, :observed_only}
+  """
   def run(options) do
     with {:ok, batch_size} <- validate_options(options),
          {:ok, counts} <- fill_pages(0, batch_size, %{observations_added: 0, unchanged: 0}) do

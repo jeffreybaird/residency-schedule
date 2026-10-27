@@ -6,7 +6,16 @@ defmodule ResidencySchedule.IdentityMappings.Crosswalk do
   alias ResidencySchedule.Repo
   alias ResidencySchedule.ScheduleCache.Revision
 
-  @doc "Prepares a read-only administrator review. Database integration tested."
+  @doc """
+  Prepares a read-only administrator review against actual roster state.
+
+      iex> ctx = ResidencySchedule.IdentityMappingDoctestFixtures.seed()
+      iex> {:ok, plan} = ResidencySchedule.IdentityMappings.Crosswalk.prepare(ctx.schedule.id, :csv, ctx.rows, ctx.admin)
+      iex> plan.summary
+      %{additions: 1, existing: 0, held: 0, conflicts: 0}
+      iex> ResidencySchedule.IdentityMappings.State.mappings(ctx.schedule.id, :csv)
+      []
+  """
   def prepare(schedule_id, namespace, rows, user) do
     with {:ok, _actor} <- State.admin(user),
          {:ok, _key} <- Key.normalize(namespace, "validation"),
@@ -28,7 +37,17 @@ defmodule ResidencySchedule.IdentityMappings.Crosswalk do
     end
   end
 
-  @doc "Rechecks a review and appends approved revisions atomically. Database integration tested."
+  @doc """
+  Rechecks a review and appends approved revisions atomically.
+
+      iex> ctx = ResidencySchedule.IdentityMappingDoctestFixtures.seed()
+      iex> {:ok, plan} = ResidencySchedule.IdentityMappings.Crosswalk.prepare(ctx.schedule.id, :csv, ctx.rows, ctx.admin)
+      iex> ResidencySchedule.IdentityMappings.Crosswalk.approve(plan, ctx.admin)
+      {:ok, %{approved: 1, unchanged: 0}}
+      iex> {:ok, result} = ResidencySchedule.IdentityMappings.resolve(ctx.schedule.id, :csv, "Legacy Iris")
+      iex> {result.reason, result.schedule_resident_id == ctx.member.id}
+      {:approved_mapping, true}
+  """
   def approve(plan, user) do
     with {:ok, _actor} <- State.admin(user),
          :ok <- validate_plan(plan) do

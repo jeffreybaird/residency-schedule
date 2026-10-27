@@ -23,7 +23,10 @@ defmodule ResidencySchedule.IdentityMappings do
   Resolves explicitly within one schedule and namespace, returning matched,
   unmatched, ambiguous or held, with a reason and any established target IDs.
 
-  Database operation; integration tested instead of doctested.
+      iex> ctx = ResidencySchedule.IdentityMappingDoctestFixtures.seed()
+      iex> {:ok, result} = ResidencySchedule.IdentityMappings.resolve(ctx.schedule.id, :qgenda, "Reed, Iris")
+      iex> {result.status, result.reason, result.schedule_resident_id == ctx.member.id}
+      {:matched, :exact_name, true}
   """
   defdelegate resolve(schedule_id, namespace, source_key), to: Resolver
 
@@ -31,7 +34,10 @@ defmodule ResidencySchedule.IdentityMappings do
   Prepares a read-only review of at most 1000 source_key/position_code/expected_name
   rows. Rechecks the actual persisted administrator, roster and retained evidence.
 
-  Database operation; integration tested instead of doctested.
+      iex> ctx = ResidencySchedule.IdentityMappingDoctestFixtures.seed()
+      iex> {:ok, plan} = ResidencySchedule.IdentityMappings.prepare_crosswalk(ctx.schedule.id, :csv, ctx.rows, ctx.admin)
+      iex> plan.summary
+      %{additions: 1, existing: 0, held: 0, conflicts: 0}
   """
   defdelegate prepare_crosswalk(schedule_id, namespace, rows, user), to: Crosswalk, as: :prepare
 
@@ -39,7 +45,10 @@ defmodule ResidencySchedule.IdentityMappings do
   Rechecks the administrator and full prepared state, then appends approvals in
   one transaction. Stale, held, conflicting or altered reviews write nothing.
 
-  Database operation; integration tested instead of doctested.
+      iex> ctx = ResidencySchedule.IdentityMappingDoctestFixtures.seed()
+      iex> {:ok, plan} = ResidencySchedule.IdentityMappings.prepare_crosswalk(ctx.schedule.id, :csv, ctx.rows, ctx.admin)
+      iex> ResidencySchedule.IdentityMappings.approve_crosswalk(plan, ctx.admin)
+      {:ok, %{approved: 1, unchanged: 0}}
   """
   defdelegate approve_crosswalk(plan, user), to: Crosswalk, as: :approve
 
@@ -48,7 +57,11 @@ defmodule ResidencySchedule.IdentityMappings do
   changing source data. Batch size defaults to 500 and must be in 1..1000.
 
   A failed batch rolls back; earlier batches may remain and can be safely retried.
-  Database operation; integration tested instead of doctested.
+  The explicit synthetic fixture below runs in the test database sandbox.
+
+      iex> _ctx = ResidencySchedule.IdentityMappingDoctestFixtures.with_source()
+      iex> ResidencySchedule.IdentityMappings.backfill(batch_size: 1)
+      {:ok, %{observations_added: 1, unchanged: 0, conflicting_keys: 0}}
   """
   def backfill(options \\ []), do: Backfill.run(options)
 end

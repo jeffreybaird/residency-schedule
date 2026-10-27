@@ -2,7 +2,14 @@ defmodule ResidencySchedule.IdentityMappings.Resolver do
   @moduledoc false
   alias ResidencySchedule.IdentityMappings.{Key, State}
 
-  @doc "Resolves a scoped key without changing the legacy importer. Database integration tested."
+  @doc """
+  Resolves a scoped key without changing the legacy importer.
+
+      iex> ctx = ResidencySchedule.IdentityMappingDoctestFixtures.seed()
+      iex> {:ok, result} = ResidencySchedule.IdentityMappings.Resolver.resolve(ctx.schedule.id, :qgenda, "Reed, Iris")
+      iex> {result.status, result.reason, result.resident_id == ctx.member.resident_id}
+      {:matched, :exact_name, true}
+  """
   def resolve(schedule_id, namespace, source_key) do
     with {:ok, key} <- Key.normalize(namespace, source_key),
          {:ok, roster} <- State.roster(schedule_id) do
@@ -15,7 +22,18 @@ defmodule ResidencySchedule.IdentityMappings.Resolver do
     end
   end
 
-  @doc "Evaluates retained evidence against current roster state. Database integration tested."
+  @doc """
+  Evaluates retained evidence against current roster state.
+
+      iex> ctx = ResidencySchedule.IdentityMappingDoctestFixtures.seed()
+      iex> {:ok, plan} = ResidencySchedule.IdentityMappings.prepare_crosswalk(ctx.schedule.id, :csv, ctx.rows, ctx.admin)
+      iex> {:ok, _counts} = ResidencySchedule.IdentityMappings.approve_crosswalk(plan, ctx.admin)
+      iex> {:ok, roster} = ResidencySchedule.IdentityMappings.State.roster(ctx.schedule.id)
+      iex> records = ResidencySchedule.IdentityMappings.State.mappings(ctx.schedule.id, :csv)
+      iex> result = ResidencySchedule.IdentityMappings.Resolver.evaluate(records, roster, "legacy iris")
+      iex> {result.status, result.reason, result.schedule_resident_id == ctx.member.id}
+      {:matched, :approved_mapping, true}
+  """
   def evaluate(records, roster, lookup_key) do
     approved = Enum.find(records, &(&1.status == "approved" and &1.current))
     observations = Enum.filter(records, &(&1.status == "observed"))
@@ -25,14 +43,26 @@ defmodule ResidencySchedule.IdentityMappings.Resolver do
     select_result(approved, observations, invalid, exact)
   end
 
-  @doc "Finds independent full-name matches, never first-name proposals. Integration tested."
+  @doc """
+  Finds independent full-name matches, never first-name proposals.
+
+      iex> roster = [%{id: 11, name: "Iris Reed"}, %{id: 12, name: "Juniper Vail"}]
+      iex> ResidencySchedule.IdentityMappings.Resolver.exact_candidates(roster, "iris reed")
+      [%{id: 11, name: "Iris Reed"}]
+  """
   def exact_candidates(roster, lookup_key) do
     if String.contains?(lookup_key, " "),
       do: Enum.filter(roster, &(Key.fold(&1.name) == lookup_key)),
       else: []
   end
 
-  @doc "Returns immutable membership/person identity for conflict comparisons. Integration tested."
+  @doc """
+  Returns immutable membership/person identity for conflict comparisons.
+
+      iex> snapshot = %{"schedule_resident_id" => 21, "resident_id" => 31, "name" => "Iris Reed"}
+      iex> ResidencySchedule.IdentityMappings.Resolver.identity(snapshot)
+      {21, 31}
+  """
   def identity(snapshot),
     do: {snapshot["schedule_resident_id"], snapshot["resident_id"]}
 
