@@ -24,6 +24,8 @@ deployed successfully, and
 four Phase 2 backfills once from a guarded migration. See the
 [production backfill record](phase2-production-backfill-record.md): every
 backfill is confirmed complete in production as of October 28, 2026.
+Phase 3 is planned in the
+[effective-read comparison plan](schedule-effective-read-plan.md).
 The [old recovery program is canceled](schedule-adapter-recovery-decision.md).
 See the [Phase 1 contract](schedule-adapter-phase-1.md) and
 [verification record](schedule-adapter-phase-1-verification.md) for checks and limits.
