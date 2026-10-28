@@ -31,7 +31,9 @@ No `exact` timing is backfilled. No current adapter supplies instants, and
 task names such as `SMH GYN R2 Day` or `HH Nights 3rd Call` are not evidence
 of hours. The `exact` precision exists so that the schema, the pure
 interpretation and the constraints are already correct when a future adapter
-supplies real instants; writing them remains later writer work.
+supplies real instants; writing them remains later writer work. That writer
+must store instants normalized to UTC (the schema's `utc_datetime` fields) and
+record the source zone in `time_zone`.
 
 ## Representation
 
@@ -93,11 +95,11 @@ existing write lock before inserting, never updates an existing row, and holds
 one transaction per batch, so interrupted work can be rerun.
 
 Counts: `processed` (new rows), `period` and `date_only` (new outcomes),
-`unchanged` (existing rows whose digest still matches the current source facts,
-including reviewed/custom rows) and `conflicting` (existing rows whose source
-facts or rules changed, which are retained for explicit review, plus live
-sources whose stored period label is outside the closed set, which receive no
-row). A completed repeat inserts zero rows. A batch whose source is not
+`unchanged` (legacy rows whose digest still matches the current source facts
+and rule version, and every reviewed/custom row, whose evidence is never
+reinterpreted) and `conflicting` (legacy rows whose source facts or rules
+changed, which are retained for explicit review, plus live sources whose stored
+period label is outside the closed set, which receive no row). A completed repeat inserts zero rows. A batch whose source is not
 `csv`/`qgenda` returns `{:error, :unsupported_namespace}` and rolls back that
 batch; earlier batches remain.
 
