@@ -318,7 +318,10 @@ Monitor the deployment in the GitHub Actions tab. The workflow:
 1. **Test job** — runs ExUnit, release-artifact tests, and Python demo validation.
    PR CI additionally runs database-recovery and production-backup suites.
 2. **Build job** — creates one release archive identified by commit and SHA256,
-   without server runtime credentials or a distribution cookie.
+   without server runtime credentials or a distribution cookie. All workflow jobs
+   run on the pinned `ubuntu-24.04` runner image (never `ubuntu-latest`) because
+   the release bundles ERTS and native NIFs that must link against the droplet's
+   glibc.
 3. **Staging job** — promotes that archive to persistent isolated staging, with
    authentication enabled, outbound integrations disabled, and no automatic seed.
    Synthetic fixtures can be loaded manually using the

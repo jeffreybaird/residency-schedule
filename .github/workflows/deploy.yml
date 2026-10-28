@@ -13,7 +13,7 @@ env:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
@@ -58,7 +58,10 @@ jobs:
 
   build:
     name: Build immutable release
-    runs-on: ubuntu-latest
+    # The release bundles ERTS and native code (e.g. the bcrypt NIF), so it must be
+    # built on the droplet's OS (Ubuntu 24.04, see DEPLOY.md). Never use
+    # ubuntu-latest here: a newer image links against a newer glibc.
+    runs-on: ubuntu-24.04
     needs: test
     steps:
       - uses: actions/checkout@v4
@@ -89,7 +92,7 @@ jobs:
 
   staging:
     name: Rehearse (${{ matrix.target }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [test, build]
     environment: ${{ matrix.target }}
     concurrency:
@@ -212,7 +215,7 @@ jobs:
 
   deploy:
     name: Deploy (${{ matrix.target }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [test, build, staging]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: ${{ matrix.target }}
