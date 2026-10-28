@@ -208,9 +208,11 @@ defmodule ResidencyScheduleWeb.ScheduleLiveTest do
     end
 
     test "cross-month shows both months" do
-      label = Index.slot_header_label(~D[2023-06-28], ~D[2023-07-04])
-      assert label =~ "Jun"
-      assert label =~ "Jul"
+      assert Index.slot_header_label(~D[2023-06-28], ~D[2023-07-04]) == "28 Jun–4 Jul"
+    end
+
+    test "single day shows only that day" do
+      assert Index.slot_header_label(~D[2026-10-31], ~D[2026-10-31]) == "31 Oct"
     end
   end
 
