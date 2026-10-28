@@ -94,10 +94,14 @@ ruby "$config_helper" prepare "$CONFIG_FILE" "$INSTALL_DIR" "$candidate" "${work
   "$DEPLOY_TARGET" "$APP_PORT" "$SEED_DEMO" "$prior_artifact" || fail 'Runtime configuration validation failed'
 
 # Ruby passes the validated JSON environment directly to the release process.
-# No server environment file is evaluated as shell code.
-if ! ruby "$config_helper" run "$candidate" "$SEED_DEMO" 9>&- >/dev/null 2>&1; then
-  fail 'Release migration or demo seeding failed; current release unchanged'
+# No server environment file is evaluated as shell code. Release output may
+# carry secrets: it goes only to a private 0600 host log beside the workspace,
+# retained on failure for operators and removed on success, never echoed here.
+eval_log="${INSTALL_DIR}.deploy/${DEPLOY_RUN_ID}.release-eval.log"
+if ! ruby "$config_helper" run "$candidate" "$SEED_DEMO" "$eval_log" 9>&- >/dev/null 2>&1; then
+  fail "Release migration or demo seeding failed; current release unchanged; release output retained privately at $eval_log"
 fi
+rm -f -- "$eval_log" >/dev/null 2>&1 || fail 'Release evaluation log cleanup failed; current release unchanged'
 
 swapping=true
 mv -- "$INSTALL_DIR" "$rollback"

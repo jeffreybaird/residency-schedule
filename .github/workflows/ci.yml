@@ -14,7 +14,8 @@ env:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
+    # Pinned to mirror deploy.yml (release must match the Ubuntu 24.04 droplet).
+    runs-on: ubuntu-24.04
 
     services:
       postgres:

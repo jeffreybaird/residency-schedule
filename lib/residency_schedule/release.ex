@@ -7,6 +7,7 @@ defmodule ResidencySchedule.Release do
   alias ResidencySchedule.SourceProvenance
   alias ResidencySchedule.StagingFixtures
   alias ResidencySchedule.TaskMappings
+  alias ResidencySchedule.Timings
   @app :residency_schedule
 
   @doc """
@@ -149,6 +150,28 @@ defmodule ResidencySchedule.Release do
           {:ok, %{seed: seed, classifications: classifications}}
         end
       end)
+
+    result
+  end
+
+  @doc """
+  Fills missing timing precision rows for saved source occurrences.
+
+  Run after the reviewed schema is deployed from the installed release:
+
+      bin/residency_schedule eval 'IO.inspect(ResidencySchedule.Release.backfill_timings())'
+
+  This executable example uses a synthetic source in the test SQL sandbox.
+
+      iex> _ctx = ResidencySchedule.TimingDoctestFixtures.source()
+      iex> ResidencySchedule.Release.backfill_timings()
+      {:ok, %{processed: 1, period: 1, date_only: 0, unchanged: 0, conflicting: 0}}
+  """
+  def backfill_timings do
+    load_app()
+    [repo] = repos()
+
+    {:ok, result, _apps} = Ecto.Migrator.with_repo(repo, fn _repo -> Timings.backfill() end)
 
     result
   end

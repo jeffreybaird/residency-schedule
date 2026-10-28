@@ -337,20 +337,38 @@ module RuntimeConfig
     File.symlink(environment, File.join(candidate, '.env'))
   end
 
-  def run(candidate, seed_demo)
+  # Release output may carry secrets, so it never reaches the promotion's own
+  # stdout/stderr (CI logs). It is retained privately on the host for operators.
+  # Re-runs reuse DEPLOY_RUN_ID, so the log is truncated rather than exclusive.
+  def open_eval_log(path)
+    log = File.open(path, File::WRONLY | File::CREAT | File::TRUNC | File::NOFOLLOW, 0o600)
+    raise 'release evaluation log is not a regular file' unless log.stat.file?
+
+    log
+  rescue StandardError
+    log&.close
+    raise
+  end
+
+  def run(candidate, seed_demo, eval_log)
     target = ENV.fetch('DEPLOY_TARGET')
     values, = managed_values(ENV.fetch('INSTALL_DIR'), File.join(candidate, '.env'),
                              target, ENV.fetch('APP_PORT'), seed_demo)
     child_environment = (ALLOWED_KEYS + RELEASE_OVERRIDE_KEYS).to_h { |key| [key, nil] }
     APPLICATION_KEYS.each { |key| child_environment[key] = values[key] if values.key?(key) }
     child_environment['CONFIG_ENVIRONMENT'] = 'staging' if target == 'staging'
-    evaluate(candidate, child_environment, 'ResidencySchedule.Release.migrate()')
-    evaluate(candidate, child_environment, 'ResidencySchedule.Release.seed_demo()') if seed_demo == 'true'
+    log = open_eval_log(eval_log)
+    begin
+      evaluate(candidate, child_environment, 'ResidencySchedule.Release.migrate()', log)
+      evaluate(candidate, child_environment, 'ResidencySchedule.Release.seed_demo()', log) if seed_demo == 'true'
+    ensure
+      log.close
+    end
   end
 
-  def evaluate(candidate, environment, expression)
+  def evaluate(candidate, environment, expression, log)
     process = Process.spawn(environment, File.join(candidate, 'bin/residency_schedule'), 'eval', expression,
-                            chdir: candidate, close_others: true, out: File::NULL, err: File::NULL)
+                            chdir: candidate, close_others: true, out: log, err: log)
     _, status = Process.wait2(process)
     raise 'release evaluation failed' unless status.success?
   end
@@ -371,7 +389,7 @@ module RuntimeConfig
 
       prepare(*values)
     when 'run'
-      raise 'invalid arguments' unless values.length == 2
+      raise 'invalid arguments' unless values.length == 3
 
       run(*values)
     else

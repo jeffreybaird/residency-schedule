@@ -218,7 +218,10 @@ contents before running application/service commands. Capture the
 prior code artifact before the first mutation. Migrations run from the candidate
 before swapping directories and restarting. Migration failure leaves the current
 application files and process in place; it does not trigger an unnecessary
-restart. Demo seeding can change data and is not reversible through binary swaps.
+restart. The migrate and seed output of that run is retained privately at
+`<INSTALL_DIR>.deploy/<DEPLOY_RUN_ID>.release-eval.log` (mode 0600, beside
+the per-run workspace) for operators reading on the host; it is never copied
+into the workflow and is removed as soon as evaluation succeeds. Demo seeding can change data and is not reversible through binary swaps.
 
 Failures during the directory swap, restart or startup HTTP check attempt to
 restore the previous application and verify its HTTP readiness. Recovery failure

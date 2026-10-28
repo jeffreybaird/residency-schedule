@@ -68,7 +68,13 @@ class ReleaseArtifactsTest < Minitest::Test
       File.open(ENV.fetch('GATE_READY'), 'w') { |ready| ready.puts('ready') }
       File.open(ENV.fetch('GATE_RELEASE'), &:gets)
     end
-    exit(ENV['FAIL_MIGRATE_LABEL'] == label ? 1 : 0)
+    if ENV['RELEASE_EVAL_MARKER']
+      $stdout.puts("synthetic-eval-stdout-#{phase}-#{ENV.fetch('RELEASE_EVAL_MARKER')}")
+      $stderr.puts("synthetic-eval-stderr-#{phase}-#{ENV.fetch('RELEASE_EVAL_MARKER')}")
+    end
+    failed = (phase == 'migrate' && ENV['FAIL_MIGRATE_LABEL'] == label) ||
+             (phase == 'seed' && ENV['FAIL_SEED_LABEL'] == label)
+    exit(failed ? 1 : 0)
   RUBY
 
   COMMAND_STUB = <<~'RUBY'
@@ -358,6 +364,37 @@ class ReleaseArtifactsTest < Minitest::Test
       refute_includes %w[.env COOKIE], File.basename(candidate), candidate
     end
     Dir.glob("#{install}.artifacts/*.tar.gz").each { |archive| assert_archive_private(archive) }
+    Dir.glob("#{install}.deploy/*.release-eval.log").each do |log|
+      refute File.symlink?(log), log
+      assert_equal 0o600, File.stat(log).mode & 0o777, log
+    end
+  end
+
+  def release_eval_log(install = @current, run_id = "run-#{SHA_A[0, 8]}")
+    "#{install}.deploy/#{run_id}.release-eval.log"
+  end
+
+  def eval_markers(phase, marker)
+    ["synthetic-eval-stdout-#{phase}-#{marker}", "synthetic-eval-stderr-#{phase}-#{marker}"]
+  end
+
+  # The failure stays diagnosable from the host without echoing release output,
+  # which may carry secrets, into the promotion's own stdout/stderr (CI logs).
+  def assert_retained_eval_log(result, log, present, absent: [])
+    assert_match(/\ARelease migration or demo seeding failed; current release unchanged/, result.stderr)
+    assert_includes result.stderr, log, 'failure message must name the retained private evaluation log'
+    assert File.file?(log), 'failed release evaluation output must be retained privately'
+    refute File.symlink?(log)
+    assert_equal 0o600, File.stat(log).mode & 0o777
+    assert_equal Process.euid, File.stat(log).uid
+    content = File.read(log)
+    present.each { |marker| assert_includes content, marker }
+    absent.each { |marker| refute_includes content, marker }
+    [COOKIE, ENV_SECRET, 'synthetic-env-cookie'].each { |secret| refute_includes content, secret }
+    (present + absent).each do |marker|
+      refute_includes result.stdout + result.stderr, marker, 'release output must not be echoed to promotion output'
+    end
+    content
   end
 
   def test_one_secret_free_artifact_promotes_unchanged_to_production_and_demo
@@ -620,6 +657,52 @@ class ReleaseArtifactsTest < Minitest::Test
     assert_equal before, File.binread(File.join(@current, '.env'))
     assert_equal ['migrate'], logged.map { |event| event['phase'] }
     assert_private_current
+    assert_no_private_retention
+  end
+
+  def test_migration_failure_retains_private_release_eval_log_without_echoing_output
+    artifact = package
+    log = release_eval_log
+    result = promote(artifact, FAIL_MIGRATE_LABEL: 'A', RELEASE_EVAL_MARKER: 'migrate-case')
+    refute result.success?
+    assert_equal 'legacy', installed_label
+    assert_equal ['migrate'], logged.map { |event| event['phase'] }
+    assert_retained_eval_log(result, log, eval_markers('migrate', 'migrate-case'))
+    assert_equal [log], Dir.glob("#{@current}.deploy/*"), 'only the private evaluation log is retained'
+    assert_private_current
+    assert_no_private_retention
+  end
+
+  def test_seed_failure_retains_both_migrate_and_seed_evaluation_output_in_one_log
+    artifact = package
+    log = release_eval_log
+    result = promote(artifact, SEED_DEMO: 'true', FAIL_SEED_LABEL: 'A', RELEASE_EVAL_MARKER: 'seed-case')
+    refute result.success?
+    assert_equal 'legacy', installed_label
+    assert_equal %w[migrate seed], logged.map { |event| event['phase'] }
+    migrate_markers = eval_markers('migrate', 'seed-case')
+    seed_markers = eval_markers('seed', 'seed-case')
+    content = assert_retained_eval_log(result, log, migrate_markers + seed_markers)
+    assert_operator content.index(migrate_markers.first), :<, content.index(seed_markers.first),
+                    'successful migrate output precedes the failed seed output in the appended log'
+    assert_private_current
+    assert_no_private_retention
+  end
+
+  def test_successful_evaluation_leaves_no_release_eval_log_and_echoes_nothing
+    artifact = package
+    log = release_eval_log
+    result = promote(artifact, SEED_DEMO: 'true', RELEASE_EVAL_MARKER: 'success-case')
+    assert result.success?, result.stderr
+    assert_equal 'A', installed_label
+    assert_equal %w[migrate seed], logged.select { |event| %w[migrate seed].include?(event['phase']) }
+                                         .map { |event| event['phase'] }
+    refute File.exist?(log), 'successful evaluation must remove its private log'
+    assert_empty Dir.glob("#{@current}.deploy/*.release-eval.log")
+    (eval_markers('migrate', 'success-case') + eval_markers('seed', 'success-case')).each do |marker|
+      refute_includes result.stdout + result.stderr, marker
+    end
+    assert_managed_configuration
     assert_no_private_retention
   end
 
