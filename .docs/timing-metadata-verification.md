@@ -153,3 +153,30 @@ increment cannot reach production until that is resolved. Existing readers and
 writers remain authoritative. Native audit/source-edit hook activation was not
 verified; role ownership, accepted test hashes and independent review provide
 the recorded workflow evidence.
+
+## Deployment failure diagnosis and fix (October 28, 2026)
+
+Comparing the build-job logs of the last successful deploy (#88) and the first
+failure (#89) showed the cause: GitHub's `ubuntu-latest` label moved from
+`ubuntu-24.04` to `ubuntu-26.04` between October 21 and 27, and
+`erlef/setup-beam` then fetched the `ubuntu-26.04` OTP build. The release
+bundles that ERTS and the bcrypt NIF, which cannot start on the Ubuntu 24.04
+droplet, so `bin/residency_schedule eval` failed within seconds, before any
+migration. Both resolved Elixir/OTP versions were identical in the two builds.
+
+Two changes on this branch, through the same test-writer/implementer/review
+workflow: every workflow job is pinned to `ubuntu-24.04`, and the promotion
+script now retains the release's evaluation output privately on the host at
+`<INSTALL_DIR>.deploy/<DEPLOY_RUN_ID>.release-eval.log` (mode 0600, never
+copied into the workflow, removed on success) and names that path in its
+failure message. Accepted Ruby contract:
+`test/deploy/release_artifacts_test.rb` SHA256
+`f0b21ea8e7b901a421ffcf5cfc9bd69bf9bb81e6272db25c448b75cd33db540a`; red run
+52 runs, 2 expected failures; green run **52 runs, 11,787 assertions, zero
+failures**, with the database recovery (43 runs) and production backup (58
+runs) suites also green, shell and Ruby syntax checks, YAML parsing and
+`git diff --check` exiting zero. The reviewer accepted the final diff.
+
+The exact server-side error text was not observed from this session; it is
+inferred from the runner-image evidence and should be confirmed by the next
+deployment run, whose evaluation log is now retained if it fails again.

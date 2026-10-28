@@ -642,7 +642,10 @@ to stale server values.
 Private configuration versions and legacy recovery copies contain credentials.
 Preserve the designated recovery configuration, restrict its access and agree a
 retention window before pruning. These files must never enter build artifacts or
-ordinary diagnostic logs. Distribution-cookie rotation requires a separate
+ordinary diagnostic logs. Release migration and seeding output is likewise
+written only to `<INSTALL_DIR>.deploy/<DEPLOY_RUN_ID>.release-eval.log`, a
+0600 host file for operator reading: it is never copied into the workflow, is
+retained when migration or seeding fails, and is removed on success. Distribution-cookie rotation requires a separate
 reviewed procedure; normal deployment verifies continuity.
 
 ### Backups and database recovery
