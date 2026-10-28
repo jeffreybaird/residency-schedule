@@ -109,7 +109,7 @@ From the installed release, after the reviewed schema is deployed:
 bin/residency_schedule eval 'IO.inspect(ResidencySchedule.Release.backfill_timings())'
 ```
 
-The call prints `{:ok, counts}`. This document records the operator contract
+The call prints `{:ok, counts}`. Migration `20261028190000_run_phase2_backfills` runs this backfill once during `Release.migrate()` on the next deployment (the `:run_phase2_backfills_on_migrate` flag is off in the test environment); the manual command above remains the verification and rerun path and reports zero new rows once the migration has run. This document records the operator contract
 and local validation only; see the
 [verification record](timing-metadata-verification.md). It does not establish
 production execution, and the earlier production backfills remain unconfirmed

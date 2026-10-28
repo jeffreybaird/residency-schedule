@@ -7,6 +7,9 @@ import Config
 # Run `mix help test` for more information.
 config :residency_schedule, roster_path: "test/fixtures/roster.csv"
 
+# Test databases are seeded per sandbox, never by migration 20261028190000.
+config :residency_schedule, run_phase2_backfills_on_migrate: false
+
 # Chat tests never reach a real model
 config :residency_schedule, :chat,
   enabled: true,

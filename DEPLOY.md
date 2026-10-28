@@ -617,6 +617,21 @@ flock -x --close /home/deploy/residency_schedule.deploy.lock bash
 sudo systemctl restart residency_schedule
 ```
 
+### Running a release command manually
+
+Release commands such as the Phase 2 backfills run as the `deploy` user from the
+installed release, without `sudo`, using the managed configuration the promotion
+generated. The command below reads the same private `runtime.json` the promotion
+uses and passes it to the release process directly, so no shell expansion or
+sourcing of the environment file takes place:
+
+```bash
+cd /home/deploy/residency_schedule && ruby -rjson -e 'env = JSON.parse(File.read(File.join(File.dirname(File.readlink(".env")), "runtime.json"))); exec(env, "bin/residency_schedule", "eval", ARGV[0])' 'IO.inspect(ResidencySchedule.Release.backfill_timings())'
+```
+
+Replace the quoted expression with the release function you need. Hold the
+deployment lock for anything that changes data.
+
 ### Manual rollback
 
 The deployment now retains checksummed code archives rather than a disposable

@@ -100,7 +100,7 @@ managed runtime/operator configuration and deployment lock:
 bin/residency_schedule eval 'IO.inspect(ResidencySchedule.Release.backfill_identity_mappings())'
 ```
 
-The context API is `IdentityMappings.backfill(options)`, with `batch_size`
+Migration `20261028190000_run_phase2_backfills` runs this backfill once during `Release.migrate()` on the next deployment (the `:run_phase2_backfills_on_migrate` flag is off in the test environment); the manual command above remains the verification and rerun path and reports zero new rows once the migration has run. The context API is `IdentityMappings.backfill(options)`, with `batch_size`
 defaulting to 500 and accepting 1–1,000. Its result includes
 `observations_added`, `unchanged` and `conflicting_keys` counts. Repeating a
 completed backfill adds zero observations; unchanged/conflict counts may still
