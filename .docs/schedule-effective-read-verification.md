@@ -109,7 +109,50 @@ or exported, and every public function has a doctest or a stated database
 exemption. One recorded deviation from plan D1: working days carry `off: nil`,
 which the accepted tests pin.
 
-### Remaining PR 1 work
+### Acceptance-scenario fixtures
 
-The acceptance-scenario fixtures and tests from the release plan's comparison
-contract follow as a test-only change against this service.
+A second, test-only round added `ResidencySchedule.EffectiveScheduleFixtures`
+(`test/support/effective_schedule_fixtures.ex`) with one synthetic fixture per
+read-side scenario of the release plan's comparison contract, and
+`test/residency_schedule/effective_schedule/acceptance_test.exs`, which runs the
+comparison on each and pins the current legacy meaning: the April 5–18 vacation
+from roster weekdays and imported weekends with dated notes; a clinic activity
+on a rotation day (invisible in legacy); gap filling and coverage precedence;
+Strong canonical and explicit-Friday night boundaries, the Friday correction,
+Highland post-call trimming and the Saturday Highland gap rule; blank, OFF,
+unknown and relabeled tasks; identical reimport and a correction. Each
+scenario compares with zero differences. Deliberately out of scope here:
+ambiguous people, consumer outputs and incomplete QGenda exports.
+
+The reviewer accepted the tests after one moduledoc edit, verifying every
+pinned value against the projection, feed and importer code. Accepted hashes:
+`test/support/effective_schedule_fixtures.ex`
+`63ddcfcddebedd50aef68e83395ee04080436c71e9eb44fa9a8ac1ab6b5aede6`;
+`test/residency_schedule/effective_schedule/acceptance_test.exs`
+`fed727a37a6f9d0e588c372870a968aa0915c9e64e85512bf7ba23857dcab97a`. The runner's
+record: format, compile and Credo clean; the acceptance file 23 tests, 0
+failures; full `mix test` **302 doctests, 1958 tests, 0 failures** (seed
+79515). Hex audit clean; no CVE-level audit tool is available.
+
+### Legacy findings to classify (plan D4)
+
+- `legacy_defect`: a one-day all-day segment immediately before a night block
+  without a source date (for example Saturday post call before Highland night
+  float) is emitted as a zero-length all-day event (`DTEND == DTSTART`),
+  which calendar clients drop. Fix in its own small PR (skip the trim when it
+  would empty the event; the UID does not change), with a spec-writer revision
+  of the acceptance assertion that pins the current output.
+- `approved` (importer write behavior, outside the read comparison): an
+  identical whole-year CSV reimport regenerates every `schedule_residents` id
+  while person ids stay stable; whole-year replacement is already refused once
+  detail links exist.
+- Expected v2 differences, pinned so the harness surfaces them in PR 2: a
+  clinic on a rotation day is not a distinct duty; OFF is a working
+  `qgenda_assignment` gap fill; coverage duties carry the stored rotation
+  type; Sunday Highland night tasks resolve to `qgenda_assignment`.
+
+### Next
+
+PR 2 replaces the `:v2` internals with the Phase 2 policies and classifies
+every difference the harness then reports; the open questions in the read
+plan need the user's answers before PR 2 starts.
