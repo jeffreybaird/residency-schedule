@@ -818,6 +818,10 @@ defmodule ResidencyScheduleWeb.ScheduleLive.Index do
   end
 
   @doc false
+  def slot_header_label(start_date, end_date) when start_date == end_date do
+    Calendar.strftime(start_date, "%-d %b")
+  end
+
   def slot_header_label(start_date, end_date) do
     if start_date.month == end_date.month do
       "#{start_date.day}–#{end_date.day} #{Calendar.strftime(start_date, "%b")}"
