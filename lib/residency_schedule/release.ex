@@ -2,6 +2,7 @@ defmodule ResidencySchedule.Release do
   @moduledoc "Provides database tasks for application releases."
 
   alias Ecto.Adapters.SQL
+  alias ResidencySchedule.EffectiveSchedule.Comparison
   alias ResidencySchedule.IdentityMappings
   alias ResidencySchedule.Importer.ScheduleImporter
   alias ResidencySchedule.SourceProvenance
@@ -202,6 +203,35 @@ defmodule ResidencySchedule.Release do
 
     result
   end
+
+  @doc """
+  Compares the legacy and v2 effective-schedule reads of one schedule and
+  prints only the aggregate counts. Resident-level detail stays in the returned
+  term for inspection in the calling session (plan D5):
+
+      bin/residency_schedule eval 'ResidencySchedule.Release.compare_effective_schedule(1)'
+
+  Returns `{:ok, summary}` or `{:error, :not_found}`, which prints nothing.
+  Requires a database; covered by `ReleaseCompareTest` instead of a doctest.
+  """
+  def compare_effective_schedule(schedule_id) do
+    load_app()
+    [repo] = repos()
+
+    {:ok, result, _apps} =
+      Ecto.Migrator.with_repo(repo, fn _repo -> Comparison.run(schedule_id) end)
+
+    print_comparison_counts(result)
+    result
+  end
+
+  @comparison_counts ~w(schedule_id identical_days differing_days differing_calendar_events differing_consumer_outputs)a
+
+  defp print_comparison_counts({:ok, summary}) do
+    Enum.each(@comparison_counts, &IO.puts("#{&1}: #{Map.fetch!(summary, &1)}"))
+  end
+
+  defp print_comparison_counts({:error, _reason}), do: :ok
 
   @doc """
   Returns the absolute path to the demo CSV inside the release.

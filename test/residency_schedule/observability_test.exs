@@ -202,4 +202,11 @@ defmodule ResidencySchedule.ObservabilityTest do
                "duration_ms" => 1
              })
   end
+
+  test "schedule comparison phase and mismatch count are allowlisted and preserve results" do
+    alias ResidencySchedule.Observability.Tracing
+    assert Tracing.phase(:schedule_compare, fn -> 1 end) == 1
+    assert Tracing.count(:mismatches, 0) == :ok
+    assert Tracing.count(:mismatches, 7) == :ok
+  end
 end
