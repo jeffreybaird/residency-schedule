@@ -44,7 +44,7 @@ relied on, run from the installed release using its existing runtime configurati
 bin/residency_schedule eval 'IO.inspect(ResidencySchedule.Release.backfill_source_provenance())'
 ```
 
-The command prints `{:ok, %{activity_sources_updated: count}}`. The context API
+The command prints `{:ok, %{activity_sources_updated: count}}`. Migration `20261028190000_run_phase2_backfills` runs this backfill once during `Release.migrate()` on the next deployment (the `:run_phase2_backfills_on_migrate` flag is off in the test environment); the manual command above remains the verification and rerun path and reports zero new rows once the migration has run. The context API
 `ResidencySchedule.SourceProvenance.backfill(batch_size: 500)` supports batch
 sizes from 1 to 1,000. It fills empty references for QGenda sources, skips other
 source kinds and already populated references, and preserves timestamps and

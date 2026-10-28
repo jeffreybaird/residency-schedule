@@ -13,7 +13,11 @@ config :residency_schedule,
   ecto_repos: [ResidencySchedule.Repo],
   generators: [timestamp_type: :utc_datetime],
   access_password: "dev-password",
-  demo_mode: false
+  demo_mode: false,
+  # Migration 20261028190000 runs the Phase 2 backfills once during
+  # Release.migrate/0; config/test.exs turns this off so test databases are
+  # never seeded by migration.
+  run_phase2_backfills_on_migrate: true
 
 # Chat assistant model provider. Swap providers or models here; the API key
 # comes from the environment in config/runtime.exs.

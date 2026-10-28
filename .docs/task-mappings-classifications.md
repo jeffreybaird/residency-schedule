@@ -92,7 +92,7 @@ legacy facts and then backfills saved source occurrences:
 bin/residency_schedule eval 'IO.inspect(ResidencySchedule.Release.backfill_task_classifications())'
 ```
 
-The release result separates `seed` counters from `classifications` counters.
+Migration `20261028190000_run_phase2_backfills` runs this backfill once during `Release.migrate()` on the next deployment (the `:run_phase2_backfills_on_migrate` flag is off in the test environment); the manual command above remains the verification and rerun path and reports zero new rows once the migration has run. The release result separates `seed` counters from `classifications` counters.
 Backfill reports `processed` as the number of newly inserted results, with
 `resolved`, `context_required`, `recognized_unclassified` and `unmapped` counting
 those new outcomes. `conflicting` counts retained results whose inputs or rules
