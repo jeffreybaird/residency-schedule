@@ -60,7 +60,9 @@ historical source facts. Existing application reads and imports remain in use.
 The [verification record](schedule-source-provenance-verification.md) records
 populated legacy-schema migration checks, legacy insert compatibility, backfill
 repetition, writer behavior and the final test/review results. Local synthetic
-validation is separate from production deployment and backfill execution.
+validation is separate from production deployment and backfill execution,
+which the [production backfill record](phase2-production-backfill-record.md)
+confirms.
 
 The next schema delivery addresses mappings and classifications, followed by
 timing metadata. The [retired recovery program](schedule-adapter-recovery-decision.md)
