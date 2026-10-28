@@ -29,8 +29,10 @@
 # exit immediately.
 #
 # This repo has no Dockerfile, so the exact toolchain versions are
-# pinned here. Keep them in sync with the ELIXIR_VERSION/OTP_VERSION
-# majors in .github/workflows/ci.yml (currently 1.18 / 27); the hexpm
+# pinned here. Keep them in sync with .tool-versions and the
+# ELIXIR_VERSION/OTP_VERSION values in .github/workflows/ci.yml and
+# deploy.yml (currently 1.19.5 / 28.5.0.7); mix.exs requires Elixir
+# ~> 1.19, so an older pin makes every mix command fail. The hexpm
 # image tag below must exist on Docker Hub for the pinned pair.
 set -euo pipefail
 
@@ -41,8 +43,8 @@ LOG=/tmp/residency-schedule-cloud-setup.log
 echo "cloud bootstrap running; full log: $LOG"
 exec >>"$LOG" 2>&1
 
-ELIXIR_VERSION=1.18.4
-OTP_VERSION=27.3.4
+ELIXIR_VERSION=1.19.5
+OTP_VERSION=28.5.0.7
 HEXPM_IMAGE="hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-bookworm-20260610"
 
 echo "==> Starting PostgreSQL"
