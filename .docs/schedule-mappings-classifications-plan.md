@@ -182,9 +182,8 @@ links. Preserve blank versus explicit OFF/cancellation semantics.
 - Keep private names/crosswalks out of committed fixtures and reports. Use
   synthetic examples and aggregate conflict counts.
 - Record actual deployment/migration/backfill results separately from local test
-  evidence. The successful deployment workflow for #88 is known, but its manual
-  production backfill is not confirmed by repository evidence; verify it locally
-  before relying on complete provenance references.
+  evidence. All Phase 2 production backfills are confirmed in the
+  [production backfill record](phase2-production-backfill-record.md).
 
 Done for this planned increment means the two additive representations and their
 backfills are tested, reviewable and documented, with differences explicitly

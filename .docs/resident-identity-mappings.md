@@ -112,8 +112,9 @@ observed targets, including conflicts recorded by earlier runs.
 
 Use synthetic data for migration, conflict and stale-plan tests. The
 [verification record](resident-identity-mappings-verification.md) distinguishes
-local results from actual deployment and backfill execution. Production execution
-is not established by this document.
+local results from actual deployment and backfill execution. Production
+execution is confirmed in the
+[production backfill record](phase2-production-backfill-record.md).
 
 The [snapshot-and-rebuild decision](schedule-adapter-recovery-decision.md) remains
 in effect. This increment introduces no backup activation or recovery program.

@@ -112,7 +112,8 @@ for them. Earlier completed batches remain and may be retried. These
 operations use the existing deployment/operator locking discipline; they are
 separate from schema deployment. See the
 [verification record](task-mappings-classifications-verification.md) for local
-checks and their limits. This document does not establish production execution.
+checks and their limits. Production execution is confirmed in the
+[production backfill record](phase2-production-backfill-record.md).
 
 ## Delivery boundaries
 

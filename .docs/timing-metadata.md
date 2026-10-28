@@ -110,10 +110,10 @@ bin/residency_schedule eval 'IO.inspect(ResidencySchedule.Release.backfill_timin
 ```
 
 The call prints `{:ok, counts}`. Migration `20261028190000_run_phase2_backfills` runs this backfill once during `Release.migrate()` on the next deployment (the `:run_phase2_backfills_on_migrate` flag is off in the test environment); the manual command above remains the verification and rerun path and reports zero new rows once the migration has run. This document records the operator contract
-and local validation only; see the
-[verification record](timing-metadata-verification.md). It does not establish
-production execution, and the earlier production backfills remain unconfirmed
-by repository evidence.
+and local validation; see the
+[verification record](timing-metadata-verification.md). Production execution
+is confirmed in the
+[production backfill record](phase2-production-backfill-record.md).
 
 ## Delivery boundaries
 
