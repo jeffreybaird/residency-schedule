@@ -45,7 +45,11 @@ exec >>"$LOG" 2>&1
 
 ELIXIR_VERSION=1.19.5
 OTP_VERSION=28.5.0.7
-HEXPM_IMAGE="hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-bookworm-20260610"
+# hexpm publishes no image for OTP 28.5.0.7 (28.5.0.5 is the newest tag as
+# of 2026-10-28), so the Docker fallback uses the nearest published patch of
+# the same OTP major; mix.exs constrains only the Elixir version.
+HEXPM_OTP_VERSION=28.5.0.5
+HEXPM_IMAGE="hexpm/elixir:${ELIXIR_VERSION}-erlang-${HEXPM_OTP_VERSION}-debian-bookworm-20260824"
 
 echo "==> Starting PostgreSQL"
 pg_lsclusters | grep -q . || pg_createcluster 16 main
