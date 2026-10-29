@@ -5,6 +5,7 @@ defmodule ResidencySchedule.StrongNightProjectionTest do
 
   alias ResidencySchedule.{
     DetailedSchedules,
+    Ical,
     Repo,
     Residents,
     Rotations,
@@ -137,6 +138,110 @@ defmodule ResidencySchedule.StrongNightProjectionTest do
 
     assert Repo.get!(Activity, amb_activity.id) == amb_activity
     assert Repo.get!(Activity, nf_activity.id) == nf_activity
+  end
+
+  test "canonical night coverage inherits the covered day's evening-first metadata", c do
+    {covering, nf, override} = cover_night(c, ~D[2026-11-03], ~D[2026-11-03])
+    raw_rotation = Rotations.get_rotation(nf.id)
+    raw_override = Repo.get!(ShiftOverrides.ShiftOverride, override.id)
+    entries = assert_coverage_read_parity(c, covering)
+
+    assert [coverage] = entries
+    assert coverage.rotation_type == "night_float"
+    assert coverage.start_date == ~D[2026-11-03]
+    assert coverage.end_date == ~D[2026-11-03]
+    assert coverage.is_coverage
+    assert coverage.original_resident.id == c.night_float.id
+    assert Map.get(coverage, :source_assignment_date) == ~D[2026-11-01]
+    assert Map.get(coverage, :source_tasks) == []
+
+    assert [event] = Ical.events_from_segments(entries, covering.name)
+    assert event.uid == "seg-night_float-2026-11-03-2026-11-03@residency-schedule"
+    assert event.dtstart == "20261103T180000"
+    assert event.dtend == "20261104T060000"
+    assert Ical.build(covering) =~ "DTSTART:20261103T180000"
+    assert Ical.build(covering) =~ "DTEND:20261104T060000"
+
+    owner_entries = Rotations.effective_segments_for_resident(c.night_float.id)
+    assert [covered] = Enum.filter(owner_entries, &(not is_nil(&1.covered_by)))
+    assert covered.source_assignment_date == coverage.source_assignment_date
+    assert covered.covered_by.id == covering.id
+    owner_events = Ical.events_from_segments(owner_entries, c.night_float.name)
+    refute Enum.any?(owner_events, &(&1.dtstart == "20261103T180000"))
+    assert Enum.any?(owner_events, &(&1.dtstart == "20261102T180000"))
+    assert Enum.any?(owner_events, &(&1.dtstart == "20261104T180000"))
+    assert Rotations.get_rotation(nf.id) == raw_rotation
+    assert Repo.get!(ShiftOverrides.ShiftOverride, override.id) == raw_override
+  end
+
+  test "incoming canonical night coverage loads timing metadata from the original schedule", c do
+    {:ok, other_schedule} = Schedules.upsert_schedule(2027, "2027–2028")
+    covering = resident(other_schedule, 3)
+    [nf | _] = Rotations.list_rotations_for_resident(c.night_float.id)
+
+    {:ok, _override} =
+      ShiftOverrides.create_override(%{
+        rotation_id: nf.id,
+        covering_schedule_resident_id: covering.id,
+        override_start_date: ~D[2026-11-03],
+        override_end_date: ~D[2026-11-03]
+      })
+
+    entries = Rotations.effective_segments_for_resident(covering.id)
+    assert [coverage] = entries
+    assert coverage.rotation_type == "night_float"
+    assert coverage.start_date == ~D[2026-11-03]
+    assert coverage.end_date == ~D[2026-11-03]
+    assert coverage.is_coverage
+    assert coverage.original_resident.id == c.night_float.id
+    assert Map.get(coverage, :source_assignment_date) == ~D[2026-11-01]
+
+    assert Rotations.resident_schedule_data(covering).effective_entries == entries
+    assert Rotations.effective_segments_for_person(covering.resident_id) == entries
+
+    assert [event] = Ical.events_from_segments(entries, covering.name)
+    assert event.uid == "seg-night_float-2026-11-03-2026-11-03@residency-schedule"
+    assert event.dtstart == "20261103T180000"
+    assert event.dtend == "20261104T060000"
+
+    assert {:ok, [^event]} =
+             ResidencySchedule.EffectiveSchedule.calendar_events(covering.resident_id, :legacy)
+
+    assert Ical.build(covering) =~ "DTSTART:20261103T180000"
+    assert Ical.build(covering) =~ "DTEND:20261104T060000"
+  end
+
+  test "coverage crossing projected and restored dates preserves each day's timing and UID", c do
+    {covering, nf, override} = cover_night(c, ~D[2026-11-05], ~D[2026-11-06])
+    raw_rotation = Rotations.get_rotation(nf.id)
+    raw_override = Repo.get!(ShiftOverrides.ShiftOverride, override.id)
+    entries = assert_coverage_read_parity(c, covering)
+
+    assert Enum.all?(entries, &(&1.is_coverage and &1.rotation_type == "night_float"))
+    assert Enum.all?(entries, &(&1.original_resident.id == c.night_float.id))
+
+    assert Enum.flat_map(entries, fn entry ->
+             for date <- Date.range(entry.start_date, entry.end_date),
+                 do: {date, Map.get(entry, :source_assignment_date)}
+           end) == [{~D[2026-11-05], ~D[2026-11-01]}, {~D[2026-11-06], nil}]
+
+    assert [projected, restored] = Ical.events_from_segments(entries, covering.name)
+    assert projected.uid == "seg-night_float-2026-11-05-2026-11-05@residency-schedule"
+    assert projected.dtstart == "20261105T180000"
+    assert projected.dtend == "20261106T060000"
+    assert restored.uid == "seg-night_float-2026-11-05-2026-11-06@residency-schedule"
+    assert restored.dtstart == "20261105T180000"
+    assert restored.dtend == "20261106T060000"
+
+    owner_events =
+      c.night_float.id
+      |> Rotations.effective_segments_for_resident()
+      |> Ical.events_from_segments(c.night_float.name)
+
+    refute Enum.any?(owner_events, &(&1.dtstart == "20261105T180000"))
+    assert Enum.any?(owner_events, &(&1.dtstart == "20261104T180000"))
+    assert Rotations.get_rotation(nf.id) == raw_rotation
+    assert Repo.get!(ShiftOverrides.ShiftOverride, override.id) == raw_override
   end
 
   test "approved Friday NF coverage retains its stored rotation identity", c do
@@ -298,6 +403,28 @@ defmodule ResidencySchedule.StrongNightProjectionTest do
              {"night_float", ~D[2026-11-01], ~D[2026-11-05]},
              {"post_call", ~D[2026-11-06], ~D[2026-11-08]}
            ]
+  end
+
+  defp cover_night(context, first, last) do
+    [nf | _] = Rotations.list_rotations_for_resident(context.night_float.id)
+    covering = resident(context.schedule, 3)
+
+    {:ok, override} =
+      ShiftOverrides.create_override(%{
+        rotation_id: nf.id,
+        covering_schedule_resident_id: covering.id,
+        override_start_date: first,
+        override_end_date: last
+      })
+
+    {covering, nf, override}
+  end
+
+  defp assert_coverage_read_parity(context, covering) do
+    entries = Rotations.effective_segments_for_resident(covering.id)
+    assert Rotations.effective_segments_for_schedule(context.schedule.id)[covering.id] == entries
+    assert Rotations.resident_schedule_data(covering).effective_entries == entries
+    entries
   end
 
   defp pure_rotation(id, type, first, last),
