@@ -632,6 +632,14 @@ cd /home/deploy/residency_schedule && ruby -rjson -e 'env = JSON.parse(File.read
 Replace the quoted expression with the release function you need. Hold the
 deployment lock for anything that changes data.
 
+The Phase 3 read comparison runs the same way and changes no data. Call
+`ResidencySchedule.Release.compare_effective_schedule(schedule_id)` without
+wrapping it in `IO.inspect`: it prints only aggregate counts, and the returned
+term carries resident-level detail that must stay in that session and never be
+printed to a log, stored or copied off the host. `eval` discards that return
+value; inspecting the detail requires an interactive `bin/residency_schedule
+remote` shell on the host, where the output goes only to that terminal.
+
 ### Manual rollback
 
 The deployment now retains checksummed code archives rather than a disposable

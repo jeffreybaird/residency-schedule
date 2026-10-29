@@ -20,9 +20,8 @@ defmodule ResidencySchedule.Ical do
   def build_from_segments(segments, resident_name) do
     events =
       segments
-      |> Enum.reject(fn s -> Map.get(s, :covered_by) != nil end)
-      |> Enum.sort_by(& &1.start_date, Date)
-      |> build_all_events(%{name: resident_name})
+      |> structured_events()
+      |> Enum.map(&render_event(&1, resident_name))
 
     """
     BEGIN:VCALENDAR
@@ -32,6 +31,32 @@ defmodule ResidencySchedule.Ical do
     X-WR-CALNAME:#{resident_name} – Schedule
     #{Enum.join(events, "")}END:VCALENDAR
     """
+  end
+
+  @doc """
+  Returns the calendar identity of each event the feed would emit for the
+  segments, as `%{uid, dtstart, dtend, summary}` maps in emission order.
+  Covered segments are excluded and coverage segments included, exactly as in
+  `build_from_segments/2`.
+
+      iex> segment = %{
+      ...>   rotation_type: "vacation",
+      ...>   start_date: ~D[2026-07-20],
+      ...>   end_date: ~D[2026-07-26],
+      ...>   slot_index: 0,
+      ...>   is_coverage: false,
+      ...>   covered_by: nil,
+      ...>   original_resident: nil,
+      ...>   source_assignment_date: nil,
+      ...>   source_tasks: []
+      ...> }
+      iex> ResidencySchedule.Ical.events_from_segments([segment], "Synthetic Resident")
+      [%{uid: "seg-vacation-2026-07-20@residency-schedule", dtstart: "20260720", dtend: "20260727", summary: "Vacation"}]
+  """
+  def events_from_segments(segments, _resident_name) do
+    segments
+    |> structured_events()
+    |> Enum.map(&Map.take(&1, [:uid, :dtstart, :dtend, :summary]))
   end
 
   @doc """
@@ -146,7 +171,14 @@ defmodule ResidencySchedule.Ical do
 
   # ── Private ──────────────────────────────────────────────────────────────────
 
-  defp build_all_events(sorted_segments, resident) do
+  defp structured_events(segments) do
+    segments
+    |> Enum.reject(fn s -> Map.get(s, :covered_by) != nil end)
+    |> Enum.sort_by(& &1.start_date, Date)
+    |> build_all_events()
+  end
+
+  defp build_all_events(sorted_segments) do
     imported_nights =
       sorted_segments
       |> Enum.filter(
@@ -162,52 +194,67 @@ defmodule ResidencySchedule.Ical do
       trim = trim_last_day?(seg, next)
 
       if all_day?(seg.rotation_type) do
-        [build_all_day_event(resident, seg, trim)]
+        [build_all_day_event(seg, trim)]
       else
-        build_timed_events(resident, seg, trim, imported_nights)
+        build_timed_events(seg, trim, imported_nights)
       end
     end)
   end
 
-  defp build_all_day_event(resident, seg, trim_last) do
-    uid = "seg-#{seg.rotation_type}-#{Date.to_iso8601(seg.start_date)}@residency-schedule"
-    label = seg |> Rotations.assignment_label() |> escape_text()
-    dtstart = format_date(seg.start_date)
+  defp build_all_day_event(seg, trim_last) do
     effective_end = if trim_last, do: seg.end_date, else: Date.add(seg.end_date, 1)
-    dtend = format_date(effective_end)
 
-    """
-    BEGIN:VEVENT
-    UID:#{uid}
-    SUMMARY:#{label}
-    DTSTART;VALUE=DATE:#{dtstart}
-    DTEND;VALUE=DATE:#{dtend}
-    DESCRIPTION:#{resident.name} – #{label}
-    END:VEVENT
-    """
+    %{
+      uid: "seg-#{seg.rotation_type}-#{Date.to_iso8601(seg.start_date)}@residency-schedule",
+      summary: seg |> Rotations.assignment_label() |> escape_text(),
+      dtstart: format_date(seg.start_date),
+      dtend: format_date(effective_end),
+      all_day: true
+    }
   end
 
-  defp build_timed_events(resident, seg, trim_last, imported_nights) do
+  defp build_timed_events(seg, trim_last, imported_nights) do
     seg.start_date
     |> Date.range(seg.end_date)
     |> Enum.to_list()
     |> then(fn dates -> if trim_last, do: Enum.drop(dates, -1), else: dates end)
     |> Enum.reject(&duplicate_imported_night?(seg, &1, imported_nights))
-    |> Enum.map(&build_timed_event(resident, seg, &1))
+    |> Enum.map(&build_timed_event(seg, &1))
   end
 
-  defp build_timed_event(resident, seg, date) do
-    uid = "seg-#{seg.rotation_type}-#{Date.to_iso8601(seg.start_date)}-#{date}@residency-schedule"
-    label = seg |> Rotations.assignment_label() |> escape_text()
+  defp build_timed_event(seg, date) do
     {dtstart, dtend} = segment_event_times(seg, date)
 
+    %{
+      uid:
+        "seg-#{seg.rotation_type}-#{Date.to_iso8601(seg.start_date)}-#{date}@residency-schedule",
+      summary: seg |> Rotations.assignment_label() |> escape_text(),
+      dtstart: dtstart,
+      dtend: dtend,
+      all_day: false
+    }
+  end
+
+  defp render_event(%{all_day: true} = event, resident_name) do
     """
     BEGIN:VEVENT
-    UID:#{uid}
-    SUMMARY:#{label}
-    DTSTART:#{dtstart}
-    DTEND:#{dtend}
-    DESCRIPTION:#{resident.name} – #{label}
+    UID:#{event.uid}
+    SUMMARY:#{event.summary}
+    DTSTART;VALUE=DATE:#{event.dtstart}
+    DTEND;VALUE=DATE:#{event.dtend}
+    DESCRIPTION:#{resident_name} – #{event.summary}
+    END:VEVENT
+    """
+  end
+
+  defp render_event(event, resident_name) do
+    """
+    BEGIN:VEVENT
+    UID:#{event.uid}
+    SUMMARY:#{event.summary}
+    DTSTART:#{event.dtstart}
+    DTEND:#{event.dtend}
+    DESCRIPTION:#{resident_name} – #{event.summary}
     END:VEVENT
     """
   end

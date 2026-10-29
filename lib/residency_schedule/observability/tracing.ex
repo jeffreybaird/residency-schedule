@@ -26,14 +26,16 @@ defmodule ResidencySchedule.Observability.Tracing do
     calendar_activities: "calendar.activities",
     calendar_overrides: "calendar.overrides",
     calendar_options: "calendar.options",
-    calendar_build: "calendar.build"
+    calendar_build: "calendar.build",
+    schedule_compare: "schedule.compare"
   }
   @counts %{
     rows: "app.rows.count",
     residents: "app.residents.count",
     slots: "app.slots.count",
     cells: "app.cells.count",
-    results: "app.results.count"
+    results: "app.results.count",
+    mismatches: "app.mismatches.count"
   }
   @timings [
     {:query_time, "db.query.duration_ms", 3},

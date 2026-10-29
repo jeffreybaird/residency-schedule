@@ -4,6 +4,7 @@ defmodule ResidencyScheduleWeb.OperationTracingTest do
   import Phoenix.LiveViewTest
 
   alias Ecto.Adapters.SQL.Sandbox
+  alias ResidencySchedule.EffectiveSchedule.Comparison
   alias ResidencySchedule.{Observability, Repo}
   alias ResidencySchedule.Observability.Tracing
   alias ResidencySchedule.ResidentPerformanceFixtures
@@ -12,7 +13,7 @@ defmodule ResidencyScheduleWeb.OperationTracingTest do
 
   @secret "PRIVATE_RESIDENT_SQL_AUTH_URL_EVENT_SENTINEL"
   @db_keys ~w(db.query.count db.query.duration_ms db.queue.duration_ms db.decode.duration_ms db.total.duration_ms)
-  @count_keys ~w(app.rows.count app.residents.count app.slots.count app.cells.count app.results.count)
+  @count_keys ~w(app.rows.count app.residents.count app.slots.count app.cells.count app.results.count app.mismatches.count)
   @attribute_keys @db_keys ++
                     @count_keys ++
                     ~w(app.rendered.rows.count app.rendered.slots.count app.rendered.cells.count app.rendered.cohorts.count) ++
@@ -399,6 +400,48 @@ defmodule ResidencyScheduleWeb.OperationTracingTest do
     end)
 
     assert_query_totals(hd(flush_spans()), 0, 0, 0, 0, 0)
+  end
+
+  test "schedule comparison exports only its phase name and a mismatch count", %{conn: conn} do
+    start_exporter()
+
+    response =
+      Tracing.request(conn, fn ->
+        assert :compared ==
+                 Tracing.phase(:schedule_compare, fn ->
+                   Tracing.count(:mismatches, 3)
+                   :compared
+                 end)
+
+        %{conn | status: 200}
+      end)
+
+    assert response.status == 200
+    spans = flush_spans()
+    assert length(spans) == 2
+    request = Enum.find(spans, &(&1.name == "HTTP request"))
+    phase = Enum.find(spans, &(&1.name == "schedule.compare"))
+    assert_nested(phase, request)
+    assert attributes(phase)["app.mismatches.count"] == 3
+    assert_diagnostics(phase)
+    refute Map.has_key?(attributes(request), "app.mismatches.count")
+  end
+
+  test "running the comparison on a seeded schedule exports a zero mismatch count", %{conn: conn} do
+    %{schedule: schedule} = ResidencySchedule.ScheduleFixtures.seed_mini_schedule()
+    start_exporter()
+
+    Tracing.request(conn, fn ->
+      assert {:ok, %{differing_days: 0, differing_calendar_events: 0}} =
+               Comparison.run(schedule.id)
+
+      %{conn | status: 200}
+    end)
+
+    spans = flush_spans()
+    assert [phase] = Enum.filter(spans, &(&1.name == "schedule.compare"))
+    assert attributes(phase)["app.mismatches.count"] == 0
+    assert_nested(phase, Enum.find(spans, &(&1.name == "HTTP request")))
   end
 
   test "static-file early return restores context and exports a bounded request" do

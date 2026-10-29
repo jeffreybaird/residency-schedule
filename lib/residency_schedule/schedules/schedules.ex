@@ -23,6 +23,13 @@ defmodule ResidencySchedule.Schedules do
   def get_schedule!(id), do: Repo.get!(Schedule, id)
 
   @doc """
+  Gets a single schedule by id. Returns nil if not found.
+
+  Exempt from doctest — hits the database. See `EffectiveScheduleTest`.
+  """
+  def get_schedule(id), do: Repo.get(Schedule, id)
+
+  @doc """
   Gets a schedule by academic year start year. Raises if not found.
   """
   def get_by_year!(year) do

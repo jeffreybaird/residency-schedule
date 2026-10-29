@@ -43,7 +43,10 @@ Schedule `app.residents.count` counts loaded schedule-resident records;
 `app.rows.count` counts unified resident rows; `app.slots.count` counts combined
 date slots; and `app.cells.count` counts rendered grouped cells after adjacent
 slots are merged. `app.results.count` counts projection or loaded collection
-results. These counts describe work size without exposing record identities.
+results. The `schedule.compare` phase wraps the effective-schedule comparison
+harness; its `app.mismatches.count` is the sum of differing days and differing
+calendar events, never the differences themselves. These counts describe work
+size without exposing record identities.
 
 Database diagnostics aggregate query count and query, queue, decode, and total
 durations in milliseconds. They include the current process and Ecto parallel
