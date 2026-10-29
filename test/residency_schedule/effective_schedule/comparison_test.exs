@@ -148,7 +148,8 @@ defmodule ResidencySchedule.EffectiveSchedule.ComparisonTest do
                   differing_days: 0,
                   differing_calendar_events: 0,
                   differing_consumer_outputs: 0,
-                  detail: %{days: [], calendar_events: []}
+                  unresolved_evidence: 0,
+                  detail: %{days: [], calendar_events: [], evidence: []}
                 }}
     end
 
@@ -169,7 +170,8 @@ defmodule ResidencySchedule.EffectiveSchedule.ComparisonTest do
       assert summary.identical_days == 63
       assert summary.differing_days == 0
       assert summary.differing_calendar_events == 0
-      assert summary.detail == %{days: [], calendar_events: []}
+      assert summary.unresolved_evidence == 0
+      assert summary.detail == %{days: [], calendar_events: [], evidence: []}
     end
 
     test "an unknown schedule is :not_found" do

@@ -208,5 +208,6 @@ defmodule ResidencySchedule.ObservabilityTest do
     assert Tracing.phase(:schedule_compare, fn -> 1 end) == 1
     assert Tracing.count(:mismatches, 0) == :ok
     assert Tracing.count(:mismatches, 7) == :ok
+    assert Tracing.count(:unresolved_evidence, 3) == :ok
   end
 end
