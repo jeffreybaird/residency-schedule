@@ -145,42 +145,84 @@ defmodule ResidencyScheduleWeb.CalendarHighlandAssignmentsTest do
     refute has_element?(saturday, person(ctx.juniper), "HH Nights Unreviewed")
   end
 
-  test "calendar summaries preserve base coverage counts and the coverer's original service",
+  test "calendar summaries count the working cover and omit the displaced service",
        ctx do
-    for {resident, type} <- [{ctx.iris, :highland_weekend_nights}, {ctx.juniper, :oncology}] do
-      {:ok, _} =
-        Rotations.insert_rotations(resident.id, [
-          %{
-            slot_index: 1,
-            start_date: ~D[2026-10-10],
-            end_date: ~D[2026-10-10],
-            rotation_type: type
-          }
-        ])
-    end
-
-    rotation =
-      Enum.find(
-        Rotations.list_rotations_for_resident(ctx.iris.id),
-        &(&1.start_date == ~D[2026-10-10])
-      )
-
-    {:ok, _} =
-      ShiftOverrides.create_override(%{
-        rotation_id: rotation.id,
-        covering_schedule_resident_id: ctx.juniper.id,
-        override_start_date: ~D[2026-10-10],
-        override_end_date: ~D[2026-10-10]
-      })
+    seed_covered_night(ctx)
 
     {:ok, week, _} = live(ctx.conn, "/calendar?view=week&date=#{@day}")
-    assert has_element?(week, day_cell() <> " div", ~r/Weekend Nights – Highland\s+1/)
-    assert has_element?(week, day_cell() <> " div", ~r/Oncology\s+1/)
-    refute has_element?(week, day_cell() <> " div", ~r/Weekend Nights – Highland\s+2/)
+    assert has_element?(week, day_cell() <> " div", ~r/Weekend Nights – Highland\s+1\s*$/)
+    refute has_element?(week, day_cell() <> " div", ~r/Oncology\s+\d/)
+    refute has_element?(week, day_cell() <> " div", ~r/Weekend Nights – Highland\s+2\s*$/)
+
+    adjacent = "[data-action='select_day'][phx-value-date='2026-10-11']"
+    {:ok, adjacent_week, _} = live(ctx.conn, "/calendar?view=week&date=2026-10-11")
+    assert has_element?(adjacent_week, adjacent <> " div", ~r/Weekend Nights – Highland\s+1\s*$/)
+    assert has_element?(adjacent_week, adjacent <> " div", ~r/Oncology\s+1\s*$/)
 
     {:ok, month, _} = live(ctx.conn, "/calendar?view=month&date=#{@day}")
     assert has_element?(month, day_cell() <> " span[title='#{@label}']")
-    assert has_element?(month, day_cell() <> " span[title='Oncology']")
+    refute has_element?(month, day_cell() <> " span[title='Oncology']")
+    assert has_element?(month, adjacent <> " span[title='#{@label}']")
+    assert has_element?(month, adjacent <> " span[title='Oncology']")
+
+    open_day(month)
+    assert has_element?(month, person(ctx.iris) <> " a.line-through")
+    assert has_element?(month, person(ctx.juniper), "(covering)")
+    refute has_element?(month, "#day-activities [data-rotation-type='oncology']")
+  end
+
+  test "a working cover and matching imported task count once per person and type", ctx do
+    seed_covered_night(ctx)
+    import_task("HH Nights 3rd Call")
+    {:ok, week, _} = live(ctx.conn, "/calendar?view=week&date=#{@day}")
+
+    assert has_element?(week, day_cell() <> " div", ~r/Weekend Nights – Highland\s+1\s*$/)
+    refute has_element?(week, day_cell() <> " div", ~r/Weekend Nights – Highland\s+[23]\s*$/)
+    refute has_element?(week, day_cell() <> " div", ~r/Oncology\s+\d/)
+
+    {:ok, month, _} = live(ctx.conn, "/calendar?view=month&date=#{@day}")
+
+    assert month
+           |> render()
+           |> LazyHTML.from_fragment()
+           |> LazyHTML.query(day_cell() <> " span[title='#{@label}']")
+           |> Enum.count() == 1
+  end
+
+  test "summary filters retain their pre-coverage resident and rotation scope", ctx do
+    seed_covered_night(ctx)
+
+    for mode <- ["week", "month"] do
+      {:ok, view, _} = live(ctx.conn, "/calendar?view=#{mode}&date=#{@day}")
+      render_click(view, "toggle_rotation_filter", %{"type" => @night_type})
+      assert_night_summary(view, mode)
+      render_click(view, "clear_rotation_filter", %{})
+      render_click(view, "toggle_rotation_filter", %{"type" => "oncology"})
+      refute has_element?(view, day_cell() <> " span[title]")
+
+      refute has_element?(
+               view,
+               day_cell() <> " div",
+               ~r/(Oncology|Weekend Nights – Highland)\s+\d/
+             )
+
+      render_click(view, "clear_rotation_filter", %{})
+      render_click(view, "toggle_resident_filter", %{"id" => to_string(ctx.iris.resident_id)})
+      assert_night_summary(view, mode)
+
+      render_click(view, "toggle_resident_filter", %{"id" => to_string(ctx.iris.resident_id)})
+      render_click(view, "toggle_resident_filter", %{"id" => to_string(ctx.juniper.resident_id)})
+      refute has_element?(view, day_cell() <> " span[title]")
+
+      refute has_element?(
+               view,
+               day_cell() <> " div",
+               ~r/(Oncology|Weekend Nights – Highland)\s+\d/
+             )
+
+      render_click(view, "toggle_resident_filter", %{"id" => to_string(ctx.juniper.resident_id)})
+      assert_night_summary(view, mode)
+    end
   end
 
   test "unclassified tasks are excluded with their base rotation until filters are cleared",
@@ -257,6 +299,47 @@ defmodule ResidencyScheduleWeb.CalendarHighlandAssignmentsTest do
       refute has_element?(view, group())
       refute has_element?(view, "#day-activities", "HH Nights 3rd Call")
     end
+  end
+
+  defp seed_covered_night(context) do
+    for {resident, type} <- [
+          {context.iris, :highland_weekend_nights},
+          {context.juniper, :oncology}
+        ] do
+      {:ok, _} =
+        Rotations.insert_rotations(resident.id, [
+          %{
+            slot_index: 1,
+            start_date: ~D[2026-10-10],
+            end_date: ~D[2026-10-11],
+            rotation_type: type
+          }
+        ])
+    end
+
+    rotation =
+      Enum.find(
+        Rotations.list_rotations_for_resident(context.iris.id),
+        &(&1.start_date == ~D[2026-10-10])
+      )
+
+    {:ok, _} =
+      ShiftOverrides.create_override(%{
+        rotation_id: rotation.id,
+        covering_schedule_resident_id: context.juniper.id,
+        override_start_date: ~D[2026-10-10],
+        override_end_date: ~D[2026-10-10]
+      })
+  end
+
+  defp assert_night_summary(view, "week") do
+    assert has_element?(view, day_cell() <> " div", ~r/Weekend Nights – Highland\s+1\s*$/)
+    refute has_element?(view, day_cell() <> " div", ~r/Oncology\s+\d/)
+  end
+
+  defp assert_night_summary(view, "month") do
+    assert has_element?(view, day_cell() <> " span[title='#{@label}']")
+    refute has_element?(view, day_cell() <> " span[title='Oncology']")
   end
 
   defp group, do: "#day-activities [data-rotation-type='#{@night_type}']"

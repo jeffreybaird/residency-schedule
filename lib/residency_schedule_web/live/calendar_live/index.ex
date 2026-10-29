@@ -813,7 +813,9 @@ defmodule ResidencyScheduleWeb.CalendarLive.Index do
     rotations =
       assigns
       |> visible_rotations(date)
-      |> Enum.map(&{&1.rotation_type, &1.schedule_resident.resident_id})
+      |> Rotations.effective_day_assignments(Map.get(assigns.override_index, date, []))
+      |> Enum.reject(& &1.overridden)
+      |> Enum.map(&{&1.rotation_type, &1.resident.resident_id})
 
     activities =
       assigns
