@@ -196,17 +196,20 @@ defmodule ResidencySchedule.Rotations do
     activities = DetailedSchedules.list_for_schedule(resident.schedule_id)
     overrides = ShiftOverrides.list_overrides_for_schedule(resident.schedule_id)
 
-    rotations =
+    projected =
       raw_rotations
       |> Repo.preload(schedule_resident: ScheduleResident.with_name_query())
       |> project_assignments(activities, overrides)
-      |> Enum.filter(&(&1.schedule_resident_id == resident.id))
+
+    rotations = Enum.filter(projected, &(&1.schedule_resident_id == resident.id))
+    incoming = ShiftOverrides.list_overrides_for_resident_as_cover(resident.id)
 
     effective_entries =
       build_effective_segments(
         rotations,
         Enum.filter(overrides, &(&1.rotation.schedule_resident_id == resident.id)),
-        ShiftOverrides.list_overrides_for_resident_as_cover(resident.id)
+        incoming,
+        coverage_projections(incoming, %{resident.schedule_id => projected})
       )
 
     %{
@@ -822,16 +825,19 @@ defmodule ResidencySchedule.Rotations do
   - `:is_coverage` — true when this segment is a coverage assignment for another resident
   - `:covered_by` — the covering ScheduleResident struct when someone is covering this segment, else nil
   - `:original_resident` — the ScheduleResident being covered when `is_coverage: true`, else nil
+  - `:source_assignment_date` — projected assignment date used for evening-first night timing, or nil
+  - `:source_tasks` — source task labels associated with the effective assignment
+  - `:calendar_start_date` — coverage-only virtual field retaining the original coverage start
+    for calendar UID identity when source metadata splits coverage into multiple segments
 
-      iex> ResidencySchedule.Rotations.effective_segments_for_resident(0)
-      []
+  Exempt from doctest — database queries. Successful coverage reads and calendar
+  timing are tested in `StrongNightProjectionTest` and `RotationsTest`.
   """
   def effective_segments_for_resident(schedule_resident_id) do
-    build_effective_segments(
-      projected_rotations_for_resident(schedule_resident_id),
-      ShiftOverrides.list_overrides_for_resident_as_original(schedule_resident_id),
-      ShiftOverrides.list_overrides_for_resident_as_cover(schedule_resident_id)
-    )
+    case Repo.get(ScheduleResident, schedule_resident_id) do
+      nil -> []
+      resident -> resident_schedule_data(resident).effective_entries
+    end
   end
 
   @doc """
@@ -864,6 +870,9 @@ defmodule ResidencySchedule.Rotations do
     as_original = Enum.group_by(overrides, & &1.rotation.schedule_resident_id)
     as_cover = Enum.group_by(overrides, & &1.covering_schedule_resident_id)
 
+    projected_by_id =
+      rotations_by_resident |> Map.values() |> List.flatten() |> Enum.group_by(& &1.id)
+
     schedule_id
     |> Residents.list_residents_for_schedule()
     |> Map.new(fn resident ->
@@ -871,7 +880,8 @@ defmodule ResidencySchedule.Rotations do
        build_effective_segments(
          Map.get(rotations_by_resident, resident.id, []),
          Map.get(as_original, resident.id, []),
-         Map.get(as_cover, resident.id, [])
+         Map.get(as_cover, resident.id, []),
+         projected_by_id
        )}
     end)
   end
@@ -890,7 +900,24 @@ defmodule ResidencySchedule.Rotations do
     |> Repo.all()
   end
 
-  defp build_effective_segments(rotations, overrides_as_original, overrides_as_cover) do
+  defp coverage_projections(overrides, cached_schedules) do
+    overrides
+    |> Enum.map(& &1.rotation.schedule_resident.schedule_id)
+    |> Enum.uniq()
+    |> Enum.flat_map(fn schedule_id ->
+      Map.get_lazy(cached_schedules, schedule_id, fn ->
+        projected_rotations_for_schedule(schedule_id)
+      end)
+    end)
+    |> Enum.group_by(& &1.id)
+  end
+
+  defp build_effective_segments(
+         rotations,
+         overrides_as_original,
+         overrides_as_cover,
+         projected_by_id
+       ) do
     covered_blocks =
       Enum.map(overrides_as_original, fn o ->
         {o.override_start_date, o.override_end_date, {:covered_by, o.covering_schedule_resident}}
@@ -916,20 +943,45 @@ defmodule ResidencySchedule.Rotations do
       end)
 
     coverage_segments =
-      Enum.map(overrides_as_cover, fn o ->
-        %{
-          rotation_type: o.rotation.rotation_type,
-          start_date: o.override_start_date,
-          end_date: o.override_end_date,
-          slot_index: -1,
-          is_coverage: true,
-          covered_by: nil,
-          original_resident: o.rotation.schedule_resident
-        }
-      end)
+      Enum.flat_map(overrides_as_cover, &build_coverage_segments(&1, projected_by_id))
 
     (own_segments ++ coverage_segments)
     |> Enum.sort_by(& &1.start_date, Date)
+  end
+
+  defp build_coverage_segments(override, projected_by_id) do
+    projected = Map.get(projected_by_id, override.rotation_id, [])
+
+    override.override_start_date
+    |> Date.range(override.override_end_date)
+    |> Enum.chunk_by(&coverage_source_metadata(projected, override.rotation, &1))
+    |> Enum.map(fn dates ->
+      {source_date, source_tasks} =
+        coverage_source_metadata(projected, override.rotation, hd(dates))
+
+      %{
+        rotation_type: override.rotation.rotation_type,
+        start_date: hd(dates),
+        end_date: List.last(dates),
+        calendar_start_date: override.override_start_date,
+        source_assignment_date: source_date,
+        source_tasks: source_tasks,
+        slot_index: -1,
+        is_coverage: true,
+        covered_by: nil,
+        original_resident: override.rotation.schedule_resident
+      }
+    end)
+  end
+
+  defp coverage_source_metadata(projected, original, date) do
+    source =
+      Enum.find(projected, original, fn rotation ->
+        rotation.rotation_type == original.rotation_type and
+          date in Date.range(rotation.start_date, rotation.end_date)
+      end)
+
+    {source.source_assignment_date, source.source_tasks}
   end
 
   defp split_by_blocks(rotation, []) do
