@@ -1,8 +1,9 @@
 defmodule ResidencySchedule.EffectiveSchedule.AcceptanceTest do
   @moduledoc """
   Acceptance scenarios from the release plan's comparison contract, read-side
-  only. Each scenario checks that the harness compares at zero differences and
-  pins the normalized legacy meaning the v2 computation must reproduce or have
+  only. Each scenario pins legacy meaning and checks missing-evidence diagnostics;
+  the CSV-only scenario still compares at zero differences. Named v2 assertions
+  distinguish retained evidence from legacy label inference. The v2 computation must reproduce or have
   classified (plan D4). Deliberately out of scope here: ambiguous people
   (identity mappings and Phase 2 evidence), consumer outputs such as service
   and shift counts, matrices, duty hours and assistant summaries (PR 3), and
@@ -10,11 +11,13 @@ defmodule ResidencySchedule.EffectiveSchedule.AcceptanceTest do
   """
 
   use ResidencySchedule.DataCase, async: true
+  import Ecto.Query
 
   alias ResidencySchedule.DetailedSchedules
   alias ResidencySchedule.EffectiveSchedule
   alias ResidencySchedule.EffectiveSchedule.Comparison
   alias ResidencySchedule.EffectiveScheduleFixtures, as: Fixtures
+  alias ResidencySchedule.Repo
   alias ResidencySchedule.Residents
 
   @date_only %{precision: :date_only, period: nil}
@@ -33,21 +36,65 @@ defmodule ResidencySchedule.EffectiveSchedule.AcceptanceTest do
     events
   end
 
-  defp assert_zero_differences(schedule_id) do
+  defp assert_comparison_contract(schedule_id) do
     records = legacy_records(schedule_id)
     assert records != []
     assert {:ok, summary} = Comparison.run(schedule_id)
-    assert summary.identical_days == length(records)
-    assert summary.differing_days == 0
-    assert summary.differing_calendar_events == 0
-    assert summary.detail == %{days: [], calendar_events: []}
+
+    sources =
+      Repo.all(
+        from s in ResidencySchedule.DetailedSchedules.ActivitySource,
+          join: a in assoc(s, :activity),
+          join: m in assoc(a, :schedule_resident),
+          where: m.schedule_id == ^schedule_id,
+          order_by: [m.id, a.date, a.id, s.id],
+          select: {a, s.id}
+      )
+
+    expected =
+      for {activity, source_id} <- sources,
+          reason <- [:missing_classification, :missing_identity, :missing_timing],
+          do: %{
+            reason: reason,
+            activity_id: activity.id,
+            activity_source_id: source_id,
+            schedule_resident_id: activity.schedule_resident_id,
+            date: activity.date
+          }
+
+    assert summary.unresolved_evidence == length(expected)
+    assert summary.detail.evidence == expected
+    assert EffectiveSchedule.evidence_diagnostics(schedule_id, :v2) == {:ok, expected}
+
+    if sources == [] do
+      assert summary.identical_days == length(records)
+      assert summary.differing_days == 0
+      assert summary.differing_calendar_events == 0
+      assert summary.detail == %{days: [], calendar_events: [], evidence: []}
+    end
+
     records
+  end
+
+  defp v2_record(ctx, resident, date) do
+    {:ok, records} = EffectiveSchedule.for_schedule(ctx.schedule.id, :v2)
+    record(records, resident, date)
   end
 
   describe "April 5–18 vacation from roster weekdays and imported weekends" do
     setup do
       ctx = Fixtures.april_vacation()
-      Map.put(ctx, :records, assert_zero_differences(ctx.schedule.id))
+      Map.put(ctx, :records, assert_comparison_contract(ctx.schedule.id))
+    end
+
+    test "v2 retains roster vacation but cannot infer weekend vacation without classifications",
+         ctx do
+      for date <- ctx.weekdays, do: assert(v2_record(ctx, ctx.ada, date).off == :vacation)
+
+      for date <- ctx.weekends do
+        assert %{off: nil, duties: [%{code: "qgenda_assignment", label: "Vacation"}]} =
+                 v2_record(ctx, ctx.ada, date)
+      end
     end
 
     test "every day of the vacation is one vacation duty that is off", ctx do
@@ -148,7 +195,16 @@ defmodule ResidencySchedule.EffectiveSchedule.AcceptanceTest do
   describe "a rotation and a clinic on the same day" do
     setup do
       ctx = Fixtures.rotation_and_clinic_same_day()
-      Map.put(ctx, :records, assert_zero_differences(ctx.schedule.id))
+      Map.put(ctx, :records, assert_comparison_contract(ctx.schedule.id))
+    end
+
+    test "v2 exposes the independent clinic beside the unchanged base rotation", ctx do
+      assert [activity, rotation] = v2_record(ctx, ctx.ada, ctx.clinic_date).duties
+      assert activity.kind == :dated_activity
+      assert activity.code == "qgenda_assignment"
+      assert activity.label == ctx.clinic_task
+      assert activity.timing == @date_only
+      assert rotation.code == "strong_obstetrics"
     end
 
     test "legacy shows the rotation only; the clinic activity is not a duty", ctx do
@@ -178,7 +234,17 @@ defmodule ResidencySchedule.EffectiveSchedule.AcceptanceTest do
   describe "imported gap filling and approved coverage precedence" do
     setup do
       ctx = Fixtures.gap_fill_and_coverage()
-      Map.put(ctx, :records, assert_zero_differences(ctx.schedule.id))
+      Map.put(ctx, :records, assert_comparison_contract(ctx.schedule.id))
+    end
+
+    test "v2 keeps coverage but cannot infer an unclassified Ultrasound gap", ctx do
+      for date <- ctx.coverage_dates do
+        assert [%{kind: :coverage, code: "strong_obstetrics"}] =
+                 v2_record(ctx, ctx.cal, date).duties
+      end
+
+      assert [%{code: "qgenda_assignment", label: "Ultrasound"}] =
+               v2_record(ctx, ctx.ada, ctx.gap_fill_date).duties
     end
 
     test "a resolved task on a blank day is a gap fill of its resolved type", ctx do
@@ -245,7 +311,16 @@ defmodule ResidencySchedule.EffectiveSchedule.AcceptanceTest do
   describe "Strong and Highland overnight boundaries and the Friday correction" do
     setup do
       ctx = Fixtures.night_boundaries_and_friday()
-      Map.put(ctx, :records, assert_zero_differences(ctx.schedule.id))
+      Map.put(ctx, :records, assert_comparison_contract(ctx.schedule.id))
+    end
+
+    test "v2 preserves base duties when literal night tasks lack classification evidence", ctx do
+      cal = v2_record(ctx, ctx.cal, ctx.corrected_friday)
+      assert Enum.any?(cal.duties, &(&1.code == "ambulatory" and &1.kind == :rotation))
+      refute Enum.any?(cal.duties, &(&1.code == "strong_weekend_nights"))
+
+      assert [%{code: "qgenda_assignment"}] =
+               v2_record(ctx, ctx.dee, ctx.highland_saturday).duties
     end
 
     test "a canonical Strong night block shifts to the evening before with its source date",
@@ -366,7 +441,14 @@ defmodule ResidencySchedule.EffectiveSchedule.AcceptanceTest do
   describe "blank input, OFF, unknown tasks and changed labels" do
     setup do
       ctx = Fixtures.blank_off_unknown_and_changed_labels()
-      Map.put(ctx, :records, assert_zero_differences(ctx.schedule.id))
+      Map.put(ctx, :records, assert_comparison_contract(ctx.schedule.id))
+    end
+
+    test "v2 retains neutral OFF and blank dates without inventing evidence", ctx do
+      assert %{off: nil, duties: [%{code: "qgenda_assignment", label: "OFF"}]} =
+               v2_record(ctx, ctx.ada, ctx.off_date)
+
+      for date <- ctx.blank_dates, do: assert(v2_record(ctx, ctx.ada, date).off == :blank)
     end
 
     test "days with no rotation and no task are blank", ctx do
@@ -425,7 +507,7 @@ defmodule ResidencySchedule.EffectiveSchedule.AcceptanceTest do
   describe "identical reimports and a correction after earlier imports" do
     setup do
       ctx = Fixtures.reimport_and_correction(&snapshot/1)
-      Map.put(ctx, :records, assert_zero_differences(ctx.schedule_id))
+      Map.put(ctx, :records, assert_comparison_contract(ctx.schedule_id))
     end
 
     defp snapshot(schedule_id) do

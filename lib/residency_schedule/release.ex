@@ -225,7 +225,7 @@ defmodule ResidencySchedule.Release do
     result
   end
 
-  @comparison_counts ~w(schedule_id identical_days differing_days differing_calendar_events differing_consumer_outputs)a
+  @comparison_counts ~w(schedule_id identical_days differing_days differing_calendar_events differing_consumer_outputs unresolved_evidence)a
 
   defp print_comparison_counts({:ok, summary}) do
     Enum.each(@comparison_counts, &IO.puts("#{&1}: #{Map.fetch!(summary, &1)}"))
