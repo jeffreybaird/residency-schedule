@@ -109,7 +109,8 @@ defmodule ResidencySchedule.ShiftOverrides do
   end
 
   @doc """
-  Lists every shift override in a schedule, with `rotation` (and its
+  Lists every shift override whose original or covering resident belongs to the
+  schedule, with `rotation` (and its
   schedule_resident) and `covering_schedule_resident` preloaded.
 
   Exempt from doctest — hits the database. See `RotationsTest`.
@@ -120,14 +121,16 @@ defmodule ResidencySchedule.ShiftOverrides do
     from(o in ShiftOverride,
       join: r in assoc(o, :rotation),
       join: sr in assoc(r, :schedule_resident),
-      where: sr.schedule_id == ^schedule_id,
+      join: cover in assoc(o, :covering_schedule_resident),
+      where: sr.schedule_id == ^schedule_id or cover.schedule_id == ^schedule_id,
       preload: [rotation: [schedule_resident: ^sr_query], covering_schedule_resident: ^sr_query]
     )
     |> Repo.all()
   end
 
   @doc """
-  Lists shift overrides for a schedule that overlap an inclusive date range.
+  Lists shift overrides whose original or covering resident belongs to the
+  schedule and that overlap an inclusive date range.
 
   Preloads `rotation` (with `schedule_resident`) and `covering_schedule_resident`.
 
@@ -139,7 +142,8 @@ defmodule ResidencySchedule.ShiftOverrides do
     from(o in ShiftOverride,
       join: r in assoc(o, :rotation),
       join: sr in assoc(r, :schedule_resident),
-      where: sr.schedule_id == ^schedule_id,
+      join: cover in assoc(o, :covering_schedule_resident),
+      where: sr.schedule_id == ^schedule_id or cover.schedule_id == ^schedule_id,
       where: o.override_start_date <= ^range_end and o.override_end_date >= ^range_start,
       preload: [rotation: [schedule_resident: ^sr_query], covering_schedule_resident: ^sr_query]
     )
