@@ -202,7 +202,10 @@ defmodule ResidencySchedule.Ical do
   end
 
   defp build_all_day_event(seg, trim_last) do
-    effective_end = if trim_last, do: seg.end_date, else: Date.add(seg.end_date, 1)
+    effective_end =
+      if trim_last and Date.before?(seg.start_date, seg.end_date),
+        do: seg.end_date,
+        else: Date.add(seg.end_date, 1)
 
     %{
       uid: "seg-#{seg.rotation_type}-#{Date.to_iso8601(seg.start_date)}@residency-schedule",
