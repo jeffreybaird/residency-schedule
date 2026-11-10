@@ -9,6 +9,13 @@ test. It implements the Phase 3 row of the
 [release plan](schedule-adapter-release-plan.md) and nothing from Phase 4:
 users keep receiving existing results throughout.
 
+Status on November 10, 2026: the service/comparison boundary (#96) and independent
+v2 computation (#102) are merged. This branch implements historical Friday
+evidence enrichment and its administrator maintenance page; see the
+[operator contract](historical-friday-policy-enrichment.md). Consumer-output
+comparisons and unused read controls remain separate deliveries. No production
+comparison or consumer switch is established by this status.
+
 ## Goal
 
 Build one explicit effective-schedule service that computes schedule meaning

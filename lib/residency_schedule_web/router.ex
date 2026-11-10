@@ -98,6 +98,7 @@ defmodule ResidencyScheduleWeb.Router do
         pipe_through [:browser, :admin_authenticated]
 
         live "/", AdminLive.Index, :index
+        live "/maintenance/friday-policy", AdminLive.FridayPolicy, :index
         live "/denied", AdminLive.Denied, :index
         live "/upload", UploadLive.Index, :index
         live "/build", BuilderLive.Index, :index

@@ -56,6 +56,13 @@ Friday policy requires sufficient stored semantic evidence for each occurrence.
 Historical generic occurrences still require explicit append-only enrichment
 before their comparisons can pass. Production comparisons have not been run.
 
+The [historical Friday enrichment increment](historical-friday-policy-enrichment.md)
+is implemented on this branch. It preserves the original classification and adds
+a separately validated policy attestation. Reads with no attestation retain the
+existing unresolved behavior; an invalid present attestation holds/excludes the
+affected source fact. This work does not authorize a consumer switch or establish
+production enrichment.
+
 ## Identity, timing and output stability
 
 Preserve existing base and coverage calendar UIDs through projection splits;

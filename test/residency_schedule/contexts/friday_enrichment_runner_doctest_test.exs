@@ -1,0 +1,5 @@
+defmodule ResidencySchedule.TaskMappings.FridayEnrichmentRunnerDoctestTest do
+  use ResidencySchedule.DataCase
+
+  doctest ResidencySchedule.TaskMappings.FridayEnrichmentRunner
+end
