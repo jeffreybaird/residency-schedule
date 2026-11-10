@@ -211,7 +211,15 @@ defmodule ResidencySchedule.TaskMappings.Backfill do
     })
   end
 
-  defp source_snapshot(row) do
+  @doc """
+  Captures the complete retained source facts used by the original backfill.
+
+      iex> ctx = ResidencySchedule.FridayEnrichmentFixtures.historical_source()
+      iex> snapshot = ResidencySchedule.TaskMappings.Backfill.source_snapshot(ctx.graph)
+      iex> {snapshot["source"]["id"] == ctx.source.id, snapshot == ctx.classification.source_snapshot}
+      {true, true}
+  """
+  def source_snapshot(row) do
     %{
       source:
         Map.take(row.source, [
@@ -247,7 +255,15 @@ defmodule ResidencySchedule.TaskMappings.Backfill do
     |> Jason.decode!()
   end
 
-  defp input_digest(source, mapping) do
+  @doc """
+  Binds the exact retained source and mapping snapshots to their original digest.
+
+      iex> ctx = ResidencySchedule.FridayEnrichmentFixtures.historical_source()
+      iex> class = ctx.classification
+      iex> ResidencySchedule.TaskMappings.Backfill.input_digest(class.source_snapshot, class.mapping_snapshot) == class.input_digest
+      true
+  """
+  def input_digest(source, mapping) do
     {source, mapping}
     |> :erlang.term_to_binary([:deterministic])
     |> then(&:crypto.hash(:sha256, &1))
