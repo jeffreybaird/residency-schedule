@@ -9,16 +9,22 @@ defmodule ResidencyScheduleWeb.ConnCase do
 
   Finally, if the test case interacts with the database,
   we enable the SQL sandbox, so changes done to the database
-  are reverted at the end of every test. If you are using
-  PostgreSQL, you can even run database tests asynchronously
-  by setting `use ResidencyScheduleWeb.ConnCase, async: true`, although
-  this option is not recommended for other databases.
+  are reverted at the end of every test. These cases share the database fixture
+  group with `ResidencySchedule.DataCase`, so reused academic years and resident
+  names cannot contend across modules. `async: true` still permits overlap with
+  independent groups. An explicit `:group` should be used only for a proven
+  isolated fixture domain. Sandbox ownership and concurrency within a test
+  remain unchanged.
   """
 
   use ExUnit.CaseTemplate
 
-  using do
+  using opts do
+    group = Keyword.get(opts, :group, :shared_schedule_fixtures)
+
     quote do
+      use ExUnit.Case, group: unquote(group)
+
       # The default endpoint for testing
       @endpoint ResidencyScheduleWeb.Endpoint
 
