@@ -225,6 +225,42 @@ defmodule ResidencySchedule.EffectiveSchedule.NormalizeTest do
       assert Normalize.sort_duties([original_6, original_5]) == [original_5, original_6]
     end
 
+    test "label and complete timing break equal-prefix ties independently of insertion order" do
+      am = duty(%{label: "Alpha", timing: %{precision: :period, period: "AM"}})
+      pm = duty(%{label: "Alpha", timing: %{precision: :period, period: "PM"}})
+      later_label = duty(%{label: "Beta", timing: %{precision: :period, period: "AM"}})
+
+      exact =
+        duty(%{
+          label: "Alpha",
+          timing: %{
+            precision: :exact,
+            period: nil,
+            starts_at: ~U[2026-11-03 12:00:00Z],
+            ends_at: ~U[2026-11-03 13:00:00Z],
+            time_zone: "Etc/UTC"
+          }
+        })
+
+      later_exact = put_in(exact.timing.ends_at, ~U[2026-11-03 14:00:00Z])
+      duties = [pm, later_label, exact, am, later_exact]
+      sorted = Normalize.sort_duties(duties)
+      assert length(sorted) == 5
+      assert MapSet.new(sorted) == MapSet.new(duties)
+
+      for permutation <- [
+            Enum.reverse(duties),
+            [am, exact, later_label, later_exact, pm],
+            [later_exact, pm, am, exact, later_label]
+          ] do
+        assert Normalize.sort_duties(permutation) == sorted
+      end
+
+      assert Normalize.sort_duties([pm, am]) == [am, pm]
+      assert Normalize.sort_duties([later_label, am]) == [am, later_label]
+      assert Normalize.sort_duties([later_exact, exact]) == [exact, later_exact]
+    end
+
     test "an empty list stays empty" do
       assert Normalize.sort_duties([]) == []
     end

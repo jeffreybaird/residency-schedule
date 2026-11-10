@@ -8,10 +8,12 @@ defmodule ResidencySchedule.DataCase do
 
   Finally, if the test case interacts with the database,
   we enable the SQL sandbox, so changes done to the database
-  are reverted at the end of every test. If you are using
-  PostgreSQL, you can even run database tests asynchronously
-  by setting `use ResidencySchedule.DataCase, async: true`, although
-  this option is not recommended for other databases.
+  are reverted at the end of every test. Database cases share an ExUnit group
+  because their fixtures reuse unique academic years and resident names.
+  `async: true` still permits overlap with independent test groups, while cases
+  using these shared fixtures run one module at a time. An explicit `:group`
+  should be used only for a proven isolated fixture domain. Grouping does not
+  change Sandbox ownership or concurrency within a test.
   """
 
   use ExUnit.CaseTemplate
@@ -20,8 +22,12 @@ defmodule ResidencySchedule.DataCase do
   alias Ecto.Adapters.SQL.Sandbox
   alias ResidencySchedule.Importer.ScheduleImporter
 
-  using do
+  using opts do
+    group = Keyword.get(opts, :group, :shared_schedule_fixtures)
+
     quote do
+      use ExUnit.Case, group: unquote(group)
+
       alias ResidencySchedule.Repo
 
       import Ecto

@@ -7,7 +7,9 @@ defmodule ResidencySchedule.EffectiveSchedule.Comparison do
   """
 
   alias ResidencySchedule.EffectiveSchedule
+  alias ResidencySchedule.EffectiveSchedule.V2
   alias ResidencySchedule.Observability.Tracing
+  alias ResidencySchedule.Residents
 
   @doc """
   Runs the comparison for a schedule and returns aggregate counts with the
@@ -75,16 +77,22 @@ defmodule ResidencySchedule.EffectiveSchedule.Comparison do
   end
 
   defp compare_schedule(schedule_id) do
-    with {:ok, legacy} <- EffectiveSchedule.for_schedule(schedule_id, :legacy),
-         {:ok, v2} <- EffectiveSchedule.for_schedule(schedule_id, :v2) do
-      {:ok, build_summary(schedule_id, legacy, v2)}
+    with {:ok, legacy} <- EffectiveSchedule.for_schedule(schedule_id, :legacy) do
+      {:ok, build_summary(schedule_id, legacy, V2.compute(schedule_id))}
     end
   end
 
-  defp build_summary(schedule_id, legacy, v2) do
+  defp build_summary(schedule_id, legacy, result) do
+    v2 = result.records
     {identical_days, differing_days} = diff_days(legacy, v2)
-    differing_events = diff_events(person_events(legacy, :legacy), person_events(v2, :v2))
+    people = result.members |> Enum.map(& &1.resident_id) |> Enum.uniq()
+
+    differing_events =
+      diff_events(person_events(people, :legacy), v2_person_events(people, schedule_id, result))
+
+    evidence = result.diagnostics
     Tracing.count(:mismatches, length(differing_days) + length(differing_events))
+    Tracing.count(:unresolved_evidence, length(evidence))
 
     %{
       schedule_id: schedule_id,
@@ -92,15 +100,38 @@ defmodule ResidencySchedule.EffectiveSchedule.Comparison do
       differing_days: length(differing_days),
       differing_calendar_events: length(differing_events),
       differing_consumer_outputs: 0,
-      detail: %{days: differing_days, calendar_events: differing_events}
+      unresolved_evidence: length(evidence),
+      detail: %{days: differing_days, calendar_events: differing_events, evidence: evidence}
     }
   end
 
-  defp person_events(records, version) do
-    records
-    |> Enum.map(& &1.person_id)
-    |> Enum.uniq()
-    |> Map.new(&{&1, calendar_events(&1, version)})
+  defp v2_person_events(people, schedule_id, result) do
+    appearances =
+      people
+      |> Map.new(&{&1, Residents.list_appearances_for_person(&1)})
+
+    computations =
+      appearances
+      |> Map.values()
+      |> List.flatten()
+      |> Enum.map(& &1.schedule_id)
+      |> Enum.uniq()
+      |> Enum.reduce(%{schedule_id => result}, fn id, cache ->
+        Map.put_new_lazy(cache, id, fn -> V2.compute(id) end)
+      end)
+
+    Map.new(appearances, fn {person_id, memberships} ->
+      events =
+        memberships
+        |> Enum.flat_map(&V2.events(Map.fetch!(computations, &1.schedule_id), &1.id))
+        |> Enum.sort_by(&{&1.dtstart, &1.uid})
+
+      {person_id, events}
+    end)
+  end
+
+  defp person_events(people, version) do
+    Map.new(people, &{&1, calendar_events(&1, version)})
   end
 
   defp calendar_events(person_id, version) do

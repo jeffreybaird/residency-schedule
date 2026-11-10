@@ -196,10 +196,30 @@ defmodule ResidencySchedule.EffectiveScheduleTest do
       assert record(ctx, ctx.bea, ~D[2026-07-27]).off == :blank
     end
 
-    test ":v2 returns the same records as :legacy", ctx do
+    test ":v2 preserves base duties but exposes missing activity evidence as neutral duties",
+         ctx do
       assert {:ok, legacy} = EffectiveSchedule.for_schedule(ctx.schedule.id, :legacy)
       assert {:ok, v2} = EffectiveSchedule.for_schedule(ctx.schedule.id, :v2)
-      assert v2 == legacy
+
+      changed = fn record ->
+        record.schedule_resident_id == ctx.ada.id and
+          record.date in [~D[2026-07-21], ~D[2026-07-22]]
+      end
+
+      assert Enum.reject(v2, changed) == Enum.reject(legacy, changed)
+      assert [%{duties: unknown}, %{duties: [vacation], off: nil}] = Enum.filter(v2, changed)
+      assert Enum.map(unknown, & &1.label) |> Enum.sort() == ["Another Task", "Mystery Clinic PM"]
+      assert Enum.all?(unknown, &(&1.code == "qgenda_assignment"))
+      assert vacation.code == "qgenda_assignment"
+      assert vacation.label == "Vacation"
+      assert {:ok, diagnostics} = EffectiveSchedule.evidence_diagnostics(ctx.schedule.id, :v2)
+      assert length(diagnostics) == 9
+
+      assert Enum.frequencies_by(diagnostics, & &1.reason) == %{
+               missing_identity: 3,
+               missing_classification: 3,
+               missing_timing: 3
+             }
     end
 
     test "an unknown schedule is :not_found and an unknown version is rejected", ctx do
@@ -270,7 +290,14 @@ defmodule ResidencySchedule.EffectiveScheduleTest do
 
       assert Enum.filter(records, &(&1.schedule_id == prior.id)) == previous
       assert Enum.find(previous, &(&1.date == ~D[2025-07-15])).off == :vacation
-      assert EffectiveSchedule.for_person(ctx.ada.resident_id, :v2) == {:ok, records}
+      assert {:ok, v2_records} = EffectiveSchedule.for_person(ctx.ada.resident_id, :v2)
+      assert Enum.filter(v2_records, &(&1.schedule_id == prior.id)) == previous
+      assert {:ok, v2_current} = EffectiveSchedule.for_schedule(ctx.schedule.id, :v2)
+
+      assert Enum.filter(v2_records, &(&1.schedule_id == ctx.schedule.id)) ==
+               Enum.filter(v2_current, &(&1.schedule_resident_id == ctx.ada.id))
+
+      assert Enum.find(v2_records, &(&1.date == ~D[2026-07-22])).off == nil
     end
 
     test "a person in one schedule gets only that schedule's records", ctx do
@@ -348,7 +375,17 @@ defmodule ResidencySchedule.EffectiveScheduleTest do
         |> Enum.sort_by(&{&1.dtstart, &1.uid})
 
       assert events == expected
-      assert EffectiveSchedule.calendar_events(ctx.ada.resident_id, :v2) == {:ok, events}
+      assert {:ok, v2_events} = EffectiveSchedule.calendar_events(ctx.ada.resident_id, :v2)
+      activity_day = &(&1.dtstart in ["20260721", "20260722"])
+      assert Enum.reject(v2_events, activity_day) == Enum.reject(events, activity_day)
+      activity_events = Enum.filter(v2_events, activity_day)
+      assert length(activity_events) == 3
+
+      assert Enum.map(activity_events, & &1.summary) |> Enum.sort() == [
+               "Another Task",
+               "Mystery Clinic PM",
+               "Vacation"
+             ]
     end
 
     test "covered dates are absent for the original and present for the cover", ctx do

@@ -147,7 +147,8 @@ defmodule ResidencySchedule.EffectiveSchedule.Normalize do
 
   defp sort_key(duty) do
     {duty.kind, duty.code, duty.status, nil_first(duty.source_assignment_date), duty.source_tasks,
-     nil_first(duty.covered_by_person_id), nil_first(duty.original_person_id)}
+     nil_first(duty.covered_by_person_id), nil_first(duty.original_person_id), duty.label,
+     duty.timing}
   end
 
   defp nil_first(nil), do: {0, 0}

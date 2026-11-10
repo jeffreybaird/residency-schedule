@@ -13,7 +13,7 @@ defmodule ResidencyScheduleWeb.OperationTracingTest do
 
   @secret "PRIVATE_RESIDENT_SQL_AUTH_URL_EVENT_SENTINEL"
   @db_keys ~w(db.query.count db.query.duration_ms db.queue.duration_ms db.decode.duration_ms db.total.duration_ms)
-  @count_keys ~w(app.rows.count app.residents.count app.slots.count app.cells.count app.results.count app.mismatches.count)
+  @count_keys ~w(app.rows.count app.residents.count app.slots.count app.cells.count app.results.count app.mismatches.count app.unresolved_evidence.count)
   @attribute_keys @db_keys ++
                     @count_keys ++
                     ~w(app.rendered.rows.count app.rendered.slots.count app.rendered.cells.count app.rendered.cohorts.count) ++
@@ -441,7 +441,36 @@ defmodule ResidencyScheduleWeb.OperationTracingTest do
     spans = flush_spans()
     assert [phase] = Enum.filter(spans, &(&1.name == "schedule.compare"))
     assert attributes(phase)["app.mismatches.count"] == 0
+    assert attributes(phase)["app.unresolved_evidence.count"] == 0
     assert_nested(phase, Enum.find(spans, &(&1.name == "HTTP request")))
+  end
+
+  test "comparison exports unresolved evidence counts without source details", %{conn: conn} do
+    alias ResidencySchedule.EffectiveScheduleV2Fixtures, as: F
+    member = F.member()
+    F.source(member, ~D[2026-11-03], "PRIVATE EVIDENCE TASK")
+    start_exporter()
+
+    Tracing.request(conn, fn ->
+      assert {:ok, %{unresolved_evidence: 3}} = Comparison.run(member.schedule_id)
+      %{conn | status: 200}
+    end)
+
+    spans = flush_spans()
+    assert [phase] = Enum.filter(spans, &(&1.name == "schedule.compare"))
+    assert attributes(phase)["app.unresolved_evidence.count"] == 3
+    assert_diagnostics(phase)
+    encoded = inspect(Enum.map(spans, &attributes/1))
+
+    for private <- [
+          member.name,
+          "PRIVATE EVIDENCE TASK",
+          "2026-11-03",
+          "activity_source_id",
+          "missing_identity"
+        ] do
+      refute encoded =~ private
+    end
   end
 
   test "static-file early return restores context and exports a bounded request" do

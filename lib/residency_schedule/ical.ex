@@ -227,10 +227,11 @@ defmodule ResidencySchedule.Ical do
 
   defp build_timed_event(seg, date) do
     {dtstart, dtend} = segment_event_times(seg, date)
+    calendar_start = Map.get(seg, :calendar_start_date, seg.start_date)
 
     %{
       uid:
-        "seg-#{seg.rotation_type}-#{Date.to_iso8601(seg.start_date)}-#{date}@residency-schedule",
+        "seg-#{seg.rotation_type}-#{Date.to_iso8601(calendar_start)}-#{date}@residency-schedule",
       summary: seg |> Rotations.assignment_label() |> escape_text(),
       dtstart: dtstart,
       dtend: dtend,
