@@ -352,12 +352,12 @@ defmodule ResidencySchedule.EffectiveSchedule.AcceptanceTest do
                summary: "Night Float – Highland"
              } in dee_events
 
-      # Legacy trims the day before a night block from the all-day post-call
-      # event, which leaves it zero-length.
+      # Keep the one-day post-call event even though the unsourced night starts
+      # that evening; trimming would erase the event from calendar clients.
       assert %{
                uid: "seg-post_call-2026-11-07@residency-schedule",
                dtstart: "20261107",
-               dtend: "20261107",
+               dtend: "20261108",
                summary: "Post Call"
              } in dee_events
     end

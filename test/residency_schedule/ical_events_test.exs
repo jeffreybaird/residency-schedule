@@ -124,6 +124,65 @@ defmodule ResidencySchedule.IcalEventsTest do
                Ical.events_from_segments(all_day, @name)
     end
 
+    test "one-day all-day events before an unsourced night retain their day and UID" do
+      for type <- ~w[vacation post_call float leave_of_absence qgenda_assignment] do
+        segments = [
+          segment(type, ~D[2026-11-07], ~D[2026-11-07]),
+          segment("highland_night_float", ~D[2026-11-08], ~D[2026-11-08])
+        ]
+
+        events = Ical.events_from_segments(segments, @name)
+        assert [all_day, night] = events
+        assert all_day.uid == "seg-#{type}-2026-11-07@residency-schedule"
+        assert all_day.dtstart == "20261107"
+        assert all_day.dtend == "20261108"
+        assert night.dtstart == "20261107T180000"
+        assert night.dtend == "20261108T060000"
+        assert parse_feed(Ical.build_from_segments(segments, @name)) == events
+      end
+    end
+
+    test "two-day all-day events before an unsourced night still trim the last day" do
+      segments = [
+        segment("post_call", ~D[2026-11-06], ~D[2026-11-07]),
+        segment("highland_night_float", ~D[2026-11-08], ~D[2026-11-08])
+      ]
+
+      events = Ical.events_from_segments(segments, @name)
+
+      assert [
+               %{
+                 uid: "seg-post_call-2026-11-06@residency-schedule",
+                 dtstart: "20261106",
+                 dtend: "20261107",
+                 summary: "Post Call"
+               },
+               %{dtstart: "20261107T180000", dtend: "20261108T060000"}
+             ] = events
+
+      assert parse_feed(Ical.build_from_segments(segments, @name)) == events
+    end
+
+    test "all-day events before a sourced night keep their full exclusive end date" do
+      for start_date <- [~D[2026-11-06], ~D[2026-11-07]] do
+        segments = [
+          segment("post_call", start_date, ~D[2026-11-07]),
+          segment("highland_night_float", ~D[2026-11-08], ~D[2026-11-08], %{
+            source_assignment_date: ~D[2026-11-08]
+          })
+        ]
+
+        events = Ical.events_from_segments(segments, @name)
+        assert [all_day, night] = events
+        assert all_day.uid == "seg-post_call-#{start_date}@residency-schedule"
+        assert all_day.dtstart == Calendar.strftime(start_date, "%Y%m%d")
+        assert all_day.dtend == "20261108"
+        assert night.dtstart == "20261108T180000"
+        assert night.dtend == "20261109T060000"
+        assert parse_feed(Ical.build_from_segments(segments, @name)) == events
+      end
+    end
+
     test "covered segments are excluded and coverage segments are included" do
       segments = [
         segment("elective", ~D[2026-07-15], ~D[2026-07-16], %{
