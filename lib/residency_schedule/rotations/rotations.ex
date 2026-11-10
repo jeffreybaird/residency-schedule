@@ -855,8 +855,10 @@ defmodule ResidencySchedule.Rotations do
 
   @doc """
   Effective rotation segments for every resident in a schedule, keyed by
-  schedule resident id, loaded with three queries instead of three per
-  resident. Each value has the same shape as `effective_segments_for_resident/1`.
+  schedule resident id. Includes incoming coverage from other schedules and
+  displaces the covering resident's own duty on the covered dates. Projections
+  are loaded once per involved source schedule, rather than per override.
+  Each value has the same shape as `effective_segments_for_resident/1`.
 
   Exempt from doctest — hits the database. See `RotationsTest`.
   """
@@ -871,7 +873,9 @@ defmodule ResidencySchedule.Rotations do
     as_cover = Enum.group_by(overrides, & &1.covering_schedule_resident_id)
 
     projected_by_id =
-      rotations_by_resident |> Map.values() |> List.flatten() |> Enum.group_by(& &1.id)
+      coverage_projections(overrides, %{
+        schedule_id => rotations_by_resident |> Map.values() |> List.flatten()
+      })
 
     schedule_id
     |> Residents.list_residents_for_schedule()
