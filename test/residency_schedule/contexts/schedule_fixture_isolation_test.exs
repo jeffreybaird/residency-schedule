@@ -1,5 +1,5 @@
 defmodule ResidencySchedule.ScheduleFixtureIsolationTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   doctest ResidencySchedule.ScheduleOrderingFixture
 
   alias Ecto.Adapters.SQL.Sandbox
