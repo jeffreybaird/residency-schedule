@@ -35,7 +35,8 @@ defmodule ResidencySchedule.Observability.Tracing do
     slots: "app.slots.count",
     cells: "app.cells.count",
     results: "app.results.count",
-    mismatches: "app.mismatches.count"
+    mismatches: "app.mismatches.count",
+    unresolved_evidence: "app.unresolved_evidence.count"
   }
   @timings [
     {:query_time, "db.query.duration_ms", 3},

@@ -22,6 +22,21 @@ before switching consumers.
   and weekday rather than retaining a generic assignment solely for compatibility.
   Recognition alone does not establish a service.
 
+## Approved v2 differences — October 29, 2026
+
+The user explicitly answered “Approve both improvements” for these two
+synthetic scenarios:
+
+- A morning clinic remains visible as a distinct dated duty with its retained
+  AM period alongside the main rotation, instead of being omitted by legacy
+  reads. Its additional activity calendar event is an approved difference.
+- An activity with retained exact start/end instants preserves those instants
+  in v2 and its calendar event instead of becoming an all-day event. Existing
+  base and coverage event identities remain unchanged.
+
+Approval applies to these behavior differences only. Missing or conflicting
+evidence still blocks acceptance; this does not approve arbitrary mismatches.
+
 ## Comparison acceptance
 
 These decisions authorize implementation direction, not blanket approval of
