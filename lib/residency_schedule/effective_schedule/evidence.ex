@@ -1,6 +1,7 @@
 defmodule ResidencySchedule.EffectiveSchedule.Evidence do
   @moduledoc "Interprets retained occurrence facts without reclassifying source labels."
   alias ResidencySchedule.IdentityMappings.{Key, Resolver, State}
+  alias ResidencySchedule.TaskMappings.FridayPolicyEvidence
   @date_only %{precision: :date_only, period: nil}
 
   @doc """
@@ -29,6 +30,7 @@ defmodule ResidencySchedule.EffectiveSchedule.Evidence do
       {["ultrasound"], [:missing_identity, :missing_timing]}
   """
   def resolve(inputs) do
+    inputs = FridayPolicyEvidence.apply(inputs)
     inputs = Map.put(inputs, :identity_results, identity_results(inputs))
 
     Enum.reduce(inputs.activities, {[], []}, fn activity, {facts, diagnostics} ->
@@ -93,6 +95,9 @@ defmodule ResidencySchedule.EffectiveSchedule.Evidence do
     }
 
   defp classification(nil), do: {true, [], nil, [:missing_classification]}
+
+  defp classification(%{friday_attestation_invalid?: true}),
+    do: {false, [], nil, [:invalid_friday_policy_attestation]}
 
   defp classification(c) do
     if supported_classification?(c),

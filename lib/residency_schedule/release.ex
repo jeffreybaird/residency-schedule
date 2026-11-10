@@ -8,6 +8,7 @@ defmodule ResidencySchedule.Release do
   alias ResidencySchedule.SourceProvenance
   alias ResidencySchedule.StagingFixtures
   alias ResidencySchedule.TaskMappings
+  alias ResidencySchedule.TaskMappings.FridayEnrichment
   alias ResidencySchedule.Timings
   @app :residency_schedule
 
@@ -173,6 +174,43 @@ defmodule ResidencySchedule.Release do
     [repo] = repos()
 
     {:ok, result, _apps} = Ecto.Migrator.with_repo(repo, fn _repo -> Timings.backfill() end)
+
+    result
+  end
+
+  @doc """
+  Previews historical Friday policy enrichment without seeding or changing evidence.
+
+      iex> _ctx = ResidencySchedule.FridayEnrichmentFixtures.historical_source()
+      iex> {:ok, plan} = ResidencySchedule.Release.preview_friday_policy_enrichment()
+      iex> plan.counts.eligible
+      1
+  """
+  def preview_friday_policy_enrichment do
+    load_app()
+    [repo] = repos()
+
+    {:ok, result, _apps} =
+      Ecto.Migrator.with_repo(repo, fn _repo -> FridayEnrichment.preview() end)
+
+    result
+  end
+
+  @doc """
+  Applies an explicitly inspected finite Friday enrichment scope in bounded pages.
+
+      iex> _ctx = ResidencySchedule.FridayEnrichmentFixtures.historical_source()
+      iex> {:ok, plan} = ResidencySchedule.Release.preview_friday_policy_enrichment()
+      iex> {:ok, result} = ResidencySchedule.Release.apply_friday_policy_enrichment(plan.scope)
+      iex> {result.attested, result.conflicting}
+      {1, 0}
+  """
+  def apply_friday_policy_enrichment(scope) do
+    load_app()
+    [repo] = repos()
+
+    {:ok, result, _apps} =
+      Ecto.Migrator.with_repo(repo, fn _repo -> FridayEnrichment.apply(scope) end)
 
     result
   end

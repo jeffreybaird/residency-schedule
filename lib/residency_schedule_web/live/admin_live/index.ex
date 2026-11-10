@@ -352,6 +352,18 @@ defmodule ResidencyScheduleWeb.AdminLive.Index do
       </p>
 
       <div class="space-y-4">
+        <div class="rounded-xl border-2 border-gray-200 p-4 dark:border-gray-700">
+          <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-100">Schedule maintenance</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-300">
+            Preview and enrich historical Friday policy evidence.
+          </p>
+          <.link
+            navigate="/admin/maintenance/friday-policy"
+            class="mt-3 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            Friday policy maintenance
+          </.link>
+        </div>
         <%!-- Schedules card --%>
         <div class="border-2 border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
           <div class="px-4 py-3 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-700">

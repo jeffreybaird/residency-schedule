@@ -17,7 +17,13 @@ defmodule ResidencySchedule.Application do
           ResidencySchedule.ScheduleCache,
           {DNSCluster,
            query: Application.get_env(:residency_schedule, :dns_cluster_query) || :ignore},
-          {Phoenix.PubSub, name: ResidencySchedule.PubSub}
+          {Phoenix.PubSub, name: ResidencySchedule.PubSub},
+          Supervisor.child_spec(
+            {Task.Supervisor,
+             name: ResidencySchedule.TaskMappings.FridayEnrichmentTaskSupervisor, max_children: 1},
+            id: ResidencySchedule.TaskMappings.FridayEnrichmentTaskSupervisor
+          ),
+          ResidencySchedule.TaskMappings.FridayEnrichmentRunner
         ] ++
         Session.children() ++
         [

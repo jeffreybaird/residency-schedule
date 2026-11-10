@@ -32,6 +32,23 @@ defmodule ResidencySchedule.TaskMappings.Legacy do
     end)
   end
 
+  @doc """
+  Returns the canonical code-origin Friday fact without requiring catalogue seeding.
+
+      iex> {:ok, fact} = ResidencySchedule.TaskMappings.Legacy.friday_policy_fact("SMH Obstetrics Resident 1st Contact Night")
+      iex> {fact.rule_version, fact.policy, fact.targets}
+      {"legacy_task_classification_v2", "friday_strong_correction_v1", ["night_float", "strong_weekend_nights"]}
+  """
+  def friday_policy_fact(label) when label in @contact_nights,
+    do:
+      {:ok,
+       fact(:qgenda, label, label in QgendaPreview.known_tasks(), [
+         "night_float",
+         "strong_weekend_nights"
+       ])}
+
+  def friday_policy_fact(_label), do: {:error, :not_contact_night}
+
   defp seed_types do
     Rotations.all_rotation_types()
     |> Enum.reject(&(&1 in ["unknown", "qgenda_assignment"]))
