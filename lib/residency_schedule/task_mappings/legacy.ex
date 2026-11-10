@@ -9,9 +9,15 @@ defmodule ResidencySchedule.TaskMappings.Legacy do
   alias ResidencySchedule.TaskMappings.{ActivityType, Classifier, Key, Mapping, Target}
 
   @rule_version "legacy_task_classification_v1"
+  @contact_nights for rank <- ~w(1st 2nd 3rd 4th),
+                      do: "SMH Obstetrics Resident #{rank} Contact Night"
 
   @doc """
   Seeds the existing reviewed code facts atomically, preserving earlier revisions.
+
+  Contact-night mappings retain their targets and gain versioned Friday policy
+  evidence. Existing occurrence classifications remain immutable; backfill reports
+  their older mapping snapshots as conflicts rather than rewriting them.
 
       iex> {:ok, counts} = ResidencySchedule.TaskMappings.Legacy.seed()
       iex> {counts.activity_types_added > 0, counts.mappings_added > 0, counts.conflicting}
@@ -73,7 +79,21 @@ defmodule ResidencySchedule.TaskMappings.Legacy do
       policy: policy(targets, recognized),
       targets: targets
     }
+    |> enrich_friday_policy()
   end
+
+  defp enrich_friday_policy(
+         %{
+           namespace: "qgenda",
+           source_label: label,
+           targets: ["night_float", "strong_weekend_nights"]
+         } = fact
+       )
+       when label in @contact_nights do
+    %{fact | rule_version: "legacy_task_classification_v2", policy: "friday_strong_correction_v1"}
+  end
+
+  defp enrich_friday_policy(fact), do: fact
 
   defp policy([_one], _recognized), do: "unique_equivalence_v1"
 

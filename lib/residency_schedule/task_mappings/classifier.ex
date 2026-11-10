@@ -119,6 +119,16 @@ defmodule ResidencySchedule.TaskMappings.Classifier do
       else: :conflicting
   end
 
+  defp supported_policy?(
+         %{
+           namespace: "qgenda",
+           rule_version: "legacy_task_classification_v2",
+           policy: "friday_strong_correction_v1"
+         },
+         ["night_float", "strong_weekend_nights"]
+       ),
+       do: true
+
   defp supported_policy?(mapping, codes) do
     mapping.rule_version == @rule_version and
       mapping.policy == expected_policy(codes, mapping.recognized)
