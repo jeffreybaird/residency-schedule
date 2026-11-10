@@ -12,13 +12,21 @@ defmodule ResidencySchedule.Importer.ImportPreviewTest do
     ScheduleImporter
   }
 
-  alias ResidencySchedule.{Residents, Schedules}
+  alias ResidencySchedule.{Residents, ScheduleOrderingFixture, Schedules}
   alias ResidencySchedule.Residents.{Resident, ScheduleResident}
   alias ResidencySchedule.Rotations.Rotation
   alias ResidencySchedule.ScheduleFixtures
 
-  setup do
-    {:ok, schedule} = Schedules.upsert_schedule(2026, "2026–2027")
+  setup context do
+    year =
+      if context[:isolate_roster_year] do
+        {year, _newer} = ScheduleOrderingFixture.years()
+        year
+      else
+        2026
+      end
+
+    {:ok, schedule} = Schedules.upsert_schedule(year, Schedules.academic_year_label(year))
 
     {:ok, resident} =
       Residents.insert_resident(schedule.id, %{
@@ -31,6 +39,7 @@ defmodule ResidencySchedule.Importer.ImportPreviewTest do
     %{schedule: schedule, resident: resident}
   end
 
+  @tag isolate_roster_year: true
   test "common CSV preview agrees with legacy preview and remains committable without parser input" do
     binary = File.read!("test/fixtures/sample.csv")
     before = snapshot()
